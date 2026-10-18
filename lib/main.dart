@@ -138,8 +138,11 @@ Future<void> main() async {
     paneModel = TaskPaneModel(useCase: taskUseCase, sidebar: sidebarModel);
     await paneModel.load();
 
-    // 课表域（M4a）：用例 + 周视图状态模型。不在启动时 load()——
-    // 首次打开课表面板时才拉数据（CoursePane.initState 触发）。
+    // 课表域（M4a）：用例 + 周视图状态模型。
+    // **启动时就 load**（2026-10-19 改）：以前等首次打开课表面板才拉数据，于是
+    // 「默认页签=清单」的冷启动下，设置 → 课表 → 导出课表文件 会禁用并写着
+    // 「还没有学期或还没有课」——而库里其实有学期和 30 门课。禁用行的理由必须是
+    // 真的（M5 定案：要么说清原因，要么别出现），拿「还没装配」当理由就是假理由。
     semesterUseCase = SemesterUseCase(services);
     // 作息模板库（M6-D §6.2/§7.2）：新建学期要选模板，漏注册会让那一节静默不可用
     // （SyncConfigStore 就是这么栽过的）。
@@ -147,6 +150,7 @@ Future<void> main() async {
     timetableUseCase = TimetableUseCase(services);
     courseModel = CoursePaneModel(
         semesterUseCase: semesterUseCase, courseUseCase: courseUseCase);
+    await courseModel.load();
     // 导入服务在装配根里建：它要拿 CourseDao，而 UI 层不许碰 DAO。
     importService = ImportService(services.courseDao);
 
