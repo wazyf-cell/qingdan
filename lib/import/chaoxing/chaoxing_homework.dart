@@ -78,6 +78,9 @@ class ChaoxingHomework {
         serverStatus: status.isEmpty ? null : status,
         serverDone: finished,
         unread: block.contains('class="redPoint"'),
+        // 同一串 data 里就带 clazzId（脚本 :757-791 也在读它），早先没取出来，
+        // 导致「详情」URL 拼不出来（M6B §B3）。缺省就是缺省，不猜。
+        clazzId: params['clazzId'],
       ));
     }
     return ChaoxingTask.dedupe(out);

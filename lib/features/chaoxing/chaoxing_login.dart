@@ -45,6 +45,25 @@ Future<String?> exportChaoxingCookie() async {
   return merged.entries.map((MapEntry<String, String> e) => '${e.key}=${e.value}').join('; ');
 }
 
+/// 清掉 WebView 的 cookie jar（M6B §B4 修既有缺陷：`logout()` 只删凭据库那份
+/// 字符串，jar 里的 `_uid` 还在 → 用户「退出」后点登录，页面直接是已登录首页，
+/// 等于没退）。
+///
+/// 三个探测域逐个 `deleteCookies` 再 `deleteAllCookies()` 兜全域：超星大多把
+/// cookie 种在 `.chaoxing.com`，但也有按主机发的项（见上面 `_cookieProbeUrls`
+/// 的注释）。API 名按 pub 缓存源码核实
+/// （`flutter_inappwebview-6.2.0-beta.3/lib/src/cookie_manager.dart`：
+/// `deleteCookies({required WebUri url, String path = "/", String? domain})`
+/// 与 `deleteAllCookies()`；**6.x 没有 `clearAll()`**）。
+Future<void> clearChaoxingCookieJar() async {
+  final CookieManager jar = CookieManager();
+  for (final String url in _cookieProbeUrls) {
+    await jar.deleteCookies(url: WebUri(url));
+  }
+  await jar.deleteAllCookies();
+  await jar.flush();
+}
+
 class ChaoxingLoginPage extends StatefulWidget {
   const ChaoxingLoginPage({super.key});
 

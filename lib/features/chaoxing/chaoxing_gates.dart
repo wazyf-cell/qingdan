@@ -7,6 +7,8 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
+import 'chaoxing_keys.dart';
+
 class ChaoxingLoginGate extends StatelessWidget {
   const ChaoxingLoginGate({super.key, required this.onLogin});
 
@@ -16,6 +18,7 @@ class ChaoxingLoginGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
     return Center(
+      key: ChaoxingKeys.vkey(ChaoxingKeys.login),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -45,7 +48,7 @@ class ChaoxingEmpty extends StatelessWidget {
   final int courses;
   final int activities;
 
-  /// 拉到了条目但当前筛选下全被隐藏（比如只剩已结束的，而「已结束」chip 没开）。
+  /// 拉到了条目但当前筛选下全被过滤掉（M6B §B1 后筛选住在弹层里，不在头部）。
   final bool filteredOut;
 
   @override
@@ -57,13 +60,14 @@ class ChaoxingEmpty extends StatelessWidget {
             ? '没拉到任何课程（会话可能没通，或账号下没有课）'
             : filteredOut
                 ? '当前筛选下没有条目（共 $activities 条活动）——'
-                    '试试打开上面的「已结束」或「已完成」'
+                    '点右上角「筛选」把开关放回来'
                 : '没有有效待办（$courses 门课 · 共 $activities 条活动）';
     return Center(
+      key: ChaoxingKeys.vkey(ChaoxingKeys.empty),
       child: loading
           ? const CircularProgressIndicator()
+          // 下拉刷新已取消（M6B §B7），所以不再强制 AlwaysScrollableScrollPhysics。
           : ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
               children: <Widget>[
                 const SizedBox(height: 120),
                 Center(
@@ -93,6 +97,7 @@ class ChaoxingBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
     return Container(
+      key: ChaoxingKeys.vkey(ChaoxingKeys.banner),
       color: colors.surfaceHigh,
       padding: const EdgeInsets.symmetric(
           horizontal: AppDimens.s16, vertical: AppDimens.s8),

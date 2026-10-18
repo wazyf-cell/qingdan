@@ -8,6 +8,7 @@ library;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chaoxing_grouping.dart';
+import 'chaoxing_hidden_entry.dart';
 
 class ChaoxingPrefs {
   ChaoxingPrefs({SharedPreferences? prefs}) : _prefs = prefs;
@@ -17,6 +18,9 @@ class ChaoxingPrefs {
   static const String kOnlySubmittableKey = 'chaoxing.view.onlySubmittable';
   static const String kSortByKey = 'chaoxing.view.sortBy';
   static const String kTabKey = 'chaoxing.view.tab';
+
+  /// 隐藏项的展示元数据（M6B §B6 登记在总纲 §五；形状是 JSON 对象，默认 `{}`）。
+  static const String kHiddenMetaKey = 'chaoxing.hidden.meta';
 
   final SharedPreferences? _prefs;
 
@@ -43,6 +47,25 @@ class ChaoxingPrefs {
     await p.setBool(kOnlySubmittableKey, s.onlySubmittable);
     await p.setString(kSortByKey, s.sortBy.name);
     await p.setString(kTabKey, s.tab.name);
+  }
+
+  /// 隐藏项元数据（损坏时 `ChaoxingHiddenEntry.decode` 已降级成空表，不抛）。
+  Future<List<ChaoxingHiddenEntry>> loadHiddenMeta() async {
+    final SharedPreferences p = await _prefsInstance();
+    return ChaoxingHiddenEntry.decode(p.getString(kHiddenMetaKey));
+  }
+
+  Future<void> saveHiddenMeta(List<ChaoxingHiddenEntry> entries) async {
+    final SharedPreferences p = await _prefsInstance();
+    await p.setString(kHiddenMetaKey, ChaoxingHiddenEntry.encode(entries));
+  }
+
+  /// 「退出并清空隐藏列表」用：隐藏集与元数据必须一起删，
+  /// 只删一个会留下渲染不出来的孤儿项。
+  Future<void> clearHiddenList() async {
+    final SharedPreferences p = await _prefsInstance();
+    await p.remove(kHiddenKey);
+    await p.remove(kHiddenMetaKey);
   }
 
   /// 存的是枚举名，读回来认不出就用默认值（旧版本留下的脏键不该让面板崩）。

@@ -44,6 +44,15 @@ ChaoxingUrgency urgencyOf(DateTime? due, DateTime now) {
   return ChaoxingUrgency.calm;
 }
 
+/// 这条待办当前**是否会被卡片上三色底**（红/黄/绿）。
+///
+/// 抽成一个函数的原因（M6B §B5）：卡片的着色条件与「隐藏时要不要弹确认」
+/// 必须是同一个判定，两处各写一套阈值迟早漂移（一处弹确认、另一处不上色，
+/// 用户就会认为「没上色的为什么问我」。
+/// 条件与 `chaoxing_card.dart` 的 `live` 逐字等价：仍是待办 且 有截止时间。
+bool showsUrgencyTint(ChaoxingTask t, DateTime now) =>
+    t.stateAt(now, done: false) == ChaoxingTaskState.todo && t.dueAt != null;
+
 /// 状态在分组/排序里的固定次序：待办最先，未开始次之，已完成、已结束垫底。
 const List<ChaoxingTaskState> kStateOrder = <ChaoxingTaskState>[
   ChaoxingTaskState.todo,

@@ -1,9 +1,8 @@
-/// 学习通面板（扩展成品界面的一比一复刻，移动端适配）：
-/// 页签（全部作业 / 课堂活动）+ 工具栏（搜索/课程/两个仅看/排序/数据时间）
-/// + 条目卡片列表 + 刷新（顶栏按钮与下拉两种）。
+/// 学习通面板：一行头部（页签 · N分钟前 · ⟳ · 筛选 · ⋮）+ 卡片列表。
 ///
-/// 条目是外部只读快照（不落库、不参与同步）；长按一行 = 隐藏本条。
-/// 与扩展的刻意差异只有一处：不做点击跳转（用户明确不要）。
+/// 条目是外部只读快照（**刻意不落库、不参与同步**，定案见 `chaoxing_model.dart`
+/// 头注释）；卡片从右往左滑揭示「详情 / 隐藏」，长按仍保留为隐藏的兜底手势。
+/// 与扩展的刻意差异只有一处：不做点击卡片跳转（用户 2026-10-17 明确不要）。
 library;
 
 import 'dart:async';
@@ -14,14 +13,16 @@ import 'package:provider/provider.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
-import 'package:qingdan/theme/app_typography.dart';
 
+import 'chaoxing_actions.dart';
 import 'chaoxing_card.dart';
+import 'chaoxing_filter_sheet.dart';
 import 'chaoxing_gates.dart';
 import 'chaoxing_grouping.dart';
-import 'chaoxing_login.dart';
+import 'chaoxing_header.dart';
+import 'chaoxing_keys.dart';
 import 'chaoxing_model.dart';
-import 'chaoxing_toolbar.dart';
+import 'swipe_reveal.dart';
 
 class ChaoxingPane extends StatefulWidget {
   const ChaoxingPane({super.key});
@@ -36,29 +37,20 @@ class _ChaoxingPaneState extends State<ChaoxingPane> {
   Timer? _ticker;
   bool _reloginOpen = false;
 
-  /// 会话失效 → 自动弹一次 WebView 登录（用户不用先点「登录学习通」）。
-  /// 用户把登录页关掉就算「这轮不弄」，等下次刷新再失败才会再弹。
-  void _maybeAskRelogin(ChaoxingModel model) {
-    if (!model.pendingRelogin || _reloginOpen) return;
-    _reloginOpen = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      model.consumeReloginRequest();
-      await _login(context);
-      _reloginOpen = false;
-    });
-  }
+  /// 当前滑开的卡片（提升到面板状态：同一时刻只允许一张开着，
+  /// 且 `ListView` 复用 item 时打开态必须由外部 key 驱动）。
+  String? _openKey;
 
   @override
   void initState() {
     super.initState();
-    // 外部数据是活的，每次打开这个视图都现拉一遍（与课表面板同一套首帧后
-    // 加载的写法：load/refresh 会 notifyListeners，build 期间同步通知会炸）。
+    // 刷新收敛（M6B §B7）：每次进程只有一次自动刷新机会，距上次拉取不足
+    // 15 分钟就跳过；另一个入口是头部的 ⟳ 按钮。下拉刷新已取消。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final ChaoxingModel model = context.read<ChaoxingModel>();
-      if (model.loggedIn && !model.loading) model.refresh();
+      context.read<ChaoxingModel>().autoRefreshOnce();
     });
-    // 倒计时得走字：每分钟推进一次模型的时间基准。
+    // 倒计时得走字：每分钟推进一次模型的时间基准（不发请求）。
     _ticker = Timer.periodic(const Duration(minutes: 1), (Timer _) {
       if (!mounted) return;
       context.read<ChaoxingModel>().tick();
@@ -72,132 +64,145 @@ class _ChaoxingPaneState extends State<ChaoxingPane> {
     super.dispose();
   }
 
+  /// 会话失效 → 自动弹一次 WebView 登录（被动路径，**不弹确认框**：
+  /// 用户把登录页关掉就算「这轮不弄」，再套一层确认只会连弹两次）。
+  void _maybeAskRelogin(ChaoxingModel model) {
+    if (!model.pendingRelogin || _reloginOpen) return;
+    _reloginOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      model.consumeReloginRequest();
+      await chaoxingLogin(context);
+      _reloginOpen = false;
+    });
+  }
+
+  int get _filterCount {
+    final ChaoxingViewSettings s = context.read<ChaoxingModel>().settings;
+    return (_search.text.trim().isEmpty ? 0 : 1) +
+        (_course.isEmpty ? 0 : 1) +
+        (s.onlyUnfinished ? 1 : 0) +
+        (s.onlySubmittable ? 1 : 0) +
+        (s.sortBy == ChaoxingSortBy.timeAsc ? 0 : 1);
+  }
+
+  /// 弹层里的「N 项」要跟着开关实时变，所以给闭包而不是给快照数字。
+  int _visibleCount(ChaoxingModel model) => buildRows(
+          tasksOfTab(model.tasks, model.settings.tab),
+          model.settings,
+          model.now,
+          query: _search.text,
+          course: _course).length;
+
   @override
   Widget build(BuildContext context) {
     final ChaoxingModel model = context.watch<ChaoxingModel>();
     _maybeAskRelogin(model);
     final List<ChaoxingTask> tabTasks =
         tasksOfTab(model.tasks, model.settings.tab);
-    final List<ChaoxingRow> rows = buildRows(tabTasks, model.settings, model.now,
+    final List<ChaoxingRow> rows = buildRows(
+        tabTasks, model.settings, model.now,
         query: _search.text, course: _course);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _header(model),
+        ChaoxingHeader(
+          tab: model.settings.tab,
+          onTab: (ChaoxingTab t) {
+            setState(() {
+              _course = '';
+              _openKey = null;
+            });
+            model.setTab(t);
+          },
+          staleText: model.fetchedAgoText,
+          stale: model.stale,
+          loading: model.loading,
+          loggedIn: model.loggedIn,
+          onRefresh: model.refresh,
+          filterCount: _filterCount,
+          onFilter: () => showChaoxingFilter(context,
+              search: _search,
+              onSearchChanged: (String _) => setState(() {}),
+              course: _course,
+              onCourseChanged: (String v) => setState(() => _course = v),
+              courses: courseOptions(tabTasks),
+              count: () => _visibleCount(model)),
+          onRelogin: () => confirmAndRelogin(context),
+          onHiddenList: () => openChaoxingHiddenList(context),
+          onLogout: () => confirmAndLogout(context),
+        ),
         if (model.error != null)
           ChaoxingBanner(
               text: model.error.toString(),
               actionLabel: '重新登录',
-              onAction: () => _login(context)),
-        if (model.loggedIn) ...<Widget>[
-          _tabs(model),
-          const SizedBox(height: AppDimens.s8),
-          ChaoxingToolbar(
-            model: model,
-            searchController: _search,
-            onQueryChanged: (String _) => setState(() {}),
-            course: _course,
-            onCourseChanged: (String v) => setState(() => _course = v),
-            courses: courseOptions(tabTasks),
-            count: rows.length,
-          ),
-        ],
+              onAction: () => confirmAndRelogin(context)),
         Expanded(
-          child: !model.loggedIn
-              ? ChaoxingLoginGate(onLogin: () => _login(context))
-              : RefreshIndicator(
-                  onRefresh: model.refresh,
-                  child: rows.isEmpty
-                      ? ChaoxingEmpty(
-                          loading: model.loading,
-                          courses: model.courseCount,
-                          activities: model.activityCount,
-                          filteredOut: model.activityCount > 0,
-                        )
-                      : _list(rows, model),
-                ),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification n) {
+              // 滚动时全部收回：不然复用中的 item 会带着打开态乱跳。
+              if (_openKey != null) setState(() => _openKey = null);
+              return false;
+            },
+            child: !model.loggedIn
+                ? ChaoxingLoginGate(onLogin: () => chaoxingLogin(context))
+                : rows.isEmpty
+                    ? ChaoxingEmpty(
+                        loading: model.loading,
+                        courses: model.courseCount,
+                        activities: model.activityCount,
+                        filteredOut: model.activityCount > 0,
+                      )
+                    : _list(rows, model),
+          ),
         ),
       ],
     );
   }
 
-  Widget _header(ChaoxingModel model) {
-    final AppColors colors = AppColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          AppDimens.s16, AppDimens.s12, AppDimens.s8, AppDimens.s4),
-      child: Row(
-        children: <Widget>[
-          Expanded(child: Text('学习通待办', style: AppTypography.pageTitle)),
-          // 扩展工具栏第一个控件就是「刷新」；这里同时保留下拉刷新。
-          TextButton.icon(
-            onPressed: model.loading ? null : model.refresh,
-            icon: Icon(model.loading ? Icons.sync : Icons.refresh, size: 18),
-            label: const Text('刷新', style: AppTypography.meta),
-            style: TextButton.styleFrom(foregroundColor: colors.textSecondary),
-          ),
-          // 会话没失效时也要能主动换号：logout() 早就写好了，之前没接线。
-          PopupMenuButton<String>(
-            tooltip: '账号',
-            onSelected: (String v) =>
-                v == 'relogin' ? _login(context) : model.logout(),
-            itemBuilder: (BuildContext _) => const <PopupMenuItem<String>>[
-              PopupMenuItem(value: 'relogin', child: Text('重新登录')),
-              PopupMenuItem(value: 'logout', child: Text('退出登录')),
-            ],
-            icon: Icon(Icons.more_vert, size: 20, color: colors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tabs(ChaoxingModel model) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppDimens.s16),
-      child: SegmentedButton<ChaoxingTab>(
-        showSelectedIcon: false,
-        segments: ChaoxingTab.values
-            .map((ChaoxingTab t) => ButtonSegment<ChaoxingTab>(
-                value: t,
-                label: Text(t.label, style: AppTypography.meta)))
-            .toList(),
-        selected: <ChaoxingTab>{model.settings.tab},
-        onSelectionChanged: (Set<ChaoxingTab> next) {
-          setState(() => _course = '');
-          model.setTab(next.first);
-        },
-      ),
-    );
-  }
-
   Widget _list(List<ChaoxingRow> rows, ChaoxingModel model) {
     return ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: rows.length + 1,
       itemBuilder: (BuildContext _, int i) => i == rows.length
           ? const SizedBox(height: AppDimens.s32)
-          : ChaoxingCard(
-              row: rows[i],
-              now: model.now,
-              onHide: () => _hide(model, rows[i].task),
-            ),
+          : _row(rows[i], model),
     );
   }
 
-  void _hide(ChaoxingModel model, ChaoxingTask t) {
-    model.hide(t.key);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('已隐藏「${t.title}」', style: AppTypography.meta),
-      duration: const Duration(seconds: 4),
-      action:
-          SnackBarAction(label: '全部恢复', onPressed: model.unhideAll),
-    ));
-  }
-
-  Future<void> _login(BuildContext context) async {
-    final ChaoxingModel model = context.read<ChaoxingModel>();
-    final String? cookie = await showChaoxingLogin(context);
-    if (cookie != null) await model.saveCookie(cookie);
+  Widget _row(ChaoxingRow row, ChaoxingModel model) {
+    final ChaoxingTask t = row.task;
+    final AppColors colors = AppColors.of(context);
+    return SwipeReveal(
+      key: ChaoxingKeys.vkey(ChaoxingKeys.card(t.key)),
+      open: _openKey == t.key,
+      onOpen: () => setState(() => _openKey = t.key),
+      onClose: () {
+        if (_openKey == t.key) setState(() => _openKey = null);
+      },
+      actions: <SwipeAction>[
+        SwipeAction(
+          key: ChaoxingKeys.vkey(ChaoxingKeys.actDetail(t.key)),
+          label: '详情',
+          icon: Icons.description_outlined,
+          background: colors.accent,
+          onTap: () {
+            setState(() => _openKey = null);
+            openChaoxingDetail(context, t);
+          },
+        ),
+        SwipeAction(
+          key: ChaoxingKeys.vkey(ChaoxingKeys.actHide(t.key)),
+          label: '隐藏',
+          icon: Icons.visibility_off_outlined,
+          background: colors.textSecondary,
+          onTap: () {
+            setState(() => _openKey = null);
+            hideChaoxingTask(context, model, t);
+          },
+        ),
+      ],
+      // 长按 = 隐藏（手势发现不了时的兜底，用户确认保留）。
+      child: ChaoxingCard(
+          row: row, now: model.now, onHide: () => hideChaoxingTask(context, model, t)),
+    );
   }
 }

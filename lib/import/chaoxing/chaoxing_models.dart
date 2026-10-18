@@ -6,99 +6,17 @@
 /// lcandy2 / Coren）——具体参考位置：课程接口 :467、类型映射 :655、
 /// 活动接口 :674、活动字段解析 :701-722、核心类型集合 :137、课程解析 :2264。
 /// 这里只重写「读哪些字段」这层契约，未拷贝其 Vue UI 与遥测代码。
+///
+/// M6B §B3 拆分：课程实体见 `chaoxing_course.dart`，状态/分桶/码表见
+/// `chaoxing_state.dart`；本文件用 [export] 兜住旧导入路径（`client` /
+/// `time` / `grouping` / 测试都是 `import 'chaoxing_models.dart'`），
+/// 搬家不改语义。
 library;
 
-/// 一门课（= 一个班级）。学习通的作业/考试都挂在 (courseId, clazzId) 上。
-class ChaoxingCourse {
-  const ChaoxingCourse({
-    required this.courseId,
-    required this.clazzId,
-    required this.name,
-  });
+import 'chaoxing_state.dart';
 
-  final String courseId;
-  final String clazzId;
-  final String name;
-
-  String get key => '$courseId|$clazzId';
-
-  /// `backclazzdata?view=json` → `channelList[]`：只取 `cataid == 100000002`
-  /// 的条目，课程在 `content.course.data[]`，班级 id 在外层 `key`。
-  static List<ChaoxingCourse> parseCourseList(Map<String, Object?> json) {
-    final List<ChaoxingCourse> out = <ChaoxingCourse>[];
-    for (final Object? raw in (json['channelList'] as List<Object?>? ?? const [])) {
-      final Map<String, Object?> channel = (raw! as Map<Object?, Object?>).cast();
-      if (channel['cataid'].toString() != '100000002') continue;
-      final Map<String, Object?> content =
-          ((channel['content'] as Map<Object?, Object?>?) ?? const {}).cast();
-      final Map<String, Object?> courseWrap =
-          ((content['course'] as Map<Object?, Object?>?) ?? const {}).cast();
-      for (final Object? c
-          in (courseWrap['data'] as List<Object?>? ?? const [])) {
-        final Map<String, Object?> course = (c! as Map<Object?, Object?>).cast();
-        out.add(ChaoxingCourse(
-          courseId: course['id'].toString(),
-          clazzId: channel['key'].toString(),
-          name: (course['name'] ?? '') as String,
-        ));
-      }
-    }
-    return dedupe(out);
-  }
-
-  /// 同一 (courseId, clazzId) 在 `channelList` 里会出现多次，不去重就会
-  /// 对同一门课发重复请求，并把同一条活动收两遍（真机第一版就撞到了）。
-  static List<ChaoxingCourse> dedupe(List<ChaoxingCourse> courses) {
-    final Set<String> seen = <String>{};
-    return courses.where((ChaoxingCourse c) => seen.add(c.key)).toList();
-  }
-}
-
-/// 条目状态。**「已完成」是本地标记，不是服务端真值**：activelist 只有
-/// `status` 1=进行中 / 2=已结束（脚本 :702-704），拿不到「用户交没交」；
-/// 真完成状态只存在于 `stu-work` / `examcode` 两个 HTML 页（脚本 :757-832）。
-/// 所以这里诚实地区分「已结束」（时间到了）与「已完成」（用户自己勾的）。
-enum ChaoxingTaskState {
-  todo('待办'),
-  notStarted('未开始'),
-  done('已完成'),
-  ended('已结束');
-
-  const ChaoxingTaskState(this.label);
-
-  final String label;
-}
-
-/// 截止时间分桶（「按截止时间分类」用）。
-enum ChaoxingDueBucket {
-  overdue('已逾期'),
-  today('今天'),
-  tomorrow('明天'),
-  week('7 天内'),
-  later('更晚'),
-  none('无截止');
-
-  const ChaoxingDueBucket(this.label);
-
-  final String label;
-
-  static ChaoxingDueBucket of(DateTime? due, DateTime now) {
-    if (due == null) return ChaoxingDueBucket.none;
-    if (due.isBefore(now)) return ChaoxingDueBucket.overdue;
-    if (due.year == now.year && due.month == now.month && due.day == now.day) {
-      return ChaoxingDueBucket.today;
-    }
-    final DateTime tomorrow = DateTime(now.year, now.month, now.day + 1);
-    if (due.year == tomorrow.year &&
-        due.month == tomorrow.month &&
-        due.day == tomorrow.day) {
-      return ChaoxingDueBucket.tomorrow;
-    }
-    return due.difference(now).inDays < 7
-        ? ChaoxingDueBucket.week
-        : ChaoxingDueBucket.later;
-  }
-}
+export 'chaoxing_course.dart';
+export 'chaoxing_state.dart';
 
 /// 一条外部待办（作业 / 考试 / 通知 / 各类课堂活动）。
 class ChaoxingTask {
@@ -114,6 +32,10 @@ class ChaoxingTask {
     this.serverStatus,
     this.serverDone = false,
     this.unread = false,
+
+    /// 班级 id：拼「详情」URL 必需（M6B §B3）。**可空**——`activelist` 的
+    /// JSON 里活动条目本身不带 classId，作业页 `li[data]` 也有少数行没带。
+    this.clazzId,
   });
 
   /// 活动 id（`id` / `activeId`）或作业的 `taskrefId`。
@@ -143,7 +65,13 @@ class ChaoxingTask {
   /// 作业页的红点（`i.redPoint`）= 还没打开看过，扩展里叫「待打开」。
   final bool unread;
 
+  /// 班级 id（作业页 `li[data]` 的 `clazzId`）。缺省时「详情」不可用。
+  final String? clazzId;
+
   /// 完成标记与忽略标记都按这个键存本地（不进数据库、不参与同步）。
+  ///
+  /// **构成不能改**：`chaoxing.view.hidden` 里已存的隐藏项就是这个形状，
+  /// 改了等于把用户隐藏过的条目全部放回来。
   String get key => '$courseId|$id';
 
   /// 当前时间是否落在 [startAt, dueAt] 闭区间内。**缺失的端点视为不设限**：
@@ -170,6 +98,7 @@ class ChaoxingTask {
     Map<String, Object?> json, {
     required String courseId,
     required String courseName,
+    String? clazzId,
   }) {
     // activelist 的包壳层级在不同课程下不一致，取第一个能当列表用的。
     final Object? wrapped = json['data'];
@@ -189,6 +118,8 @@ class ChaoxingTask {
             ongoing: item['status'] == 1,
             startAt: _stamp(item['startTime']),
             dueAt: _stamp(item['endTime']),
+            // 活动自己不带 classId，用请求参数（= 课程表的班级）兜。
+            clazzId: (item['classId'] ?? item['clazzid'] ?? clazzId)?.toString(),
           );
         })
         .toList());
@@ -259,23 +190,3 @@ class ChaoxingTask {
         '其他任务';
   }
 }
-
-/// `activeType` 码表（学习通内部编号，逐条照抄脚本 :656-659）。
-///
-/// 11 / 46 / 74 三条是 2026-10-17 真机探针补的：样本标题分别是「选人」、
-/// 一条音乐会公告、「位置签到20251110-签退」，语义明确才敢写进表。
-/// **77 / 59 / 44 不写**：探针里它们是「计算投资收益数字特征」「讲解P12-14的
-/// 练习」「推荐阅读书目.doc」这类杂项，JSON 里没有官方名称字段，猜一个标签
-/// 比显示「其他任务」更糟。
-const Map<Object, String> kActiveTypeNames = <Object, String>{
-  0: '签到', 2: '签到', 4: '抢答', 5: '分组讨论', 6: '投票',
-  11: '选人', 14: '问卷', 17: '直播', 23: '随堂练习', 35: '分组任务',
-  42: '随堂练习', 43: '评分', 45: '拍照', 46: '通知', 47: '作业',
-  64: '笔记', 74: '位置签到',
-};
-
-/// 核心类型（脚本 :137）——「只看核心类型」开关用它，把签到/投票/笔记这类
-/// 一次性活动折叠掉。
-const Set<String> kCoreKinds = <String>{
-  '作业', '视频/任务点', 'AI实践', '分组讨论', '分组任务', '测验', '随堂练习', '考试',
-};

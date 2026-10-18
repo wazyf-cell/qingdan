@@ -56,8 +56,11 @@ class ChaoxingClient {
         try {
           final Map<String, Object?> json = await _activelist(c);
           okCourses++;
-          return ChaoxingTask.parseActivities(
-              json, courseId: c.courseId, courseName: c.name);
+          return ChaoxingTask.parseActivities(json,
+              courseId: c.courseId,
+              courseName: c.name,
+              // 活动 JSON 本身不给 classId，用请求它时用的那个班级（M6B §B3）。
+              clazzId: c.clazzId);
         } catch (e) {
           // 单门课失败不该让整次刷新空手而归；但一门都没成功时说明是会话问题，
           // 必须照抛，否则「未登录」会被伪装成「没有待办」。

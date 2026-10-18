@@ -108,5 +108,17 @@ void main() {
     test('未提交且未过期 = 待办', () {
       expect(parse()[0].stateAt(kNow, done: false), ChaoxingTaskState.todo);
     });
+
+    // M6B §B3：`li[data]` 里就带 clazzId，早先没读出来 → 详情 URL 拼不出来。
+    // 这条断言在未改解析器时必须红（旧代码解析完 clazzId 恒为 null）。
+    test('clazzId 从同一串 data 里读出来（拼详情 URL 用）', () {
+      final List<ChaoxingTask> tasks = parse();
+      expect(tasks[0].clazzId, '160000001');
+      expect(tasks[1].clazzId, '160000002');
+      // 第三条是 proxyRenwuAttendUrl，data 里没有 clazzId → 缺省而不是猜。
+      expect(tasks[2].clazzId, isNull);
+      // 读它不能改 key 的形状：隐藏项 prefs 里存的就是这个键。
+      expect(tasks[0].key, '240000001|88000001');
+    });
   });
 }
