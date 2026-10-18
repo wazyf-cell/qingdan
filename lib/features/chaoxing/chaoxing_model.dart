@@ -69,6 +69,11 @@ class ChaoxingModel extends ChangeNotifier {
   /// 倒计时的时间基准。面板每分钟 [tick] 一次推进，否则「剩23小时49分」会停住。
   DateTime now;
 
+  /// C4 §2 钩子：[refresh] 成功后落一份「学习通提醒快照」。筛选与序列化全在装配根
+  /// （`main.dart`）给的回调里；未注入时空操作。
+  Future<void> Function(
+      List<ChaoxingTask> tasks, Set<String> hidden, DateTime now)? onReminderSnapshot;
+
   /// **进程内**是否已经自动刷过（M6B §B7：刷新收敛到两处）。刻意不落 prefs：
   /// 杀掉应用重开就该再自动刷一次。
   bool _autoRefreshedSinceLaunch = false;
@@ -190,6 +195,7 @@ class ChaoxingModel extends ChangeNotifier {
       now = _clock();
       loggedIn = true;
       await _syncHiddenMeta();
+      await _writeReminderSnapshot();
     } catch (e) {
       error = e;
       if (e is ChaoxingAuthException) {
@@ -200,6 +206,15 @@ class ChaoxingModel extends ChangeNotifier {
       loading = false;
       client.close();
       notifyListeners();
+    }
+  }
+
+  /// C4 §2 写入点。异常吞这里而不是 [refresh] 的 catch：写盘失败不该把成功抓取说成失败。
+  Future<void> _writeReminderSnapshot() async {
+    try {
+      await onReminderSnapshot?.call(tasks, settings.hidden, _clock());
+    } catch (e) {
+      debugPrint('学习通提醒快照写入失败：${e.runtimeType}');
     }
   }
 
