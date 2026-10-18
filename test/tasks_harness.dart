@@ -137,6 +137,8 @@ class TasksHarness {
       .widget<ChoiceChip>(find.ancestor(
           of: key('chip:$viewId'), matching: find.byType(ChoiceChip)));
 
-  /// 打开左上「清单 ▾」半屏面板。
-  Future<void> openSheet(WidgetTester tester) => tapIo(tester, key('listSwitcher'));
+  /// 打开「清单列表」半屏面板。
+  /// M6-A2 起顶栏改成三个图标按钮，入口 key 从文本上的 `listSwitcher` 换成
+  /// `btn-lists`；面板本体（`list_sheet.dart`）与用例逻辑没变。
+  Future<void> openSheet(WidgetTester tester) => tapIo(tester, key('btn-lists'));
 }

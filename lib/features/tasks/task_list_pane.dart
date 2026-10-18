@@ -8,6 +8,7 @@ import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 import 'package:qingdan/features/tasks/list_shortcuts.dart';
 import 'package:qingdan/features/tasks/quick_add_field.dart';
 import 'package:qingdan/features/tasks/task_list_body.dart';
+import 'package:qingdan/features/tasks/task_list_pane_dates.dart';
 import 'package:qingdan/features/tasks/task_pane_model.dart';
 import 'package:qingdan/features/tasks/task_row.dart';
 import 'package:qingdan/features/shell/sidebar/sync_status_model.dart';
@@ -74,7 +75,8 @@ class TaskListPane extends StatelessWidget {
                       onOpenDetailPage?.call();
                     },
                     onDelete: () => _deleteWithUndo(context, model, task),
-                    onEditDate: () => _pickDate(context, model, task),
+                    onEditDate: () =>
+                        pickDueDateFromRowMenu(context, model, task),
                     onChangePriority: (TaskPriority p) =>
                         model.setPriority(task, p),
                     onCopyAsText: () => _copyAsText(context, task),
@@ -135,21 +137,6 @@ class TaskListPane extends StatelessWidget {
         ),
       );
     });
-  }
-
-  static Future<void> _pickDate(
-      BuildContext context, TaskPaneModel model, Task task) async {
-    final DateTime initial =
-        task.dueDate?.toLocal() ?? DateTime.now();
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(initial.year - 5),
-      lastDate: DateTime(initial.year + 5),
-    );
-    if (picked != null) {
-      await model.setDueDate(task, picked);
-    }
   }
 
   static void _copyAsText(BuildContext context, Task task) {

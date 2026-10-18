@@ -4,11 +4,12 @@ import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/domain/course_conflict.dart';
+import 'package:qingdan/domain/course_freshness.dart';
 import 'package:qingdan/domain/section_layout.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/time_table.dart';
 
-/// 课表周视图的状态模型（F31 / F34）。
+/// 课表周视图的状态模型（F31 / F34 + M6-A A5/A8）。
 ///
 /// 只经用例层读数据（AGENTS.md：UI 不碰 DAO）。加载失败**记进 [error] 由界面
 /// 呈现**，不静默吞掉；与 `SidebarModel` 的区别是本视图失败不阻塞启动，故不 rethrow。
@@ -27,7 +28,14 @@ class CoursePaneModel extends ChangeNotifier {
 
   Semester? semester;
   List<TimeDetail> details = const <TimeDetail>[];
-  List<Course> weekCourses = const <Course>[];
+
+  /// 本学期**全部**未删除课程。一次 `load()` 捞全，之后切周与相邻页都不再查库——
+  /// 滑动切周要「手指一抬就看到下一页」，而 `findOnWeek` 本来就是「捞全 + `isOn`
+  /// 过滤」，缓存整学期不多花一次查询，还省掉了每周一次往返。
+  List<Course> allCourses = const <Course>[];
+
+  /// 顶部「上次更新 / 导入时间」的读数（A8）。
+  CourseFreshness freshness = const CourseFreshness();
 
   /// 当前显示的周次（1 起）。
   int week = 1;
@@ -66,67 +74,46 @@ class CoursePaneModel extends ChangeNotifier {
 
   int get todayWeek => semester?.weekOf(_clock()) ?? 0;
 
-  DateTime get weekMonday =>
-      semester?.mondayOfWeek(week) ?? Semester.mondayOf(_clock());
+  /// 第 [target] 周的周一。没有学期时按「本周一」推算，保证表头永远有日期。
+  DateTime mondayOf(int target) => semester?.mondayOfWeek(target) ??
+      Semester.mondayOf(_clock()).add(Duration(days: 7 * (target - 1)));
+
+  DateTime get weekMonday => mondayOf(week);
 
   /// 当前周第 [weekday]（1~7，ISO）对应的日期。
-  DateTime dateOf(int weekday) => weekMonday.add(Duration(days: weekday - 1));
+  DateTime dateOf(int weekday) => dateInWeek(week, weekday);
 
-  /// 加载学期 + 作息 + 当前周课程。
-  Future<void> load() async {
-    try {
-      semester = await _semesters.activeSemester();
-      details = await _semesters.loadDefaultDetails();
-      // 打开就定位到今天那一周（界面 §4.1：周视图默认定位到本周）；学期外回落到第 1 周。
-      week = (semester?.weekOf(_clock()) ?? 1).clamp(1, totalWeeks == 0 ? 1 : totalWeeks);
-      await _reloadWeek();
-      error = null;
-    } catch (e) {
-      error = '$e';
-    }
-    loaded = true;
-    notifyListeners();
-  }
+  /// 第 [target] 周第 [weekday] 天的日期（滑动切周时相邻页各自要算自己的表头）。
+  DateTime dateInWeek(int target, int weekday) =>
+      mondayOf(target).add(Duration(days: weekday - 1));
 
-  Future<void> selectWeek(int target) async {
-    final int upper = totalWeeks == 0 ? 1 : totalWeeks;
-    final int clamped = target.clamp(1, upper);
-    if (clamped == week && weekCourses.isNotEmpty) return;
-    week = clamped;
-    await _reloadWeek();
-    notifyListeners();
-  }
+  /// 当前周要上的课。
+  List<Course> get weekCourses => coursesInWeek(week);
 
-  Future<void> prevWeek() =>
-      canPrev ? selectWeek(week - 1) : Future<void>.value();
-
-  Future<void> nextWeek() =>
-      canNext ? selectWeek(week + 1) : Future<void>.value();
-
-  /// 回到今天所在的那一周（[今天] 按钮）。
-  Future<void> goToday() =>
-      todayInSemester ? selectWeek(todayWeek) : Future<void>.value();
-
-  void toggleWeekend() {
-    showWeekend = !showWeekend;
-    notifyListeners();
-  }
+  List<Course> coursesInWeek(int target) =>
+      <Course>[for (final Course c in allCourses) if (c.isOn(target)) c];
 
   /// 当前周第 [weekday] 天的课程（查询已按周次过滤，这里只分天）。
-  List<Course> coursesOn(int weekday) => weekCourses
-      .where((Course c) => c.weekday == weekday && c.isOn(week))
-      .toList(growable: false);
+  List<Course> coursesOn(int weekday) => coursesOnDay(week, weekday);
+
+  List<Course> coursesOnDay(int target, int weekday) => <Course>[
+        for (final Course c in coursesInWeek(target))
+          if (c.weekday == weekday) c
+      ];
 
   /// 当天的同槽分组（渲染堆叠用）。
-  List<OverlapGroup> groupsOn(int weekday) =>
-      groupByOverlap(coursesOn(weekday));
+  List<OverlapGroup> groupsOn(int weekday) => groupsOnDay(week, weekday);
+
+  List<OverlapGroup> groupsOnDay(int target, int weekday) =>
+      groupByOverlap(coursesOnDay(target, weekday));
 
   /// 节次不在作息表里的课 → 底部「未排时间」收纳区（§3.4，绝不静默截断）。
-  List<Course> get unscheduled {
+  List<Course> get unscheduled => unscheduledInWeek(week);
+
+  List<Course> unscheduledInWeek(int target) {
     final SectionLayout l = layout;
-    return weekCourses
+    return coursesInWeek(target)
         .where((Course c) =>
-            c.isOn(week) &&
             l.missingSections(c.startSection, c.endSection).isNotEmpty)
         .toList(growable: false);
   }
@@ -143,10 +130,99 @@ class CoursePaneModel extends ChangeNotifier {
           ? const <int>[1, 2, 3, 4, 5, 6, 7]
           : const <int>[1, 2, 3, 4, 5];
 
-  Future<void> _reloadWeek() async {
+  /// 顶部那一行的文案；无数据返回 null（整行不渲染）。
+  String? get freshnessLabel {
+    final DateTime? at = freshness.at;
+    if (at == null) return null;
+    final String stamp = courseStamp(at);
+    return switch (freshness.kind) {
+      CourseFreshnessKind.import =>
+        '$stamp 导入 · ${freshness.fileName ?? '课表文件'}',
+      CourseFreshnessKind.edit => '$stamp 更新',
+      CourseFreshnessKind.none => null,
+    };
+  }
+
+  /// 局限必须写在界面上：`import_batches` 没有学期列，导入时间只能取全局最近一次。
+  String get freshnessTooltip => freshness.kind == CourseFreshnessKind.import
+      ? '最近一次导入（不区分学期）· 点此查看最近 10 次'
+      : '本学期课程最后一次改动 · 点此查看最近导入';
+
+  /// 加载学期 + 作息 + 整学期课程 + 新鲜度。
+  Future<void> load() async {
+    try {
+      semester = await _semesters.activeSemester();
+      details = await _semesters.loadDefaultDetails();
+      // 打开就定位到今天那一周（界面 §4.1：周视图默认定位到本周）；学期外回落到第 1 周。
+      week = (semester?.weekOf(_clock()) ?? 1)
+          .clamp(1, totalWeeks == 0 ? 1 : totalWeeks);
+      await _reloadCourses();
+      error = null;
+    } catch (e) {
+      error = '$e';
+    }
+    loaded = true;
+    notifyListeners();
+  }
+
+  Future<void> selectWeek(int target) async {
+    final int upper = totalWeeks == 0 ? 1 : totalWeeks;
+    final int clamped = target.clamp(1, upper);
+    if (clamped == week) return;
+    week = clamped;
+    notifyListeners();
+  }
+
+  Future<void> prevWeek() =>
+      canPrev ? selectWeek(week - 1) : Future<void>.value();
+
+  Future<void> nextWeek() =>
+      canNext ? selectWeek(week + 1) : Future<void>.value();
+
+  /// 回到今天所在的那一周（[今天] 按钮）。
+  Future<void> goToday() =>
+      todayInSemester ? selectWeek(todayWeek) : Future<void>.value();
+
+  /// 一键校准（A5）：把第 [n] 周当作「本周」。
+  ///
+  /// 真正改的是 `semester.first_week_monday`——「今天是第几周」完全由它推出，
+  /// 用户看到的「显示错了一周」根因就是这个日期当初填错了整整一周。
+  ///
+  /// 保存**只调一次 [SemesterUseCase.saveSemester]**：拆成
+  /// rename → setTotalWeeks → setFirstWeek 三次写时，每次都拿同一份旧快照整行
+  /// 写回，后一次盖掉前一次，最后只有最后一个字段生效（2026-10-18 用户报
+  /// 「点了没反应」就是它）。
+  ///
+  /// 返回改好后的「开学第一周周一」，供界面回执；没有学期或周次非法返回 null。
+  Future<DateTime?> calibrateThisWeekTo(int n) async {
     final Semester? s = semester;
-    weekCourses = s == null
-        ? const <Course>[]
-        : await _courses.coursesOnWeek(week, semesterId: s.id);
+    if (s == null || n < 1 || n > Semester.maxTotalWeeks) return null;
+    final DateTime newMonday =
+        Semester.mondayOf(_clock()).subtract(Duration(days: 7 * (n - 1)));
+    await _semesters.saveSemester(
+      s,
+      name: s.name,
+      firstWeekDate: newMonday,
+      totalWeeks: s.totalWeeks,
+    );
+    await load();
+    await goToday();
+    return newMonday;
+  }
+
+  void toggleWeekend() {
+    showWeekend = !showWeekend;
+    notifyListeners();
+  }
+
+  Future<void> _reloadCourses() async {
+    final Semester? s = semester;
+    if (s == null) {
+      allCourses = const <Course>[];
+      freshness = const CourseFreshness();
+      return;
+    }
+    allCourses = await _courses.activeCourses(semesterId: s.id);
+    freshness = await _courses.freshness(s.id);
   }
 }

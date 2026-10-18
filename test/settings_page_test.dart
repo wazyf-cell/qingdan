@@ -164,6 +164,22 @@ void main() {
     expect(find.text('手机默认打开的页面'), findsOneWidget);
   });
 
+  test('trash.purgeDays 落盘往返：存 7 读回 7，非法值回退默认 30', () async {
+    await settings.setTrashPurgeDays(7);
+    final SharedPreferences p = await SharedPreferences.getInstance();
+    expect(p.getInt(SettingsModel.kTrashPurgeDaysKey), 7);
+
+    final SettingsModel reloaded = SettingsModel(prefs: p);
+    await reloaded.load();
+    expect(reloaded.trashPurgeDays, 7);
+
+    // 非法档位（手改 prefs / 旧数据）不采信：回退 30，不写入非法值语义。
+    await p.setInt(SettingsModel.kTrashPurgeDaysKey, 15);
+    final SettingsModel bogus = SettingsModel(prefs: p);
+    await bogus.load();
+    expect(bogus.trashPurgeDays, SettingsModel.kTrashPurgeDaysDefault);
+  });
+
   test('kAppVersion 必须与 pubspec.yaml 的 version 同步', () {
     final String pubspec = File('pubspec.yaml').readAsStringSync();
     final RegExpMatch? m =

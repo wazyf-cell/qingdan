@@ -12,6 +12,9 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   exclude:
     - build/**
+    # 子代理的隔离 worktree 副本（无 .dart_tool，解析不了 import），
+    # 不排掉的话 `flutter analyze` 会把那份副本一起当成项目代码报错。
+    - .qoder/**
     - android/**
     - windows/**
     # 一次性平台能力探针工程，非项目代码；其弃用告警不进入本项目分析结果

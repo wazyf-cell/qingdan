@@ -2,7 +2,7 @@ import 'package:qingdan/domain/task.dart';
 
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 
-import 'task_pane_model.dart';
+import 'task_pane_queries.dart';
 
 /// 视图过滤 + 排序（从 TaskPaneModel 抽出，纯逻辑便于复用）。
 

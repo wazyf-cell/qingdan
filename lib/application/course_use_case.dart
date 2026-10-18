@@ -1,5 +1,6 @@
 import 'package:qingdan/application/app_services.dart';
 import 'package:qingdan/domain/course.dart';
+import 'package:qingdan/domain/course_freshness.dart';
 import 'package:qingdan/domain/course_uid.dart';
 import 'package:qingdan/domain/semester.dart';
 
@@ -120,6 +121,36 @@ class CourseUseCase {
   }
 
   Future<List<Course>> coursesToday() => coursesOn(DateTime.now());
+
+  /// 顶部「上次更新 / 导入时间」的读数（M6-A A8）。只读，不写库。
+  ///
+  /// 取「最近一次导入」与「本学期最后编辑」里较新的那个：导入完又手改过一门课，
+  /// 显示导入时间就是在骗人。
+  ///
+  /// **已知局限**：`import_batches` 没有 `semester_id` 列（M6-D 迁移 v6 才加，
+  /// A 批不许动库结构），所以导入那条只能取**全局**最近一次——切到别的学期时
+  /// 它可能来自另一个学期。界面 tooltip 里如实写着，别当成 per-semester 读数。
+  Future<CourseFreshness> freshness(String semesterId) async {
+    final List<ImportBatch> batches = await _services.courseDao.recentBatches();
+    final DateTime? edited =
+        await _services.courseDao.lastCourseModified(semesterId);
+    final ImportBatch? latest = batches.isEmpty ? null : batches.first;
+    if (latest != null &&
+        (edited == null || !latest.importedAt.isBefore(edited))) {
+      return CourseFreshness(
+        at: latest.importedAt,
+        kind: CourseFreshnessKind.import,
+        fileName: latest.fileName,
+        imported: latest.countImported,
+        updated: latest.countUpdated,
+        skipped: latest.countSkipped,
+        batches: batches,
+      );
+    }
+    if (edited == null) return CourseFreshness(batches: batches);
+    return CourseFreshness(
+        at: edited, kind: CourseFreshnessKind.edit, batches: batches);
+  }
 
   void _validate({
     required String name,

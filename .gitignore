@@ -96,3 +96,7 @@ android/app/build/
 android/.idea/
 android/*.iml
 
+# 子代理的 git worktree 副本（.qoder/worktrees/**）——里面是整份项目的第二份拷贝，
+# 还各自带 .dart_tool。误 add 一次就会把几百 MB 推上 public 仓库。
+/.qoder/
+

@@ -9,6 +9,7 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
+import 'compose_date_time_row.dart';
 import 'quick_compose_rows.dart';
 
 /// 快捷添加抽屉（2026-10-18 用户第二轮定案，取代原「＋ = 聚焦顶部输入框」）。
@@ -30,7 +31,12 @@ Future<void> showQuickCompose(BuildContext context) {
 }
 
 class QuickComposeSheet extends StatefulWidget {
-  const QuickComposeSheet({super.key});
+  const QuickComposeSheet({super.key, this.pickDate, this.pickTime});
+
+  /// 日期/时刻选择器接缝，默认真选择器；widget 测试注入假结果（见
+  /// `compose_date_time_row.dart` 的 [DateFieldPicker] 注释）。
+  final DateFieldPicker? pickDate;
+  final DateFieldPicker? pickTime;
 
   @override
   State<QuickComposeSheet> createState() => _QuickComposeSheetState();
@@ -104,15 +110,21 @@ class _QuickComposeSheetState extends State<QuickComposeSheet> {
           Divider(color: colors.divider),
           ComposeListRow(lists: lists, value: _listId, onChanged: _setList),
           ComposePriorityRow(value: _priority, onChanged: _setPriority),
-          ComposeDateRow(
+          ComposeDateTimeRow(
               rowKey: 'compose-start',
               label: '开始',
+              helpText: '开始日期',
               value: _start,
+              pickDate: widget.pickDate,
+              pickTime: widget.pickTime,
               onChanged: (DateTime? v) => setState(() => _start = v)),
-          ComposeDateRow(
+          ComposeDateTimeRow(
               rowKey: 'compose-due',
               label: '到期',
+              helpText: '到期日期',
               value: _due,
+              pickDate: widget.pickDate,
+              pickTime: widget.pickTime,
               onChanged: (DateTime? v) => setState(() => _due = v)),
           const SizedBox(height: AppDimens.s12),
           FilledButton(

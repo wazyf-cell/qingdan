@@ -5,6 +5,10 @@
 
 import 'time_table.dart';
 
+/// 「当日分钟数」的换算住在 `time_table.dart`（校验错误摘要要用它，而那边
+/// 依赖本文件会构成循环）；这里 re-export 出来，让既有调用点继续只认一个入口。
+export 'time_table.dart' show parseMinutes, formatMinutes;
+
 /// 每分钟对应的逻辑像素（dp）。细化 §2.2:70。
 const double kMinutesToDp = 0.9;
 
@@ -138,24 +142,4 @@ SectionLayout layoutSections(
     cursor += height;
   }
   return SectionLayout(slots: slots);
-}
-
-/// `HH:MM` → 当日分钟数；格式不合法返回 null（UI 层输入校验用）。
-///
-/// 与 [formatMinutes] 成对：全链路只有「当日分钟数 int」一种时间表示（§1.2），
-/// `TimeOfDay` 只允许出现在 UI 层，边界就在这里换算。
-int? parseMinutes(String text) {
-  final RegExpMatch? m = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(text.trim());
-  if (m == null) return null;
-  final int h = int.parse(m.group(1)!);
-  final int min = int.parse(m.group(2)!);
-  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
-  return h * 60 + min;
-}
-
-/// 当日分钟数 → `HH:MM`（节次轴与课程块显示用）。
-String formatMinutes(int minutes) {
-  final int h = minutes ~/ 60;
-  final int m = minutes % 60;
-  return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
 }

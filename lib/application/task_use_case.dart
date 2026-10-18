@@ -118,6 +118,16 @@ class TaskUseCase {
     }
   }
 
+  /// 回收站自动清空（M6-A4）：物理删除入站超过 [days] 天的任务，返回条数。
+  /// `days <= 0` = 永不：直接返回 0，不调 DAO。
+  /// 阈值语义与界面文案见 `TrashPurgeScheduler`（启动 + 应用存活期每 30 分钟检查）。
+  Future<int> purgeExpiredTrash({required int days}) async {
+    if (days <= 0) return 0;
+    final DateTime cutoff =
+        DateTime.now().toUtc().subtract(Duration(days: days));
+    return _services.taskDao.purgeTrashedBefore(cutoff);
+  }
+
   // ---- 子任务（F5）----
 
   Future<Subtask> addSubtask({

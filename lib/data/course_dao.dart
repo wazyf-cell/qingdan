@@ -5,80 +5,49 @@ import '../domain/field_change.dart';
 import '../domain/ids.dart';
 import '../domain/op_log_entry.dart';
 import '../domain/timestamps.dart';
+import 'course_dao_queries.dart';
 import 'op_log_writer.dart';
 import 'row_diff.dart';
 
-/// 课程 DAO（F28 / F29 / F31）。
+/// 课程 DAO（F28 / F29 / F31）——**写侧**。
 ///
 /// 写方法自持事务并在同一事务内记 op-log。`import_batches` 是本地簿记，
 /// **不记 op-log、不参与同步**（2026-10-10 定案 3）。
+/// 只读查询在 `course_dao_queries.dart`（本文件触 300 行红线后按读/写拆的）。
 class CourseDao {
   CourseDao(this._db, {OpLogWriter? opLog})
-      : _opLog = opLog ?? const OpLogWriter();
+      : _opLog = opLog ?? const OpLogWriter(),
+        _queries = CourseQueries(_db);
 
   final Database _db;
   final OpLogWriter _opLog;
+  final CourseQueries _queries;
 
-  /// 未删除的课程，按星期 + 起始节排序。[semesterId] 为空则不限学期。
+  // ---- 只读转发：签名不变，调用方（用例层 / 同步 / 测试）无需改动 ----
+
   Future<List<Course>> findActive({String? semesterId, int? weekday}) =>
-      _readActive(_db, semesterId, weekday: weekday);
+      _queries.findActive(semesterId: semesterId, weekday: weekday);
 
-  /// 读逻辑抽成「接受任意执行器」的版本，事务内（`applyImport`）与事务外共用。
-  Future<List<Course>> _readActive(DatabaseExecutor txn, String? semesterId,
-      {int? weekday}) async {
-    final List<String> where = <String>['deleted = 0'];
-    final List<Object?> args = <Object?>[];
-    if (semesterId != null) {
-      where.add('semester_id = ?');
-      args.add(semesterId);
-    }
-    if (weekday != null) {
-      where.add('weekday = ?');
-      args.add(weekday);
-    }
-    final List<Map<String, Object?>> rows = await txn.query('courses',
-        where: where.join(' AND '),
-        whereArgs: args,
-        orderBy: 'weekday ASC, start_section ASC, name ASC');
-    return [for (final Map<String, Object?> r in rows) Course.fromMap(r)];
-  }
+  Future<List<Course>> findOnWeek(int week, {String? semesterId}) =>
+      _queries.findOnWeek(week, semesterId: semesterId);
 
-  /// 第 [week] 周要上的课。
-  ///
-  /// 周次在库里是 JSON 数组字符串，**不能用 `LIKE '%3%'` 过滤**（会把第 3 周
-  /// 和第 13、23 周一起捞出来），所以先按学期+星期捞、再在 Dart 里 `contains`。
-  Future<List<Course>> findOnWeek(int week, {String? semesterId}) async {
-    final List<Course> all =
-        await findActive(semesterId: semesterId);
-    return all.where((Course c) => c.isOn(week)).toList(growable: false);
-  }
+  Future<List<Course>> findByUid(String uid, {String? semesterId}) =>
+      _queries.findByUid(uid, semesterId: semesterId);
 
-  /// 某天（含日期→周次换算由调用方做）某星期的课。
-  Future<List<Course>> findByUid(String uid, {String? semesterId}) async {
-    final List<Map<String, Object?>> rows = await _db.query(
-      'courses',
-      where: 'uid = ? AND deleted = 0'
-          '${semesterId == null ? '' : ' AND semester_id = ?'}',
-      whereArgs: <Object?>[uid, ?semesterId],
-    );
-    return [for (final Map<String, Object?> r in rows) Course.fromMap(r)];
-  }
+  Future<Course?> findById(String id) => _queries.findById(id);
 
-  Future<Course?> findById(String id) async {
-    final List<Map<String, Object?>> rows = await _db.query('courses',
-        where: 'id = ?', whereArgs: <Object?>[id], limit: 1);
-    return rows.isEmpty ? null : Course.fromMap(rows.first);
-  }
+  Future<int> countActive({String? semesterId}) =>
+      _queries.countActive(semesterId: semesterId);
 
-  /// 未删除课程总数（今日课空态判断用）。
-  Future<int> countActive({String? semesterId}) async {
-    final List<Map<String, Object?>> result = await _db.rawQuery(
-      'SELECT COUNT(*) AS n FROM courses WHERE deleted = 0'
-      '${semesterId == null ? '' : ' AND semester_id = ?'}',
-      <Object?>[?semesterId],
-    );
-    return result.first['n']! as int;
-  }
+  /// 最近 [limit] 次导入批次（A8）。**不区分学期**：`import_batches` 没有学期列。
+  Future<List<ImportBatch>> recentBatches({int limit = 10}) =>
+      _queries.recentBatches(limit: limit);
+
+  /// 本学期课程的最后编辑时刻，无记录返回 null（A8）。
+  Future<DateTime?> lastCourseModified(String semesterId) =>
+      _queries.lastCourseModified(semesterId);
+
+  // ---- 写侧 ----
 
   Future<Course> insert(Course course) async {
     final Course row = _newRowForInsert(course);
@@ -151,6 +120,9 @@ class CourseDao {
   }
 
   /// 软删除（课程不进回收站，只是不再显示；同步侧按 update 记）。
+  ///
+  /// 对用户等于**永久删除**：回收站只管任务，课程没有找回入口，
+  /// 所以 UI 的确认框必须写清「无法找回」（A6）。
   Future<void> softDelete(String id) async {
     final Course? existing = await findById(id);
     if (existing == null || existing.deleted) return;
@@ -180,7 +152,7 @@ class CourseDao {
 
   Future<int> _writeSoftDeleteImported(
       DatabaseExecutor txn, String? semesterId) async {
-    final List<Course> targets = await _readActive(txn, semesterId);
+    final List<Course> targets = await readActiveCourses(txn, semesterId);
     final List<Course> imported = targets
         .where((Course c) => c.origin == CourseOrigin.import)
         .toList(growable: false);

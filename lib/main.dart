@@ -10,6 +10,7 @@ import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/application/task_list_use_case.dart';
 import 'package:qingdan/application/task_use_case.dart';
+import 'package:qingdan/application/trash_purge_scheduler.dart';
 import 'package:qingdan/app.dart';
 import 'package:qingdan/data/database.dart';
 import 'package:qingdan/data/device_id.dart';
@@ -75,6 +76,7 @@ Future<void> main() async {
   SyncStatusModel? syncStatusModel;
   SyncConfigStore? syncConfigStore;
   ChaoxingModel? chaoxingModel;
+  TrashPurgeScheduler? trashPurgeScheduler;
   try {
     final db = await openAppDatabase();
 
@@ -121,6 +123,15 @@ Future<void> main() async {
         SyncStatusModel(coordinator: coordinator, deviceId: deviceId);
     coordinator.start();
 
+    // 回收站自动清空（M6-A4）：启动时检查一次 + 应用存活期每 30 分钟一次。
+    // **无后台真定时**（Android 会被杀，需求已确认接受）；首轮内部有 try/catch，
+    // 不 await 也不阻塞 runApp。独立于 SyncCoordinator：同步关掉回收站照样清。
+    trashPurgeScheduler = TrashPurgeScheduler(
+      useCase: taskUseCase,
+      settings: settingsModel,
+    );
+    trashPurgeScheduler.start();
+
     // 学习通（外部只读待办）：cookie 走系统凭据库，与同步层同一个 SecureStore
     // 实现。启动只恢复「有没有登录过」，不自动拉取——拉取发生在打开面板时。
     chaoxingModel = ChaoxingModel(secure: SecureStorageStore());
@@ -128,7 +139,7 @@ Future<void> main() async {
 
     // Windows 关窗钩子（M3 §2.1）：先同步一次（10s 超时兜底）再真正退出。
     if (Platform.isWindows) {
-      _installWindowsCloseHook(coordinator);
+      _installWindowsCloseHook(coordinator, trashPurgeScheduler);
     }
   } catch (e, st) {
     dbInitError = '$e\n$st';
@@ -181,23 +192,28 @@ Future<void> main() async {
 /// 若收到会被 GC 的临时对象，回调会静默失效（该库的已知坑）。
 _WindowCloseSyncHook? _windowCloseHook;
 
-void _installWindowsCloseHook(SyncCoordinator coordinator) {
+void _installWindowsCloseHook(
+    SyncCoordinator coordinator, TrashPurgeScheduler trashPurge) {
   windowManager.setPreventClose(true);
-  _windowCloseHook = _WindowCloseSyncHook(coordinator);
+  _windowCloseHook = _WindowCloseSyncHook(coordinator, trashPurge);
   windowManager.addListener(_windowCloseHook!);
 }
 
 /// 关窗同步钩子（见 [_installWindowsCloseHook]）。
 class _WindowCloseSyncHook with WindowListener {
-  _WindowCloseSyncHook(this._coordinator);
+  _WindowCloseSyncHook(this._coordinator, this._trashPurge);
 
   final SyncCoordinator _coordinator;
+  final TrashPurgeScheduler _trashPurge;
   bool _closing = false;
 
   @override
   Future<void> onWindowClose() async {
     if (_closing) return;
     _closing = true;
+    // 先停清空调度：退出窗口期不应再有物理删除发生（op-log 意图留在库里，
+    // 下次启动的同步照常上传）。
+    _trashPurge.stop();
     try {
       await _coordinator.syncNow().timeout(const Duration(seconds: 10));
     } catch (_) {

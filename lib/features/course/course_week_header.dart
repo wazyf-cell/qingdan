@@ -9,6 +9,10 @@ import 'package:qingdan/theme/app_typography.dart';
 /// 边界禁用：第 1 周 ‹ 置灰不可点、最后一周 › 同理（**不给空周**，§2.6:125）。
 /// 末尾两个入口：＋ 添加课程（F28 手工录入）、⚙ 学期与作息（S4b 编辑器）。
 /// 没有学期时两者都不传，按钮不渲染——不留死按钮。
+///
+/// 周次标签本身可点（M6-A A5：弹周次网格选择器）。A8 的「上次更新 / 导入时间」
+/// 在周次行**下方单独一行**，绝不塞进这一行——411dp 真机实测这一行已经排到
+/// 只剩 123dp 标签余量，再塞就重演「周次标签换行压住星期轴」（S4b 事故）。
 class CourseWeekHeader extends StatelessWidget {
   const CourseWeekHeader({
     super.key,
@@ -26,6 +30,10 @@ class CourseWeekHeader extends StatelessWidget {
     this.onAddCourse,
     this.onOpenSetup,
     this.onImport,
+    this.onPickWeek,
+    this.freshnessLabel,
+    this.freshnessTooltip,
+    this.onFreshnessTap,
   });
 
   final int week;
@@ -40,13 +48,21 @@ class CourseWeekHeader extends StatelessWidget {
   final VoidCallback? onToday;
   final VoidCallback? onToggleWeekend;
 
-  /// ＋ 添加课程 / ⚙ 学期与作息设置 / ⤒ 导入课表文件。
+  /// ＋ 添加课程 / ⚙ 学期与作息设置 / ⤓ 导入课表文件。
   ///
   /// [onImport] 只在桌面端传：411dp 头部一行已经排到 123dp 的标签余量，
   /// 再塞一个图标就要牺牲周次标签（移动端改从「学期与作息」弹层进）。
   final VoidCallback? onAddCourse;
   final VoidCallback? onOpenSetup;
   final VoidCallback? onImport;
+
+  /// 点周次标签 → 周次网格选择器（A5）。不传时标签仍可看但不可点。
+  final VoidCallback? onPickWeek;
+
+  /// 「上次更新 / 导入时间」那一行（A8）；null = 没有数据，整行不渲染。
+  final String? freshnessLabel;
+  final String? freshnessTooltip;
+  final VoidCallback? onFreshnessTap;
 
   /// 移动端一行要摆 7 个元素，默认内边距会把周次标签挤到换行（真机 411dp 实测
   /// 第二行「16 周」压在星期轴上），加了 maxLines 又会被省略号截断。
@@ -73,75 +89,142 @@ class CourseWeekHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
+    final String? stamp = freshnessLabel;
     return Container(
-      height: isMobile
-          ? AppDimens.courseHeaderMobile
-          : AppDimens.courseHeaderDesktop,
       padding: const EdgeInsets.symmetric(horizontal: AppDimens.s4),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(bottom: BorderSide(color: colors.divider, width: 1)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          _NavButton(
-            icon: Icons.chevron_left,
-            tooltip: '上一周',
-            enabled: canPrev,
-            onPressed: onPrev,
-          ),
-          Expanded(
-            child: Center(
-              child: Text(
-                weekLabel(week, totalWeeks),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.panelTitle, // 16sp / w600（2026-10-10 定案）
-              ),
+          SizedBox(
+            height: isMobile
+                ? AppDimens.courseHeaderMobile
+                : AppDimens.courseHeaderDesktop,
+            child: Row(
+              children: <Widget>[
+                _NavButton(
+                  icon: Icons.chevron_left,
+                  tooltip: '上一周',
+                  enabled: canPrev,
+                  onPressed: onPrev,
+                ),
+                Expanded(
+                  child: InkWell(
+                    onTap: onPickWeek,
+                    child: Center(
+                      child: Text(
+                        weekLabel(week, totalWeeks),
+                        // key 挂在 Text 上：测试既要点它（tap 命中的是外面的
+                        // InkWell），又要读它的文案（断言周次真的翻了）。
+                        key: const ValueKey<String>('week-label'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.panelTitle, // 16sp / w600（2026-10-10 定案）
+                      ),
+                    ),
+                  ),
+                ),
+                _NavButton(
+                  icon: Icons.chevron_right,
+                  tooltip: '下一周',
+                  enabled: canNext,
+                  onPressed: onNext,
+                ),
+                TextButton(
+                  style: _tightText,
+                  onPressed: todayButtonDisabled ? null : onToday,
+                  child: const Text('今天'),
+                ),
+                if (isMobile)
+                  TextButton(
+                    style: _tightText,
+                    onPressed: onToggleWeekend,
+                    child: Text(showWeekend ? '收起周末' : '周末'),
+                  ),
+                if (onAddCourse != null)
+                  IconButton(
+                    key: const ValueKey<String>('btn-add-course'),
+                    style: _tightIcon,
+                    tooltip: '添加课程',
+                    icon: const Icon(Icons.add, size: 20),
+                    onPressed: onAddCourse,
+                  ),
+                if (onImport != null)
+                  IconButton(
+                    key: const ValueKey<String>('btn-import'),
+                    style: _tightIcon,
+                    tooltip: '导入课表文件',
+                    // A7：导入 = 数据进应用，箭头朝下（原来是 file_upload 朝上）。
+                    icon: const Icon(Icons.file_download_outlined, size: 20),
+                    onPressed: onImport,
+                  ),
+                if (onOpenSetup != null)
+                  IconButton(
+                    key: const ValueKey<String>('btn-setup'),
+                    style: _tightIcon,
+                    tooltip: '学期与作息',
+                    icon: const Icon(Icons.settings_outlined, size: 20),
+                    onPressed: onOpenSetup,
+                  ),
+              ],
             ),
           ),
-          _NavButton(
-            icon: Icons.chevron_right,
-            tooltip: '下一周',
-            enabled: canNext,
-            onPressed: onNext,
-          ),
-          TextButton(
-            style: _tightText,
-            onPressed: todayButtonDisabled ? null : onToday,
-            child: const Text('今天'),
-          ),
-          if (isMobile)
-            TextButton(
-              style: _tightText,
-              onPressed: onToggleWeekend,
-              child: Text(showWeekend ? '收起周末' : '周末'),
-            ),
-          if (onAddCourse != null)
-            IconButton(
-              key: const ValueKey<String>('btn-add-course'),
-              style: _tightIcon,
-              tooltip: '添加课程',
-              icon: const Icon(Icons.add, size: 20),
-              onPressed: onAddCourse,
-            ),
-          if (onImport != null)
-            IconButton(
-              key: const ValueKey<String>('btn-import'),
-              style: _tightIcon,
-              tooltip: '导入课表文件',
-              icon: const Icon(Icons.file_upload_outlined, size: 20),
-              onPressed: onImport,
-            ),
-          if (onOpenSetup != null)
-            IconButton(
-              key: const ValueKey<String>('btn-setup'),
-              style: _tightIcon,
-              tooltip: '学期与作息',
-              icon: const Icon(Icons.settings_outlined, size: 20),
-              onPressed: onOpenSetup,
+          if (stamp != null)
+            _FreshnessRow(
+              label: stamp,
+              tooltip: freshnessTooltip,
+              onTap: onFreshnessTap,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// A8 的新鲜度行：12sp、muted、单独占一行。
+class _FreshnessRow extends StatelessWidget {
+  const _FreshnessRow({
+    required this.label,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final String label;
+  final String? tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    final Text text = Text(
+      label,
+      key: const ValueKey<String>('course-freshness'),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: AppTypography.meta.copyWith(color: colors.textFaint),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppDimens.s12, 0, AppDimens.s12, AppDimens.s4),
+      child: InkWell(
+        key: const ValueKey<String>('course-freshness-tap'),
+        onTap: onTap,
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.schedule, size: 14, color: colors.textFaint),
+            const SizedBox(width: AppDimens.s4),
+            // 长文件名必须被 Flexible 收掉，不能把这一行撑爆。
+            Flexible(
+              child: tooltip == null
+                  ? text
+                  : Tooltip(message: tooltip!, child: text),
+            ),
+          ],
+        ),
       ),
     );
   }

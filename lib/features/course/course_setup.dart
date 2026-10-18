@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:qingdan/application/semester_use_case.dart';
-import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/import/course/schedule_file.dart';
@@ -11,10 +10,13 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
-import 'course_edit_panel.dart';
 import 'course_pane_model.dart';
 import 'import_wizard/import_wizard.dart';
 import 'semester_timetable_cards.dart';
+
+// 课程编辑弹层已按职责拆到 `course_editor_sheet.dart`（本文件触 300 行红线）。
+// 这里再导出一次：课表面板与向导步 4 的 `import 'course_setup.dart'` 不用改。
+export 'course_editor_sheet.dart';
 
 /// 课表设置弹层（§4.2 步骤 3 的「学期卡 + 作息卡」，平时也从头部 ⚙ 进来）。
 ///
@@ -91,7 +93,7 @@ class _CourseSetupBodyState extends State<_CourseSetupBody> {
                 nav.pop();
                 showImportWizard(nav.context);
               },
-              icon: const Icon(Icons.file_upload_outlined, size: 18),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
               label: const Text('导入课表文件'),
             ),
             TextButton.icon(
@@ -138,18 +140,40 @@ class _CourseSetupBodyState extends State<_CourseSetupBody> {
         // 回执紧跟在产生它的那张卡下面：弹层是 85% 高的滚动区，放在最底部
         // （完成按钮旁）等于在屏幕外面（2026-10-18 模拟器实测第一版就这么藏起来了）。
         _Said(text: _saidSemester, keyName: 'setup-said-semester'),
+        if (model.semester != null)
+          // A5 的出口说明。计划文档要求贴在「开学日期」那一行下面，但
+          // `semester_editor.dart` 不在本批可改范围，就挂在同一张学期卡正下方。
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppDimens.s12, AppDimens.s4, AppDimens.s12, 0),
+            child: Text(
+              '周数显示不对？在周视图点顶部「第 N 周」→ 长按正确的那一周即可一键校准',
+              key: const ValueKey<String>('setup-week-calibrate-hint'),
+              style: AppTypography.meta
+                  .copyWith(color: AppColors.of(context).textFaint),
+            ),
+          ),
         const SizedBox(height: AppDimens.s16),
         TimetableCard(
           details: model.details,
           isMobile: isMobile,
           onSave: (List<TimeDetail> draft) async {
             final String? error = await semesters.saveDefaultTimetable(draft);
-            if (error != null) return; // 校验错误由面板自己展示，不关弹层
+            if (error != null) {
+              // 用例层这道闸通常不会响（面板 _save 已跑过同一个
+              // validateTimeDetails），但一旦两处判据分叉，静默 return 就又变成
+              // 用户报过的「点了没反应」。回执必须显式变红，不能吞。
+              _sayTimetable('保存被拒绝：$error', error: true);
+              return;
+            }
             await model.load();
             _sayTimetable('作息已保存 · ${draft.length} 节');
           },
         ),
-        _Said(text: _saidTimetable, keyName: 'setup-said-timetable'),
+        _Said(
+            text: _saidTimetable,
+            keyName: 'setup-said-timetable',
+            error: _timetableFailed),
         const SizedBox(height: AppDimens.s8),
         Align(
           alignment: Alignment.centerRight,
@@ -168,18 +192,26 @@ class _CourseSetupBodyState extends State<_CourseSetupBody> {
     setState(() => _saidSemester = text);
   }
 
-  void _sayTimetable(String text) {
+  bool _timetableFailed = false;
+
+  void _sayTimetable(String text, {bool error = false}) {
     if (!mounted) return;
-    setState(() => _saidTimetable = text);
+    setState(() {
+      _saidTimetable = text;
+      _timetableFailed = error;
+    });
   }
 }
 
 /// 一行保存回执，紧贴在产生它的那张卡下面。
 class _Said extends StatelessWidget {
-  const _Said({required this.text, required this.keyName});
+  const _Said({required this.text, required this.keyName, this.error = false});
 
   final String? text;
   final String keyName;
+
+  /// 被拒绝的保存也要看得见（灰色「已保存」与红色「保存被拒绝」不能长一样）。
+  final bool error;
 
   @override
   Widget build(BuildContext context) {
@@ -194,60 +226,7 @@ class _Said extends StatelessWidget {
           key: ValueKey<String>(keyName),
           textAlign: TextAlign.right,
           style: AppTypography.meta
-              .copyWith(color: AppColors.of(context).textSecondary)),
+              .copyWith(color: error ? AppColors.of(context).overdue : AppColors.of(context).textSecondary)),
     );
   }
 }
-
-/// 课程编辑弹层：新建或修改一门课，返回要落库的 [Course]（取消返回 null）。
-///
-/// [totalWeeks] / [maxSection] 由调用方给——导入向导的校正界面没有
-/// `CoursePaneModel`，不该为了弹层去伪造一个。
-Future<Course?> showCourseEditor(BuildContext context,
-    {Course? course,
-    required bool isMobile,
-    required int totalWeeks,
-    required int maxSection}) async {
-  if (isMobile) {
-    return showModalBottomSheet<Course>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (BuildContext ctx) => Padding(
-        // 键盘避让：不垫 viewInsets 时「保存」会被 IME 整个盖住（真机 411dp
-        // 实测点不到，只能靠收起键盘再点）。与 [showCourseSetup] 同一处理。
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(ctx).bottom, top: AppDimens.s8),
-        child: DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.9,
-          builder: (BuildContext ctx, ScrollController controller) =>
-              CourseEditPanel(
-            totalWeeks: totalWeeks,
-            maxSection: maxSection,
-            initial: course,
-            isMobile: true,
-            scrollController: controller,
-            onSave: (Course c) => Navigator.of(ctx).pop(c),
-          ),
-        ),
-      ),
-    );
-  }
-  return showDialog<Course>(
-    context: context,
-    builder: (BuildContext ctx) => AlertDialog(
-      title: Text(course == null ? '添加课程' : '编辑课程'),
-      content: SizedBox(
-        width: 560,
-        child: CourseEditPanel(
-          totalWeeks: totalWeeks,
-          maxSection: maxSection,
-          initial: course,
-          onSave: (Course c) => Navigator.of(ctx).pop(c),
-        ),
-      ),
-    ),
-  );
-}
-

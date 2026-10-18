@@ -167,7 +167,8 @@ class _PickEntry extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Icon(Icons.upload_file, size: 28, color: colors.textSecondary),
+            Icon(Icons.file_download_outlined,
+                size: 28, color: colors.textSecondary),
             const SizedBox(height: AppDimens.s8),
             const Text('点击选择课表文件'),
             const SizedBox(height: AppDimens.s4),

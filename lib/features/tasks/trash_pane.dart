@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:qingdan/application/task_use_case.dart';
 import 'package:qingdan/domain/task.dart';
+import 'package:qingdan/features/settings/settings_model.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 import 'package:qingdan/features/tasks/task_pane_model.dart';
 import 'package:qingdan/features/tasks/task_row.dart';
@@ -10,7 +11,7 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
-/// 回收站（F4，§2.5）：顶部「清空回收站」+「30 天后自动清除」，
+/// 回收站（F4，§2.5）：顶部「清空回收站」+ 真实的自动清空阈值提示（M6-A4），
 /// 行复用 TaskRow（restoreMode），恢复 / 彻底删除，彻底删除需确认。
 class TrashPane extends StatefulWidget {
   const TrashPane({super.key});
@@ -24,6 +25,16 @@ class _TrashPaneState extends State<TrashPane> {
   bool _loaded = false;
 
   TaskUseCase? get _useCase => context.read<TaskPaneModel>().useCase;
+
+  /// 阈值文案读自 [SettingsModel]（watch：设置里改档立刻刷新此处）。
+  /// `maybeWatch` 兜底默认 30 天：provider 树缺 SettingsModel 的老测试壳不炸，
+  /// 且兜底值与旧写死文案语义一致。括号里那句必须留着——无后台真定时，
+  /// 清空只发生在「启动时 + 应用存活期每 30 分钟」的检查里，须如实告知。
+  String _purgeHint(BuildContext context) {
+    final int days = Provider.of<SettingsModel?>(context)?.trashPurgeDays ??
+        SettingsModel.kTrashPurgeDaysDefault;
+    return days <= 0 ? '不会自动清除' : '$days 天后自动清除（应用打开时检查）';
+  }
 
   @override
   void initState() {
@@ -78,7 +89,8 @@ class _TrashPaneState extends State<TrashPane> {
         Padding(
           padding:
               const EdgeInsets.symmetric(horizontal: AppDimens.listPanePaddingH),
-          child: Text('30 天后自动清除',
+          child: Text(_purgeHint(context),
+              key: const ValueKey<String>('trashPurgeHint'),
               style: TextStyle(fontSize: 12, color: colors.textFaint)),
         ),
         const SizedBox(height: AppDimens.s4),

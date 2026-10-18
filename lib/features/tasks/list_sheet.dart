@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:qingdan/application/task_list_use_case.dart';
 import 'package:qingdan/domain/task_list.dart';
-import 'package:qingdan/features/shell/sidebar/sidebar_actions.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_view.dart'
     show kInboxName;
+import 'package:qingdan/features/tasks/list_actions.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
-/// 半屏「清单」面板（M5 定案第 4 条）。
+/// 半屏「清单」面板（M5 定案第 4 条，M6-A2 补「全部清单」首行）。
 ///
-/// 抽屉在窄屏下线后，这里就是切换 / 新建 / 重命名 / 删除清单的唯一入口。
+/// 抽屉在窄屏下线后，这里就是切换 / 重命名 / 删除清单的入口（新建与顶栏「＋」
+/// 共用 `list_actions.dart` 的同一条实现）。列表首行固定「全部清单」= 智能视图
+/// 「所有」：没有它，用户在手机上一旦进了某个清单就只能靠 chips 绕回去。
 /// 高度按定案取屏高 50%：`showModalBottomSheet` 默认只包内容且上限半屏，
 /// 清单多于 6 条时会被裁掉，所以显式 `isScrollControlled` + `maxHeight`。
 Future<void> showListSheet(BuildContext context) {
@@ -66,7 +67,7 @@ class ListSheet extends StatelessWidget {
                 IconButton(
                   tooltip: '新建清单',
                   icon: const Icon(Icons.add, size: 20),
-                  onPressed: () => showCreateListDialog(context, model),
+                  onPressed: () => promptNewList(context, model),
                 ),
               ],
             ),
@@ -76,6 +77,14 @@ class ListSheet extends StatelessWidget {
               shrinkWrap: true,
               padding: const EdgeInsets.only(bottom: AppDimens.s8),
               children: <Widget>[
+                _AllListsRow(
+                  count: model.allCount,
+                  selected: model.selectedId == kSmartAll,
+                  onTap: () {
+                    model.select(kSmartAll);
+                    Navigator.of(context).pop();
+                  },
+                ),
                 for (final TaskList list in model.lists)
                   _SheetListRow(
                     list: list,
@@ -90,6 +99,70 @@ class ListSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 固定首行「全部清单」（M6-A2）：等价于智能视图「所有」= 所有清单的未完成待办。
+/// 两行文案（名称 + 副文案），所以行高比单行的用户清单行高一档，同时保住 44dp
+/// 触控下限。
+class _AllListsRow extends StatelessWidget {
+  const _AllListsRow({
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    final Color label = selected ? colors.accent : colors.textPrimary;
+    return InkWell(
+      key: const ValueKey<String>('list-all'),
+      onTap: onTap,
+      child: Container(
+        color: selected ? colors.accentFaint : null,
+        height: AppDimens.sidebarItemHeight + AppDimens.s16,
+        padding: const EdgeInsets.only(left: AppDimens.s16),
+        child: Row(
+          children: <Widget>[
+            Icon(Icons.all_inclusive,
+                size: 18,
+                color: selected ? colors.accent : colors.textSecondary),
+            const SizedBox(width: AppDimens.s8),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text('全部清单',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.body.copyWith(color: label)),
+                  Text('所有清单的待办',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.meta
+                          .copyWith(color: colors.textSecondary)),
+                ],
+              ),
+            ),
+            if (selected) ...<Widget>[
+              Icon(Icons.check, size: 16, color: colors.accent),
+              const SizedBox(width: AppDimens.s4),
+            ],
+            Text('$count',
+                style: AppTypography.counter
+                    .copyWith(color: colors.textSecondary)),
+            // 末尾留出用户清单行那个 ⋮ 的宽度，两行的计数才能右对齐。
+            const SizedBox(width: AppDimens.s32),
+          ],
+        ),
       ),
     );
   }
@@ -159,6 +232,7 @@ class _RowMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
+    final SidebarModel sidebar = context.read<SidebarModel>();
     return PopupMenuButton<String>(
       key: ValueKey<String>('listMenu:${list.id}'),
       tooltip: '清单操作',
@@ -167,114 +241,14 @@ class _RowMenu extends StatelessWidget {
       color: colors.surface,
       icon: Icon(Icons.more_vert, size: 18, color: colors.textSecondary),
       onSelected: (String v) => v == 'rename'
-          ? _rename(context, list)
-          : _delete(context, list),
+          ? renameList(context, sidebar: sidebar, list: list)
+          : deleteList(context, sidebar: sidebar, list: list),
       itemBuilder: (BuildContext _) => <PopupMenuEntry<String>>[
         const PopupMenuItem<String>(value: 'rename', child: Text('重命名')),
         PopupMenuItem<String>(
             value: 'delete',
             enabled: !isInbox,
             child: Text('删除', style: TextStyle(color: isInbox ? colors.textFaint : colors.overdue))),
-      ],
-    );
-  }
-
-  Future<void> _rename(BuildContext context, TaskList list) async {
-    final SidebarModel sidebar = context.read<SidebarModel>();
-    final TaskListUseCase useCase = context.read<TaskListUseCase>();
-    final String? name = await _askText(
-        context, title: '重命名清单', initial: list.name, confirmLabel: '保存');
-    if (name == null || name.isEmpty || name == list.name) return;
-    await useCase.rename(list, name);
-    await sidebar.load();
-  }
-
-  Future<void> _delete(BuildContext context, TaskList list) async {
-    final SidebarModel sidebar = context.read<SidebarModel>();
-    final TaskListUseCase useCase = context.read<TaskListUseCase>();
-    final bool ok = await showDialog<bool>(
-          context: context,
-          builder: (BuildContext ctx) => AlertDialog(
-            title: Text('删除「${list.name}」？'),
-            content: const Text('清单里的任务不会丢，会移到收集箱。'),
-            actions: <Widget>[
-              TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: const Text('取消')),
-              TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  child: const Text('删除')),
-            ],
-          ),
-        ) ??
-        false;
-    if (!ok) return;
-    await useCase.delete(list.id);
-    // 先改视图再重载：删掉正在看的清单后若仍指向它，列表会显示已删清单的空任务，
-    // 侧栏重载也读不到那一行。
-    if (sidebar.selectedId == list.id) sidebar.select(kSmartToday);
-    await sidebar.load();
-  }
-}
-
-Future<String?> _askText(BuildContext context,
-    {required String title,
-    required String initial,
-    required String confirmLabel}) {
-  return showDialog<String>(
-    context: context,
-    builder: (BuildContext _) => _TextDialog(
-        title: title, initial: initial, confirmLabel: confirmLabel),
-  );
-}
-
-/// 通用文本输入对话框。
-///
-/// 控制器由对话框自己持有、在 `dispose()` 里释放：S5-f 的 Android 真机教训是
-/// 在 `await showDialog` 之后再 dispose，会撞上退场动画里还挂着的 TextField，
-/// 开着键盘点「确定/取消/遮罩」必红屏 `_dependents.isEmpty`。
-class _TextDialog extends StatefulWidget {
-  const _TextDialog({
-    required this.title,
-    required this.initial,
-    required this.confirmLabel,
-  });
-
-  final String title;
-  final String initial;
-  final String confirmLabel;
-
-  @override
-  State<_TextDialog> createState() => _TextDialogState();
-}
-
-class _TextDialogState extends State<_TextDialog> {
-  late final TextEditingController _controller =
-      TextEditingController(text: widget.initial);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() => Navigator.of(context).pop(_controller.text.trim());
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        decoration: const InputDecoration(hintText: '清单名称'),
-        onSubmitted: (String _) => _submit(),
-      ),
-      actions: <Widget>[
-        TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消')),
-        TextButton(onPressed: _submit, child: Text(widget.confirmLabel)),
       ],
     );
   }

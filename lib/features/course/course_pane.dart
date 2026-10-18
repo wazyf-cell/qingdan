@@ -11,15 +11,20 @@ import 'package:qingdan/theme/app_typography.dart';
 import 'course_block_sheet.dart';
 import 'course_grid.dart';
 import 'course_pane_model.dart';
-import 'import_wizard/import_wizard.dart';
 import 'course_setup.dart';
+import 'course_toast.dart';
 import 'course_week_header.dart';
+import 'import_history_sheet.dart';
+import 'import_wizard/import_wizard.dart';
 import 'today_summary_bar.dart';
+import 'week_picker_sheet.dart';
 
-/// 课表周视图（F31 / F34）。三栏、两栏、抽屉三种形态共用同一个面板。
+/// 课表周视图（F31 / F34 + M6-A A5/A6/A7/A8）。三栏、两栏、抽屉三种形态共用同一个面板。
 ///
 /// 今天落在学期内时顶部出现今日摘要条（F34 **不单独做页面**，界面 §4.1:47）；
 /// 节次不在作息表里的课进底部「未排时间」收纳区，绝不静默截断（§3.4）。
+/// 周内容外面套 [CourseWeekPager]（左右滑动切周），页与页共享模型里那一份
+/// 整学期课程缓存，所以翻页不需要再查库。
 class CoursePane extends StatefulWidget {
   const CoursePane({super.key});
 
@@ -30,6 +35,9 @@ class CoursePane extends StatefulWidget {
 class _CoursePaneState extends State<CoursePane> {
   SyncStatusModel? _sync;
   DateTime? _lastSyncSeen;
+
+  /// 校准 / 删除之后的行内回执（不用 SnackBar，见 `course_toast.dart`）。
+  final CourseToastController _toast = CourseToastController();
 
   @override
   void initState() {
@@ -51,6 +59,7 @@ class _CoursePaneState extends State<CoursePane> {
   @override
   void dispose() {
     _sync?.removeListener(_onSyncChanged);
+    _toast.dispose();
     super.dispose();
   }
 
@@ -89,22 +98,51 @@ class _CoursePaneState extends State<CoursePane> {
   Future<void> _openBlock(Course course) async {
     final CoursePaneModel model = context.read<CoursePaneModel>();
     final CourseUseCase useCase = context.read<CourseUseCase>();
-    final bool? edit = await showCourseBlockSheet(
+    final CourseBlockAction action = await showCourseBlockSheet(
       context,
       course: course,
       layout: model.layout,
       isMobile: _isMobile,
     );
-    if (edit != true || !mounted) return;
+    if (action == CourseBlockAction.deleted) {
+      await _deleteCourse(course, useCase, model);
+      return;
+    }
+    if (action != CourseBlockAction.edit || !mounted) return;
     final Course? draft =
         await showCourseEditor(context,
             course: course,
             isMobile: _isMobile,
             totalWeeks: model.totalWeeks,
-            maxSection: model.maxSection);
+            maxSection: model.maxSection,
+            // 编辑器里也能删（A6）：传了 onDelete 才渲染那一行。
+            onDelete: () => _deleteCourse(course, useCase, model));
     if (draft == null) return;
     await useCase.save(draft);
     await model.load();
+  }
+
+  /// 删课的唯一落库点（块详情弹层与编辑器共用同一条路）。
+  ///
+  /// `CourseDao.softDelete` 只是把 `deleted` 置 1 供同步传播，**课程没有回收站**，
+  /// 所以对用户等于永久删除——回执里必须这么说，不给「能找回」的错觉（A6）。
+  Future<void> _deleteCourse(Course course, CourseUseCase useCase,
+      CoursePaneModel model) async {
+    await useCase.delete(course.id);
+    await model.load();
+    // await 之后不碰 context；控制器也只有在还挂着时才通知（dispose 后
+    // notifyListeners 会抛）。
+    if (!mounted) return;
+    _toast.show('已删除「${course.name}」（课程没有回收站，无法找回）');
+  }
+
+  /// 周次网格选择器：点格子翻周（模型自己就翻了），长按格子校准。
+  /// 校准回执在**面板关闭之后**才显示，因为弹层里放 SnackBar 看不见。
+  Future<void> _pickWeek(CoursePaneModel model) async {
+    final DateTime? calibrated = await showWeekPickerSheet(context,
+        model: model, isMobile: _isMobile);
+    if (calibrated == null || !mounted) return;
+    _toast.show('已把开学第一周改为 ${weekMondayText(calibrated)}');
   }
 
   @override
@@ -144,17 +182,36 @@ class _CoursePaneState extends State<CoursePane> {
           // 导入入口：桌面在头部给图标；移动端头部一行已经排满，改从
           // 「学期与作息」弹层进（同一个 showImportWizard）。
           onImport: _isMobile ? null : () => showImportWizard(context),
+          onPickWeek: () => _pickWeek(model),
+          // A8：上次更新 / 导入时间。没有数据时 label 为 null → 整行不渲染。
+          freshnessLabel: model.freshnessLabel,
+          freshnessTooltip: model.freshnessTooltip,
+          onFreshnessTap: () => showImportHistorySheet(context,
+              batches: model.freshness.batches, isMobile: _isMobile),
+        ),
+        ListenableBuilder(
+          listenable: _toast,
+          builder: (_, _) => CourseToastLine(
+            text: _toast.text,
+            opaque: _toast.opaque,
+          ),
         ),
         Expanded(
-          child: CourseWeekGrid(
-            days: model.visibleDays(isMobile: _isMobile),
-            layout: model.layout,
-            coursesOf: model.coursesOn,
-            dateOf: model.dateOf,
-            todayWeekday:
-                model.week == model.todayWeek ? model.today.weekday : null,
-            isMobile: _isMobile,
-            onBlockTap: (Course course, List<Course> _) => _openBlock(course),
+          child: CourseWeekPager(
+            totalWeeks: model.totalWeeks,
+            week: model.week,
+            onWeekChanged: (int week) => model.selectWeek(week),
+            pageBuilder: (BuildContext _, int week) => CourseWeekGrid(
+              days: model.visibleDays(isMobile: _isMobile),
+              layout: model.layout,
+              coursesOf: (int weekday) => model.coursesOnDay(week, weekday),
+              dateOf: (int weekday) => model.dateInWeek(week, weekday),
+              todayWeekday:
+                  week == model.todayWeek ? model.today.weekday : null,
+              isMobile: _isMobile,
+              onBlockTap: (Course tapped, List<Course> sameSlot) =>
+                  _openBlock(tapped),
+            ),
           ),
         ),
         if (model.unscheduled.isNotEmpty)

@@ -1,5 +1,6 @@
-// 快捷抽屉的四种行：清单 / 优先级 / 日期（自 quick_compose_sheet.dart 拆出，
-// 保持单文件不超 300 行）。视觉规格沿用详情面板属性行（标签 12sp、行高 44dp 触控）。
+// 快捷抽屉的两类选择行：清单 / 优先级（自 quick_compose_sheet.dart 拆出，保持
+// 单文件不超 300 行）。视觉规格沿用详情面板属性行（标签 12sp、行高 44dp 触控）。
+// 日期行在 compose_date_time_row.dart（抽屉与详情面板共用）。
 
 import 'package:flutter/material.dart';
 
@@ -9,17 +10,25 @@ import 'package:qingdan/features/tasks/due_format.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 
-/// 一行：左标签 + 右内容（沿用详情面板属性行的规格，36dp / 标签 12sp）。
+/// 一行：左标签 + 右内容（标签 12sp、值区左对齐）。
+///
+/// 抽屉里的行高 44dp（§2.6 触控下限），详情面板沿用 36dp，所以高度做成参数。
 class ComposeRow extends StatelessWidget {
-  const ComposeRow({super.key, required this.label, required this.child});
+  const ComposeRow({
+    super.key,
+    required this.label,
+    required this.child,
+    this.height = 44,
+  });
 
   final String label;
   final Widget child;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44, // 触控目标 ≥44（§2.6 移动形态）
+      height: height,
       child: Row(
         children: <Widget>[
           SizedBox(
@@ -132,63 +141,3 @@ class ComposePriorityRow extends StatelessWidget {
   }
 }
 
-/// 日期行：点一下开日历，已选时行尾多一个 ✕ 用来清空。
-class ComposeDateRow extends StatelessWidget {
-  const ComposeDateRow({
-    super.key,
-    required this.rowKey,
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String rowKey;
-  final String label;
-  final DateTime? value;
-  final ValueChanged<DateTime?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final AppColors colors = AppColors.of(context);
-    return ComposeRow(
-      label: label,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          InkWell(
-            key: ValueKey<String>(rowKey),
-            borderRadius: BorderRadius.circular(AppDimens.radiusDesktop),
-            onTap: () async {
-              final DateTime initial = value ?? DateTime.now();
-              final DateTime? picked = await showDatePicker(
-                context: context,
-                initialDate: initial,
-                firstDate: DateTime(initial.year - 5),
-                lastDate: DateTime(initial.year + 5),
-              );
-              if (picked != null) onChanged(picked);
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimens.s4, vertical: AppDimens.s8),
-              child: Text(
-                value == null
-                    ? '设置日期'
-                    : '${value!.year}/${value!.month}/${value!.day}',
-                style: TextStyle(
-                    fontSize: 14,
-                    color: value == null ? colors.textFaint : null),
-              ),
-            ),
-          ),
-          if (value != null)
-            IconButton(
-              key: ValueKey<String>('$rowKey-clear'),
-              icon: Icon(Icons.close, size: 16, color: colors.textFaint),
-              onPressed: () => onChanged(null),
-            ),
-        ],
-      ),
-    );
-  }
-}

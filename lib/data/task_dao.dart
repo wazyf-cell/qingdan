@@ -5,6 +5,7 @@ import '../domain/ids.dart';
 import '../domain/op_log_entry.dart';
 import '../domain/task.dart';
 import '../domain/task_priority.dart';
+import '../domain/timestamps.dart';
 import 'op_log_writer.dart';
 import 'row_diff.dart';
 
@@ -167,6 +168,57 @@ class TaskDao {
               field: 'title', oldValue: row['title'] as String?, newValue: null),
         ],
       );
+    });
+  }
+
+  /// 回收站自动清空（M6-A4）：物理删除 `deleted_time` 早于 [cutoff] 的行，
+  /// 返回**真删掉**的条数。
+  ///
+  /// 与 [deleteForever] 同形：**删行与 append task/delete 意图在同一事务内**。
+  /// task 是同步实体（`sync_serializer.dart` 的 kEntityTypes），漏记意图的后果
+  /// 是另一台设备上该行永远留着、下次 pull 还可能把它复活——单机删除 ≠ 全端清空。
+  /// 子行不显式删：`subtasks.task_id` / `task_tags.task_id` 均为
+  /// `ON DELETE CASCADE`（migrations.dart:145/168，连接已开 PRAGMA foreign_keys）；
+  /// `task_tags` 本身不参与同步（2026-10-10 定案：设备本地视图），无需为它记意图。
+  ///
+  /// 候选查询**必须在事务内**、且 DELETE 自带 `deleted = 1 AND deleted_time < ?`
+  /// 兜底：旧写法把 SELECT 放在事务外，某行在 SELECT 后、事务开始前恰好被恢复
+  /// （用户点「恢复」，或同步 pull 回来一条 restore 更新），就会被当成过期垃圾
+  /// 物理删掉——那是一条刚复活的活数据，且 op-log 还跟着广播删除。
+  /// 事务内查询挡掉同一连接的交错，WHERE 条件挡掉跨连接/跨进程的交错；
+  /// 只有 `delete` 真返回受影响行数时才 append 意图，账不会多一笔。
+  Future<int> purgeTrashedBefore(DateTime cutoff) async {
+    final int? cutoffMs = dateTimeToMs(cutoff);
+    return _db.transaction<int>((Transaction txn) async {
+      final List<Map<String, Object?>> doomed = await txn.query(
+        'tasks',
+        columns: <String>['id', 'title'],
+        where:
+            'deleted = 1 AND deleted_time IS NOT NULL AND deleted_time < ?',
+        whereArgs: <Object?>[cutoffMs],
+      );
+      final String where = 'id = ? AND deleted = 1 AND deleted_time < ?';
+      int purged = 0;
+      for (final Map<String, Object?> row in doomed) {
+        final String id = row['id']! as String;
+        final int deleted = await txn.delete('tasks',
+            where: where, whereArgs: <Object?>[id, cutoffMs]);
+        if (deleted == 0) continue; // 这一行已被恢复：一行都不该动，也不记意图。
+        purged += deleted;
+        await _opLog.append(
+          txn,
+          entityType: OpLogEntityType.task,
+          entityId: id,
+          operation: OpLogOperation.delete,
+          changes: <FieldChange>[
+            FieldChange(
+                field: 'title',
+                oldValue: row['title'] as String?,
+                newValue: null),
+          ],
+        );
+      }
+      return purged;
     });
   }
 

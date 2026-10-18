@@ -5,16 +5,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show FocusNode;
 
 import 'package:qingdan/application/task_use_case.dart';
-import 'package:qingdan/domain/tag.dart';
 import 'package:qingdan/domain/task.dart';
 import 'package:qingdan/domain/task_list.dart';
 import 'package:qingdan/domain/task_priority.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 
+import 'task_pane_queries.dart';
 import 'task_view_query.dart';
 
-/// 列表排序四档（F9）。
-enum TaskSortMode { manual, due, priority, title }
+// 排序四档与视图判定搬到 `task_pane_queries.dart`（300 行红线，按职责拆）。
+// 这里 re-export 枚举：`tasks_page / task_list_pane / tasks_bar / detail_attributes
+// / trash_pane` 与多个测试都是 `import 'task_pane_model.dart'` 拿到 TaskSortMode 的，
+// 搬家不能改它们的 import，公开 API 也就一个没动。
+export 'task_pane_queries.dart' show TaskSortMode;
 
 /// 任务列表状态：当前视图的任务集合、排序、选中、快捷操作。
 ///
@@ -64,39 +67,13 @@ class TaskPaneModel extends ChangeNotifier {
 
   Timer? _collapseTimer;
 
-  bool get isUserList =>
-      viewId != kSmartToday &&
-      viewId != kSmartNext7 &&
-      viewId != kSmartAll &&
-      viewId != kSmartCompleted &&
-      viewId != kTrash;
+  bool get isUserList => isUserListView(viewId);
 
   /// 智能清单 / 回收站视图（快速添加落点为收集箱，listId = null）。
   bool get isSmartView => !isUserList;
 
   /// 当前视图名（快速添加反馈行「→ 将创建到「…」」用）。
-  String get currentViewName {
-    switch (viewId) {
-      case kSmartToday:
-        return '今天';
-      case kSmartNext7:
-        return '最近 7 天';
-      case kSmartAll:
-        return '所有';
-      case kSmartCompleted:
-        return '已完成';
-      case kTrash:
-        return '回收站';
-      case kCourseWeek:
-        return '课表';
-      case kChaoxing:
-        return '学习通';
-    }
-    for (final TaskList list in lists) {
-      if (list.id == viewId) return list.name;
-    }
-    return '收集箱';
-  }
+  String get currentViewName => viewDisplayName(viewId, lists);
 
   /// 快速添加保存（F1）：写库 + 刷新列表与侧栏计数。
   ///
@@ -143,8 +120,7 @@ class TaskPaneModel extends ChangeNotifier {
   }
 
   /// 智能清单「今天 / 最近 7 天」：完成后 2s 塌缩移除（§3.1）。
-  bool get collapsesCompleted =>
-      viewId == kSmartToday || viewId == kSmartNext7;
+  bool get collapsesCompleted => collapsesCompletedView(viewId);
 
   void _onViewChanged() {
     detailTaskId = null;
@@ -167,30 +143,14 @@ class TaskPaneModel extends ChangeNotifier {
             viewId == kSmartNext7 ||
             viewId == kSmartAll,
       );
-      await _loadAnnotations(useCase);
+      final PaneAnnotations marks = await loadAnnotations(useCase, tasks);
+      subtaskProgress = marks.subtaskProgress;
+      tagCounts = marks.tagCounts;
       notifyListeners();
     } catch (e) {
       notifyListeners();
       rethrow;
     }
-  }
-
-  Future<void> _loadAnnotations(TaskUseCase useCase) async {
-    final Map<String, List<int>> progress = <String, List<int>>{};
-    final Map<String, int> tags = <String, int>{};
-    for (final Task t in tasks) {
-      final List<Subtask> subs = await useCase.findSubtasks(t.id);
-      if (subs.isNotEmpty) {
-        progress[t.id] = <int>[
-          subs.where((Subtask s) => s.completed).length,
-          subs.length,
-        ];
-      }
-      final List<Tag> taskTags = await useCase.findTagsOf(t.id);
-      if (taskTags.isNotEmpty) tags[t.id] = taskTags.length;
-    }
-    subtaskProgress = progress;
-    tagCounts = tags;
   }
 
   void setSortMode(TaskSortMode mode) {

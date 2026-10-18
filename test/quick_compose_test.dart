@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qingdan/domain/task.dart';
 import 'package:qingdan/domain/task_priority.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
+import 'package:qingdan/features/tasks/due_format.dart';
 
 import 'tasks_harness.dart';
 
@@ -51,12 +52,12 @@ void main() {
     expect(find.text('交实验报告'), findsOneWidget);
   });
 
-  testWidgets('到期日期：日历里选一天写进任务，✕ 能清空',
+  testWidgets('到期日期：真日历里选一天 → 无时间形态（10-15）+ 时刻钮，✕ 能清空',
       (WidgetTester tester) async {
     await h.pumpAtWidth(tester, 411);
     await open(tester);
 
-    expect(find.textContaining('设置日期', findRichText: true), findsNWidgets(2),
+    expect(find.text('未设置'), findsNWidgets(2),
         reason: '开始与到期两行都该是未设置');
 
     await tester.tap(h.key('compose-due'));
@@ -70,9 +71,17 @@ void main() {
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('/15'), findsOneWidget);
+    final String pickedDay = '${twoDigits(DateTime.now().month)}-15';
+    expect(find.text(pickedDay), findsOneWidget,
+        reason: '只选日期不填时刻 → 只显示 MM-dd（约定 00:00 视为没填时间）');
+    expect(find.text('无时间'), findsOneWidget,
+        reason: '有日期后行尾出现时刻钮，默认「无时间」');
+    expect(find.byKey(const ValueKey<String>('compose-due-time')), findsOneWidget);
+
     await h.tapIo(tester, h.key('compose-due-clear'));
-    expect(find.textContaining('设置日期', findRichText: true), findsNWidgets(2));
+    expect(find.text('未设置'), findsNWidgets(2),
+        reason: '✕ 把日期与时刻一起清掉，时刻钮也随之消失');
+    expect(find.text('无时间'), findsNothing);
   });
 
   testWidgets('标题为空时「添加」是死的，填了才可点', (WidgetTester tester) async {
