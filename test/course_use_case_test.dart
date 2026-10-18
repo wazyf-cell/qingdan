@@ -59,7 +59,9 @@ void main() {
     expect(s.firstWeekMonday, DateTime.utc(2025, 9, 1),
         reason: '选了周三 9/3，应归一到该周周一（§2.1）');
 
-    final String? error = await semesters.saveDefaultTimetable(<TimeDetail>[
+    // 作息录进**这个学期自己的**表：建学期时它先拿着模板的 12 节，整表替换后
+    // 就是这里的 2 节。旧写法把 2 节写到匿名默认表，靠的还是当时读错的那条路径。
+    final String? error = await semesters.saveDetailsForSemester(s.id, <TimeDetail>[
       TimeDetail(
           id: '',
           timetableId: '',
@@ -74,7 +76,7 @@ void main() {
           endMinutes: 580),
     ]);
     expect(error, isNull);
-    expect(await semesters.loadDefaultDetails(), hasLength(2));
+    expect(await semesters.loadDetailsForSemester(s.id), hasLength(2));
 
     final Course created = await courses.create(
       name: '高等数学',

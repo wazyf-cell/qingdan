@@ -59,7 +59,8 @@ void main() {
             firstWeekDate: DateTime.utc(2025, 8, 4),
             totalWeeks: 16))
         .id;
-    await semesters.saveDefaultTimetable(<TimeDetail>[
+    // 节次写进**这个学期自己的**作息表（匿名老表那条读路径 2026-10-19 已改掉）。
+    await semesters.saveDetailsForSemester(semesterId, <TimeDetail>[
       TimeDetail(
           id: '', timetableId: '', section: 1, startMinutes: 480, endMinutes: 525),
     ]);

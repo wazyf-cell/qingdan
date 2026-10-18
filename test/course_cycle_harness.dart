@@ -76,7 +76,7 @@ class CycleEnv {
     int sectionMinutes = 45,
     int gapMinutes = 10,
   }) async {
-    await semesters.createSemester(
+    final Semester seeded = await semesters.createSemester(
         name: '2025-2026-1',
         firstWeekDate: mondayWeek1,
         totalWeeks: totalWeeks);
@@ -87,7 +87,9 @@ class CycleEnv {
       details.add(_detail(section, start, end));
       start = end + gapMinutes;
     }
-    expect(await semesters.saveDefaultTimetable(details), isNull);
+    // 节次写进**这个学期自己的**作息表（读路径 2026-10-19 起按学期；
+    // 写匿名老表只是碰巧被当时那条读错的路径命中）。
+    expect(await semesters.saveDetailsForSemester(seeded.id, details), isNull);
   }
 
   static TimeDetail _detail(int section, int start, int end) => TimeDetail(

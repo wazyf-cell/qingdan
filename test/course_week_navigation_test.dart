@@ -69,12 +69,13 @@ void main() {
   Future<void> seed(WidgetTester tester,
       {required DateTime firstMonday, int totalWeeks = 16}) {
     return io(tester, () async {
-      await semesters.createSemester(
+      final Semester s = await semesters.createSemester(
           name: '2025-2026-1',
           firstWeekDate: firstMonday,
           totalWeeks: totalWeeks);
+      // 节次写进**这个学期自己的**作息表（读路径 2026-10-19 起按学期）。
       final String? error =
-          await semesters.saveDefaultTimetable(<TimeDetail>[
+          await semesters.saveDetailsForSemester(s.id, <TimeDetail>[
         TimeDetail(
             id: '',
             timetableId: '',

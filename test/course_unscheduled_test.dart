@@ -69,7 +69,7 @@ void main() {
       tester.runAsync<T?>(body);
 
   /// 建学期 + [scheduled] 门「作息里有节次」的课 + [unscheduled] 门「节次超出
-  /// 作息」的课。作息写几节由 [sections] 决定，0 = 完全不写（空表）。
+  /// 作息」的课。作息写几节由 [sections] 决定，0 = 把该学期那张作息表整表清空。
   Future<void> seed(WidgetTester tester,
       {required int sections,
       int scheduled = 0,
@@ -80,18 +80,20 @@ void main() {
               firstWeekDate: firstMonday,
               totalWeeks: 20))
           .id;
-      if (sections > 0) {
-        final String? error = await semesters.saveDefaultTimetable(<TimeDetail>[
-          for (int s = 1; s <= sections; s++)
-            TimeDetail(
-                id: '',
-                timetableId: '',
-                section: s,
-                startMinutes: 480 + (s - 1) * 55,
-                endMinutes: 480 + (s - 1) * 55 + 45),
-        ]);
-        expect(error, isNull);
-      }
+      // 节次写进**这个学期自己的**作息表（读路径 2026-10-19 起按学期）。
+      // [sections] = 0 时整表替换成空表：建学期时它先拿着模板的 12 节，
+      // 不写这一趟就清不掉，「作息空表」那个形态永远测不到。
+      final String? error = await semesters
+          .saveDetailsForSemester(semesterId, <TimeDetail>[
+        for (int s = 1; s <= sections; s++)
+          TimeDetail(
+              id: '',
+              timetableId: '',
+              section: s,
+              startMinutes: 480 + (s - 1) * 55,
+              endMinutes: 480 + (s - 1) * 55 + 45),
+      ]);
+      expect(error, isNull);
       for (int i = 0; i < scheduled; i++) {
         await courses.create(
             name: '已排课$i',

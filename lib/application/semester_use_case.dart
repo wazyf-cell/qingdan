@@ -138,17 +138,50 @@ class SemesterUseCase {
   }
 
   /// 默认作息表的节次，按节次升序。
+  ///
+  /// **只给「还没有学期」与老库回落用**。课表页 / 向导步 3 / 「学期与作息」弹层
+  /// 这些**已经按学期**的地方一律用 [loadDetailsForSemester]——2026-10-19 真机
+  /// 就是栽在这里：写路径 M6-D 起按学期，读路径还恒读这张匿名表，于是两个学期
+  /// 各自的 12 节永远读不到，课表页说「作息表还是空的」。
   Future<List<TimeDetail>> loadDefaultDetails() async {
     final TimeTable table = await ensureDefaultTimetable();
     return _dao.findDetails(table.id);
   }
 
-  /// 保存作息表。**返回 null 表示成功**，否则是可直接展示的校验错误摘要
-  /// （§2.3：时间必须递增、不重叠；校验不过**一行都不写**）。
-  Future<String?> saveDefaultTimetable(List<TimeDetail> details) async {
+  /// [semesterId] 那个学期**该用哪张作息表**：先取它自己的行（M6-D 建学期时
+  /// 从模板复制出来的那一份），没有就回落到老的匿名默认表。
+  ///
+  /// 回落是给**v6 之前建的学期**用的：那时作息只有一张、`semester_id IS NULL`，
+  /// 老库升级上来的学期根本没有配套作息行。不回落的话这些学期的课表页会直接
+  /// 空掉——比修之前更糟，所以这条回落由 `semester_timetable_read_test.dart`
+  /// 单独钉住，不许哪天当成多余的兜底删掉。
+  Future<TimeTable> timetableForSemester(String semesterId) async {
+    final TimeTable? own = await _dao.findTimetableForSemester(semesterId);
+    return own ?? await ensureDefaultTimetable();
+  }
+
+  /// [semesterId] 那个学期的节次，按节次升序；[semesterId] 为 null（还没建
+  /// 学期）时读匿名默认表。**读写必须共用 [timetableForSemester] 这一张表**，
+  /// 否则就是「显示本学期的、保存写进老表」——用户点完保存重读还是旧值。
+  Future<List<TimeDetail>> loadDetailsForSemester(String? semesterId) async {
+    if (semesterId == null) return loadDefaultDetails();
+    final TimeTable table = await timetableForSemester(semesterId);
+    return _dao.findDetails(table.id);
+  }
+
+  /// 整表保存 [semesterId] 那一学期的作息（表解析同 [timetableForSemester]）。
+  ///
+  /// **返回 null 表示成功**，否则是可直接展示的校验错误摘要（§2.3，
+  /// 校验不过一行都不写）。[semesterId] 为 null = 写匿名默认表（老库形状）。
+  Future<String?> saveDetailsForSemester(
+    String? semesterId,
+    List<TimeDetail> details,
+  ) async {
     final String? error = validateTimeDetails(details);
     if (error != null) return error;
-    final TimeTable table = await ensureDefaultTimetable();
+    final TimeTable table = semesterId == null
+        ? await ensureDefaultTimetable()
+        : await timetableForSemester(semesterId);
     await _dao.replaceDetails(
       table.id,
       <TimeDetail>[
@@ -158,6 +191,11 @@ class SemesterUseCase {
     );
     return null;
   }
+
+  /// 保存匿名默认作息（v6 前的老路径；[semesterId] 已知时改用
+  /// [saveDetailsForSemester]，别把新学期的节次写进这张公用表）。
+  Future<String?> saveDefaultTimetable(List<TimeDetail> details) =>
+      saveDetailsForSemester(null, details);
 
   static TimeDetail _retarget(TimeDetail d, String timetableId) => TimeDetail(
         id: d.id,

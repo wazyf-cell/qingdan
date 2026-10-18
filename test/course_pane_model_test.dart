@@ -41,7 +41,10 @@ void main() {
         name: '2025-2026-1',
         firstWeekDate: mondayWeek1,
         totalWeeks: totalWeeks);
-    await semesters.saveDefaultTimetable(<TimeDetail>[
+    // 节次写进**这个学期自己的**作息表（建学期时它已从模板复制过一份 12 节，
+    // 整表替换后就是这里给的 2 节）。写到 `saveDefaultTimetable` 那张匿名表上
+    // 只是碰巧被读路径命中——2026-10-19 读路径改成按学期后，那种写法就失效了。
+    await semesters.saveDetailsForSemester(s.id, <TimeDetail>[
       TimeDetail(
           id: '',
           timetableId: '',

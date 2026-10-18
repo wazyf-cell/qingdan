@@ -23,6 +23,21 @@ TimeDetail? rowOf(List<TimeDetail> details, int section) {
   return null;
 }
 
+/// 两套节次的**内容**是否逐节相同（节次 + 起止时刻；id 不参与比较）。
+///
+/// 给 `TimetableEditPanel.didUpdateWidget` 用：父级换了一张表（切学期、套模板）
+/// 内容一定变，得重种草稿；而 `model.load()` 每轮都返回**新的列表对象**、内容
+/// 却没变，按 identity 比会把用户敲了一半的格子抹掉——那是另一种「点了没反应」。
+bool sameDetailsContent(List<TimeDetail> a, List<TimeDetail> b) {
+  if (a.length != b.length) return false;
+  for (int i = 0; i < a.length; i++) {
+    if (a[i].section != b[i].section || pairOf(a[i]) != pairOf(b[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /// 时间格「能不能解析」的账本：**记录与染红分家**（M6-A1）。
 ///
 /// 为什么必须分家：`parseMinutes` 只认完整的 `HH:MM`，用户敲到一半（`0`、`09`、

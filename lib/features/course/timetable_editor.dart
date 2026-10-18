@@ -36,6 +36,11 @@ class _TimetableEditPanelState extends State<TimetableEditPanel> {
   String? _error;
   int _breakMinutes = 10;
 
+  /// 上一次**从库里拿到的那套**节次（不是用户正在敲的草稿）。
+  /// 比内容用它、不比 identity：`model.load()` 每轮都产一个新列表，按 identity
+  /// 重挂会把用户敲了一半的草稿抹掉——那是另一种「点了没反应」。
+  List<TimeDetail> _seeded = const <TimeDetail>[];
+
   /// 时间格账本（键 `'$section-$tag'`）：记「哪一格当前的文本解析不过」。
   final TimeCellRecords _rec = TimeCellRecords();
 
@@ -46,7 +51,25 @@ class _TimetableEditPanelState extends State<TimetableEditPanel> {
   void initState() {
     super.initState();
     _draft = <TimeDetail>[...widget.initialDetails];
+    _seeded = <TimeDetail>[...widget.initialDetails];
     _auditLoaded();
+  }
+
+  @override
+  void didUpdateWidget(covariant TimetableEditPanel old) {
+    super.didUpdateWidget(old);
+    // 父级换了一套节次（切学期、套用模板、建完学期后重读）→ 草稿必须跟着换，
+    // 否则卡片继续画着**上一张表**的时刻，界面说的就不是真话。
+    // 比的是**内容**不是 identity：`model.load()` 每轮都产一个新列表对象，
+    // 按 identity 重挂会抹掉用户敲了一半的草稿（`sameDetailsContent` 的理由）。
+    if (sameDetailsContent(_seeded, widget.initialDetails)) return;
+    setState(() {
+      _draft = <TimeDetail>[...widget.initialDetails];
+      _seeded = <TimeDetail>[...widget.initialDetails];
+      _error = null;
+      _rec.clearAll(); // 整张表都换了，旧账找不到新格子上，留着就是幽灵红框。
+      _resync++;
+    });
   }
 
   /// 载入既有数据时体检：越界格子（历史脏数据）标红并要求改正再保存。

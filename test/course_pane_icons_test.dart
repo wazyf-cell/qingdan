@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_common_ffi.dart';
 import 'package:qingdan/application/app_services.dart';
 import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
+import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_pane.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
@@ -48,11 +49,12 @@ void main() {
     courses = CourseUseCase(services);
     model = CoursePaneModel(
         semesterUseCase: semesters, courseUseCase: courses, clock: () => today);
-    await semesters.createSemester(
+    final Semester seeded = await semesters.createSemester(
         name: '2025-2026-1',
         firstWeekDate: DateTime.utc(2025, 8, 4),
         totalWeeks: 16);
-    await semesters.saveDefaultTimetable(<TimeDetail>[
+    // 节次写进**这个学期自己的**作息表（匿名老表那条读路径 2026-10-19 已改掉）。
+    await semesters.saveDetailsForSemester(seeded.id, <TimeDetail>[
       TimeDetail(
           id: '', timetableId: '', section: 1, startMinutes: 480, endMinutes: 525),
     ]);

@@ -67,12 +67,15 @@ void main() {
   Future<void> seedSemester(WidgetTester tester,
       {int totalWeeks = 4}) async {
     await io(tester, () async {
-        await semesters.createSemester(
+        final Semester s = await semesters.createSemester(
             name: '2025-2026-1',
             firstWeekDate: mondayWeek1,
             totalWeeks: totalWeeks);
+        // 节次写进**这个学期自己的**作息表。旧写法写的是 `semester_id IS NULL`
+        // 那张匿名表，课表页能读到只是巧合（读路径恒盯着那张表）——2026-10-19
+        // 读路径改成按学期之后，那种铺数据的方式就失效了。
         final String? error =
-            await semesters.saveDefaultTimetable(<TimeDetail>[
+            await semesters.saveDetailsForSemester(s.id, <TimeDetail>[
           TimeDetail(
               id: '',
               timetableId: '',

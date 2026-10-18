@@ -122,16 +122,21 @@ class SemesterSwitcherHarness {
             firstWeekDate: DateTime.utc(2025, 8, 11),
             totalWeeks: 20,
             setActive: false);
-        final String? error = await semesters.saveDefaultTimetable(<TimeDetail>[
-          TimeDetail(
-              id: '', timetableId: '', section: 1, startMinutes: 480, endMinutes: 525),
-          TimeDetail(
-              id: '', timetableId: '', section: 2, startMinutes: 535, endMinutes: 580),
-        ]);
-        expect(error, isNull);
         final List<Semester> all = await semesters.allSemesters();
         final Semester a = all.firstWhere((Semester s) => s.name == 'A 学期');
         final Semester b = all.firstWhere((Semester s) => s.name == 'B 学期');
+        // 两个学期**各自**的作息表都铺这 2 节。旧写法只写匿名默认表那一张，
+        // 两边「看起来都对」靠的是读路径读错了表（2026-10-19 已改成按学期读）。
+        for (final Semester s in <Semester>[a, b]) {
+          final String? error = await semesters.saveDetailsForSemester(
+            s.id,
+            <TimeDetail>[
+              TimeDetail(id: '', timetableId: '', section: 1, startMinutes: 480, endMinutes: 525),
+              TimeDetail(id: '', timetableId: '', section: 2, startMinutes: 535, endMinutes: 580),
+            ],
+          );
+          expect(error, isNull);
+        }
         await courses.create(
             name: '高等数学',
             weekday: 1,

@@ -155,7 +155,12 @@ class CoursePaneModel extends ChangeNotifier {
   Future<void> load() async {
     try {
       semester = await _semesters.activeSemester();
-      details = await _semesters.loadDefaultDetails();
+      // 节次读**当前学期自己**的那张作息表（M6-D 起建学期即从模板复制一份）。
+      // 这里以前调 `loadDefaultDetails()`，那张是 `semester_id IS NULL` 的匿名
+      // 老表：2026-10-19 真机库里两个学期各有 12 节、匿名表一条都没有，于是周
+      // 视图永远说「作息表还是空的」、所有课程落进「未排时间」。老库（学期没有
+      // 自己的作息行）由用例层回落到同一张匿名表，不会空也不会崩。
+      details = await _semesters.loadDetailsForSemester(semester?.id);
       // 打开就定位到今天那一周（界面 §4.1：周视图默认定位到本周）；学期外回落到第 1 周。
       week = (semester?.weekOf(_clock()) ?? 1)
           .clamp(1, totalWeeks == 0 ? 1 : totalWeeks);

@@ -74,7 +74,8 @@ void main() {
               totalWeeks: 20))
           .id;
       expect(
-          await semesters.saveDefaultTimetable(<TimeDetail>[
+          // 节次写进**这个学期自己的**作息表（读路径 2026-10-19 起按学期）。
+          await semesters.saveDetailsForSemester(id, <TimeDetail>[
             TimeDetail(
                 id: '',
                 timetableId: '',

@@ -166,7 +166,12 @@ class _CourseSetupBodyState extends State<_CourseSetupBody> {
           details: model.details,
           isMobile: isMobile,
           onSave: (List<TimeDetail> draft) async {
-            final String? error = await semesters.saveDefaultTimetable(draft);
+            // 写回**当前学期自己**的那张作息表（弹层显示的就是它，读写必须同表）。
+            // 旧实现调 `saveDefaultTimetable`，那是 `semester_id IS NULL` 的匿名
+            // 老表：读路径 2026-10-19 改成按学期之后，若这里不跟着改，用户改完点
+            // 保存、重读回的还是本学期旧值——2026-10-18「点了没反应」的同一个形状。
+            final String? error = await semesters
+                .saveDetailsForSemester(model.semester?.id, draft);
             if (error != null) {
               // 用例层这道闸通常不会响（面板 _save 已跑过同一个
               // validateTimeDetails），但一旦两处判据分叉，静默 return 就又变成

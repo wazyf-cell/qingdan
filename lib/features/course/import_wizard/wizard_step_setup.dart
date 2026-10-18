@@ -9,6 +9,8 @@
 // 卡片本体与设置弹层共用（`semester_timetable_cards.dart`），这里只负责
 // 「保存 → 回读 → 交给向导模型」。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -55,12 +57,15 @@ class _WizardStepSetupState extends State<WizardStepSetup> {
     final TimetableUseCase tt = context.read<TimetableUseCase>();
     final List<Semester> all = await semesters.allSemesters();
     final Semester? active = await semesters.activeSemester();
-    final List<TimeDetail> d = await semesters.loadDefaultDetails();
-    final List<TimeTable> templates = await tt.templates();
-    if (!mounted) return;
     final String? wanted = keepSelectedId ?? _selected?.id;
     final Semester? selected =
         all.where((Semester s) => s.id == wanted).firstOrNull ?? active;
+    // 节次按**选中的那个学期**读。这里以前恒读 `semester_id IS NULL` 的匿名老
+    // 表：这一步早就有「导入到哪个学期」下拉，读的却是另一张表（2026-10-19）。
+    final List<TimeDetail> d =
+        await semesters.loadDetailsForSemester(selected?.id);
+    final List<TimeTable> templates = await tt.templates();
+    if (!mounted) return;
     // 模板可能在上一次保存后被删掉：下拉值失效就退回「沿用」，
     // DropdownButton 的 value 不在 items 里会直接断言失败。
     final String choice = templates.any((TimeTable t) => t.id == _timetableChoice)
@@ -77,17 +82,25 @@ class _WizardStepSetupState extends State<WizardStepSetup> {
     context.read<ImportWizardModel>().adoptSemester(selected, d);
   }
 
-  /// 「导入到学期」下拉换了目标：立刻把模型指过去，作息沿用当前展示值
-  /// （学期专属作息的只读 API 属 §六/§七 的并行改造，落地后这里换数据源即可）。
+  /// 「导入到学期」下拉换了目标：立刻把模型指过去，并**重读该学期自己的节次**
+  /// （步 4 的解析与超界警告拿的就是这份，读错表等于预览按另一套时间算）。
   void _pickSemester(Semester? s) {
     if (s == null) return;
     setState(() => _selected = s);
-    context.read<ImportWizardModel>().adoptSemester(s, _details);
+    unawaited(_reloadDetailsFor(s));
+  }
+
+  Future<void> _reloadDetailsFor(Semester s) async {
+    final List<TimeDetail> d =
+        await context.read<SemesterUseCase>().loadDetailsForSemester(s.id);
+    if (!mounted) return;
+    setState(() => _details = d);
+    context.read<ImportWizardModel>().adoptSemester(s, d);
   }
 
   /// 「作息」两选：沿用 / 换成模板。选模板 = 把模板节次**复制成该学期作息的
-  /// 快照**（`applyTemplateToSemester`），此后与模板再无关系；界面展示的
-  /// 就是刚复制的那份内容。
+  /// 快照**（`applyTemplateToSemester`），此后与模板再无关系；界面展示的就是
+  /// 复制完**从该学期那张表读回来**的内容（不拿模板行充数——id 都不是一张表）。
   Future<void> _pickTimetable(String? choice) async {
     if (choice == null) return;
     setState(() => _timetableChoice = choice);
@@ -98,9 +111,13 @@ class _WizardStepSetupState extends State<WizardStepSetup> {
       return;
     }
     final TimetableUseCase tt = context.read<TimetableUseCase>();
+    // 用例对象在 await 之前取好：await 之后再摸 context 就是那个
+    // `use_build_context_synchronously` 警告的老坑（这里还顺带保证「读回来的是
+    // 该学期那张表的内容」，不是模板行）。
+    final SemesterUseCase sem = context.read<SemesterUseCase>();
     try {
       await tt.applyTemplateToSemester(semesterId: s.id, templateId: choice);
-      final List<TimeDetail> copied = await tt.templateDetails(choice);
+      final List<TimeDetail> copied = await sem.loadDetailsForSemester(s.id);
       if (!mounted) return;
       setState(() {
         _details = copied;
@@ -136,9 +153,12 @@ class _WizardStepSetupState extends State<WizardStepSetup> {
     await _reload(keepSelectedId: savedId);
   }
 
+  /// 保存作息：写进**下拉选中的那个学期**自己的作息表（没有学期时才是老那张
+  /// 匿名表）。以前恒写匿名表，与「这一步能选学期」自相矛盾。
   Future<void> _saveTimetable(List<TimeDetail> draft) async {
-    final String? error =
-        await context.read<SemesterUseCase>().saveDefaultTimetable(draft);
+    final String? error = await context
+        .read<SemesterUseCase>()
+        .saveDetailsForSemester(_selected?.id, draft);
     if (!mounted) return;
     setState(() => _notice = error);
     if (error == null) await _reload();

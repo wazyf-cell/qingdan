@@ -7,6 +7,7 @@ import 'package:qingdan/application/app_services.dart';
 import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/data/migrations.dart';
+import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_block.dart';
 import 'package:qingdan/features/course/course_pane.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
@@ -183,6 +184,11 @@ void main() {
     await tester.pumpAndSettle();
     await tapIo(tester, 'semester-save');
     await tester.pumpAndSettle();
+    // 建完学期，本学期自己那张表已经有模板的 12 节：先记下真值，
+    // 待会儿断言「校验拦下来 = 库里一个字没动」（旧断言写的是 isEmpty，
+    // 那是靠读路径读错表才成立的——2026-10-19 修好后这里必须比内容）。
+    final List<int> beforeSave =
+        model.details.map((TimeDetail d) => d.startMinutes).toList();
     await tapIo(tester, 'tt-generate');
     await tester.pumpAndSettle();
 
@@ -195,7 +201,10 @@ void main() {
     await tapIo(tester, 'tt-save');
     await tester.pumpAndSettle();
 
-    expect(model.details, isEmpty, reason: '校验失败一行都不写');
+    expect(model.details.map((TimeDetail d) => d.startMinutes).toList(),
+        beforeSave,
+        reason: '校验失败一行都不写：库里还得是建学期时那 12 节');
+    expect(beforeSave, hasLength(12), reason: '前提：本学期自己的作息表有 12 节');
     expect(find.textContaining('重叠'), findsOneWidget);
   });
 

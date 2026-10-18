@@ -74,7 +74,8 @@ void main() {
   Future<void> pullDuringSync() async {
     final Semester s = await semesters.createSemester(
         name: '对端学期', firstWeekDate: mondayWeek1, totalWeeks: 4);
-    await semesters.saveDefaultTimetable(<TimeDetail>[
+    // 节次写进**这个学期自己的**作息表（匿名老表那条读路径 2026-10-19 已改掉）。
+    await semesters.saveDetailsForSemester(s.id, <TimeDetail>[
       TimeDetail(
           id: '',
           timetableId: '',

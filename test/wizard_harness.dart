@@ -19,6 +19,7 @@ import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/application/timetable_use_case.dart';
 import 'package:qingdan/data/migrations.dart';
 import 'package:qingdan/domain/course.dart';
+import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/course/import_wizard/import_wizard.dart';
@@ -61,11 +62,12 @@ class WizardHarness {
             semesterUseCase: SemesterUseCase(services),
             courseUseCase: CourseUseCase(services)));
     if (withSemester) {
-      await h.semesters.createSemester(
+      final Semester seeded = await h.semesters.createSemester(
           name: '2025-2026-1',
           firstWeekDate: DateTime(2025, 9, 1),
           totalWeeks: totalWeeks);
-      await h.semesters.saveDefaultTimetable(generateTimeDetails(
+      // 节次写进**这个学期自己的**作息表（读路径 2026-10-19 起按学期）。
+      await h.semesters.saveDetailsForSemester(seeded.id, generateTimeDetails(
           timetableId: '',
           firstStartMinutes: 480,
           lessonMinutes: 45,
