@@ -133,10 +133,14 @@ class SemesterDao {
   // ---- 作息表 ----
 
   /// 默认作息表（`semester_id` 为 NULL 的第一张，当前版本恒只有一张）。
+  ///
+  /// v6（M6-D）起模板库行也挂在 `semester_id IS NULL` 下（内置模板
+  /// `builtin-college` 是其中之一），必须排除，否则「默认作息」会被模板
+  /// 抢走身份（迁移 seed 的 created_time 早于一切运行期写入）。
   Future<TimeTable?> findDefaultTimetable() async {
     final List<Map<String, Object?>> rows = await _db.query(
       'timetables',
-      where: 'semester_id IS NULL',
+      where: 'semester_id IS NULL AND is_template = 0',
       orderBy: 'created_time ASC',
       limit: 1,
     );

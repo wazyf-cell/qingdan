@@ -3,12 +3,16 @@ import 'timestamps.dart';
 /// 作息时间表（F28/F30）：`第 N 节 → 时间区间`。
 ///
 /// **时间一律用「当日分钟数 int」**（`480 == 08:00`），`TimeOfDay` 只允许出现在
-/// UI 层（§1.2 强制）。[semesterId] 当前版本恒为 null，即「默认作息表」。
+/// UI 层（§1.2 强制）。v6（M6-D）起 [semesterId] 可为学期专属作息；
+/// `semester_id == null && isTemplate` 表示模板库条目，其中 [isBuiltin] 行
+/// 是每台设备本地 seed 的内置模板（不参与同步）。
 class TimeTable {
   TimeTable({
     required this.id,
     required this.name,
     this.semesterId,
+    this.isTemplate = false,
+    this.isBuiltin = false,
     this.createdTime,
     this.modifiedTime,
   });
@@ -16,13 +20,39 @@ class TimeTable {
   final String id;
   String name;
   String? semesterId;
+
+  /// v6 列 `is_template`：模板库条目（可被新建学期复制快照）。
+  final bool isTemplate;
+
+  /// v6 列 `is_builtin`：内置模板（不可删、不可改名、不进同步）。
+  final bool isBuiltin;
   final DateTime? createdTime;
   final DateTime? modifiedTime;
+
+  TimeTable copyWith({
+    String? name,
+    String? semesterId,
+    bool? isTemplate,
+    bool? isBuiltin,
+    DateTime? createdTime,
+    DateTime? modifiedTime,
+  }) =>
+      TimeTable(
+        id: id,
+        name: name ?? this.name,
+        semesterId: semesterId ?? this.semesterId,
+        isTemplate: isTemplate ?? this.isTemplate,
+        isBuiltin: isBuiltin ?? this.isBuiltin,
+        createdTime: createdTime ?? this.createdTime,
+        modifiedTime: modifiedTime ?? this.modifiedTime,
+      );
 
   factory TimeTable.fromMap(Map<String, Object?> map) => TimeTable(
         id: map['id']! as String,
         name: map['name']! as String,
         semesterId: map['semester_id'] as String?,
+        isTemplate: (map['is_template'] as int? ?? 0) != 0,
+        isBuiltin: (map['is_builtin'] as int? ?? 0) != 0,
         createdTime: msToDateTime(map['created_time'] as int?),
         modifiedTime: msToDateTime(map['modified_time'] as int?),
       );
@@ -31,6 +61,8 @@ class TimeTable {
         'id': id,
         'name': name,
         'semester_id': semesterId,
+        'is_template': isTemplate ? 1 : 0,
+        'is_builtin': isBuiltin ? 1 : 0,
         'created_time': dateTimeToMs(createdTime),
         'modified_time': dateTimeToMs(modifiedTime),
       };

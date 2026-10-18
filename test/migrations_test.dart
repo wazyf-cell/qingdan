@@ -183,7 +183,12 @@ void main() {
             },
           ),
         );
+        // v6 起迁移还会给内置模板 seed 13 行 sync_state 基线
+        // （timetable ×1 + time_detail ×12），本条只验 v3 的存量搬运，
+        // 把断言限定在搬运涉及的四个类型上。
         final List<Map<String, Object?>> rows = await db2.query('sync_state',
+            where: 'entity_type IN (?,?,?,?)',
+            whereArgs: <Object?>['task', 'list', 'subtask', 'tag'],
             orderBy: 'entity_type ASC');
         expect(rows, hasLength(2),
             reason: 'task 与 list 各搬一行，NULL 基线不搬');
