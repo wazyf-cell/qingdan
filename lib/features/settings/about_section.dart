@@ -12,7 +12,7 @@ import 'settings_section_page.dart';
 /// 不引 `package_info_plus`（本轮定死「不新增依赖」），代价是它是个手抄常量，
 /// 所以 `test/app_version_test.dart` 直接读 pubspec 比对：改了版本号忘了改这里，
 /// 那条测试就红——留一个永远显示 0.1.0 的死字符串比不显示更糟。
-const String kAppVersion = '1.0.0';
+const String kAppVersion = '1.0.1';
 
 /// 设置 · 关于节（M5 定案第 13 条 + M6-C C1 / C6 / E1）。
 class AboutSection extends StatelessWidget {
