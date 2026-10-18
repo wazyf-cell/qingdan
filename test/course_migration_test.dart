@@ -135,14 +135,17 @@ void main() {
 
       // 3. 列补上了，且 12 行内容原样还在，时间戳为 NULL（老行没有编辑时间，
       //    同步层据此判定胜负，见 sync_two_device_course_test 的老行用例）。
+      //    限定 t1：当前库已升到头（v6 会 seed 内置模板 builtin-college 的
+      //    12 行节次，全表计数会把存量断言污染成 24）。
       final List<String> cols =
           (await v5.rawQuery('PRAGMA table_info(time_details)'))
               .map((Map<String, Object?> r) => r['name']!)
               .cast<String>()
               .toList();
       expect(cols, containsAll(<String>['created_time', 'modified_time']));
-      final List<Map<String, Object?>> kept =
-          await v5.query('time_details', orderBy: 'section ASC');
+      final List<Map<String, Object?>> kept = await v5.query('time_details',
+          where: 'timetable_id = ?', whereArgs: <Object?>['t1'],
+          orderBy: 'section ASC');
       expect(kept, hasLength(12), reason: '升级不得动掉存量作息行');
       expect(kept.first['start_minutes'], 480);
       expect(kept.last['end_minutes'], 525 + 11 * 55);

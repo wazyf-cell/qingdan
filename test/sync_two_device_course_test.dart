@@ -64,8 +64,11 @@ void main() {
   }
 
   Future<TimeDetail> sectionOne(DeviceHarness d) async {
-    final List<Map<String, Object?>> rows = await d.db
-        .query('time_details', where: 'section = ?', whereArgs: <Object?>[1]);
+    // v6 起每台设备本地 seed 内置模板 builtin-college（12 行节次，设备本地、
+    // 不参与同步），按节次号裸查会多命中，必须排除内置模板行。
+    final List<Map<String, Object?>> rows = await d.db.query('time_details',
+        where: 'section = ? AND timetable_id <> ?',
+        whereArgs: <Object?>[1, 'builtin-college']);
     return TimeDetail.fromMap(rows.single);
   }
 
