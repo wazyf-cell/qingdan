@@ -7,5 +7,6 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(engine: FlutterEngine) {
         super.configureFlutterEngine(engine)
         SystemIntents.register(this, engine)
+        FileIntents.register(this, engine)
     }
 }
