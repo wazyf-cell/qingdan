@@ -1,0 +1,98 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Widget Preview related
+.widget_preview/
+
+# =====================================================================
+# 本项目追加（2026-10-18 入库安检）。原则：**宁可漏掉也不要泄露**——
+# 加回来很容易，从公开仓库的历史里删掉几乎不可能。
+# =====================================================================
+
+# --- 构建产物与本地缓存（build 3.9G / _probe 3.3G / .dart_tool 822M）---
+/_probe/
+/_probe_dav/
+/.qoder-credits/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- 含真实数据或凭据的备份，绝不入库 ---
+# _bak_20261010/android_device_v4.db = 真机拉回的业务库（真实待办 + sync_state etag）
+/_bak_20261010/
+# _env_backup/ = 本机 PATH / MAVEN_HOME 快照与回滚脚本（暴露机器环境，非项目源码）
+/_env_backup/
+# 一次性验收驱动（从 stdin 读凭据，本身干净，但属草稿）
+/_s6/
+/_s7/
+
+# --- 第三方扩展目录：含 Chrome 扩展签名私钥 1.2.2_0.pem、AGPL 上游代码、
+#     以及 本学期.wakeup_schedule / 日历.ics（本人真实课表，个人数据）---
+/扩展/
+
+# --- 桌面端：本仓库只发布 Android 端（2026-10-18 用户明确要求）---
+/windows/
+
+# --- 根目录一次性交接草稿与日志（正式文档在 开发文档/）---
+/M3-交接给下一个助手.md
+/M3-执行计划.md
+/handoff-*.md
+/_probe_test_baseline.log
+/secret_scan.py
+/secret_scan.txt
+
+# --- 来历不明的根目录图片（32 位十六进制命名，疑似聊天/CDN 截图）---
+/B21EA9C249FA864F0F86CEDA95DDFF98.jpg
+
+# --- Android 本机路径与构建产物 ---
+android/local.properties
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/.idea/
+android/*.iml
+
