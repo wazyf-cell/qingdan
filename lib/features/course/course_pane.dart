@@ -10,6 +10,7 @@ import 'package:qingdan/theme/app_typography.dart';
 
 import 'course_block_sheet.dart';
 import 'course_grid.dart';
+import 'course_pane_empty.dart';
 import 'course_pane_model.dart';
 import 'course_setup.dart';
 import 'course_toast.dart';
@@ -196,26 +197,38 @@ class _CoursePaneState extends State<CoursePane> {
             opaque: _toast.opaque,
           ),
         ),
-        Expanded(
-          child: CourseWeekPager(
-            totalWeeks: model.totalWeeks,
-            week: model.week,
-            onWeekChanged: (int week) => model.selectWeek(week),
-            pageBuilder: (BuildContext _, int week) => CourseWeekGrid(
-              days: model.visibleDays(isMobile: _isMobile),
-              layout: model.layout,
-              coursesOf: (int weekday) => model.coursesOnDay(week, weekday),
-              dateOf: (int weekday) => model.dateInWeek(week, weekday),
-              todayWeekday:
-                  week == model.todayWeek ? model.today.weekday : null,
-              isMobile: _isMobile,
-              onBlockTap: (Course tapped, List<Course> sameSlot) =>
-                  _openBlock(tapped),
+        // 作息表空着的时候网格画不出任何块，全部课程都会掉进「未排时间」。
+        // 这时给用户一张空网格等于让他以为课表坏了（2026-10-18 模拟器实测），
+        // 所以换成把因果讲清楚 + 一个「去填作息」的出口；收纳区也不再重复列一遍。
+        if (model.details.isEmpty)
+          Expanded(
+            child: NoTimetableState(
+              courseCount: model.allCourses.length,
+              onFill: () => showCourseSetup(context, isMobile: _isMobile),
+            ),
+          )
+        else ...<Widget>[
+          Expanded(
+            child: CourseWeekPager(
+              totalWeeks: model.totalWeeks,
+              week: model.week,
+              onWeekChanged: (int week) => model.selectWeek(week),
+              pageBuilder: (BuildContext _, int week) => CourseWeekGrid(
+                days: model.visibleDays(isMobile: _isMobile),
+                layout: model.layout,
+                coursesOf: (int weekday) => model.coursesOnDay(week, weekday),
+                dateOf: (int weekday) => model.dateInWeek(week, weekday),
+                todayWeekday:
+                    week == model.todayWeek ? model.today.weekday : null,
+                isMobile: _isMobile,
+                onBlockTap: (Course tapped, List<Course> sameSlot) =>
+                    _openBlock(tapped),
+              ),
             ),
           ),
-        ),
-        if (model.unscheduled.isNotEmpty)
-          _UnscheduledStrip(courses: model.unscheduled),
+          if (model.unscheduled.isNotEmpty)
+            UnscheduledStrip(courses: model.unscheduled),
+        ],
       ],
     );
   }
@@ -249,38 +262,6 @@ class _NoSemesterState extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// 「未排时间」收纳区：网格底部的折叠条（2026-10-10 定案：放底部，不挤占列宽）。
-class _UnscheduledStrip extends StatelessWidget {
-  const _UnscheduledStrip({required this.courses});
-
-  final List<Course> courses;
-
-  @override
-  Widget build(BuildContext context) {
-    final AppColors colors = AppColors.of(context);
-    return ExpansionTile(
-      tilePadding: const EdgeInsets.symmetric(horizontal: AppDimens.s12),
-      childrenPadding: const EdgeInsets.only(bottom: AppDimens.s8),
-      title: Text('未排时间（${courses.length}）',
-          style: AppTypography.body.copyWith(color: colors.textSecondary)),
-      subtitle: Text('这些课占的节次不在作息表里，先收在这里，不截断',
-          style: AppTypography.meta.copyWith(color: colors.textFaint)),
-      children: <Widget>[
-        for (final Course c in courses)
-          ListTile(
-            dense: true,
-            title: Text(c.name, style: AppTypography.body),
-            subtitle: Text(
-              '第 ${c.startSection}-${c.endSection} 节'
-              '${c.location == null ? '' : ' · ${c.location}'}',
-              style: AppTypography.meta,
-            ),
-          ),
-      ],
     );
   }
 }
