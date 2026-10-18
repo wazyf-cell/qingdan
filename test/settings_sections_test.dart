@@ -90,7 +90,12 @@ void main() {
     final ListTile lang =
         tester.widget<ListTile>(find.byKey(const ValueKey<String>('settings-language')));
     expect(lang.enabled, isFalse, reason: '语言没做就该看着是灰的');
-    expect(find.textContaining('英文版尚未制作'), findsOneWidget);
+    // 2026-10-19：占位文案不许暗示一个没排期的未来。「英文版尚未制作 · 即将推出」
+    // 让用户以为中英文是欠着的基本功能，而需求文档里根本没有多语言这一项。
+    expect(find.textContaining('本应用只做简体中文'), findsOneWidget);
+    expect(find.textContaining('英文版尚未制作'), findsNothing);
+    expect(find.textContaining('即将推出'), findsNothing,
+        reason: '没有排期的事不能写在界面上');
 
     expect(find.textContaining('更新源尚未配置'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey<String>('settings-update')));

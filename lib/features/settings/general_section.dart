@@ -54,6 +54,11 @@ class GeneralSection extends StatelessWidget {
           onTap: () => showPermissionsSheet(context),
         ),
         // E2：语言整行禁用。做半套 i18n 比不做更糟——切了语言只有一半界面跟着变。
+        //
+        // 2026-10-19 去掉「英文版尚未制作 · 即将推出」这句：需求规格书、项目概览、
+        // 「明确不做」清单里**都没有多语言这一项**，是这句占位文案自己造出了一个
+        // 「欠着的基本功能」的错觉（用户据此问「中英文都有吧」）。禁用是真的，
+        // 「即将推出」不是——没有排期的事不许写在界面上。
         ListTile(
           key: const ValueKey<String>('settings-language'),
           contentPadding: EdgeInsets.zero,
@@ -61,9 +66,8 @@ class GeneralSection extends StatelessWidget {
           enabled: false,
           title: Text('语言',
               style: AppTypography.body.copyWith(color: colors.textPrimary)),
-          subtitle: const Text('简体中文 · 英文版尚未制作',
+          subtitle: const Text('简体中文（本应用只做简体中文）',
               style: AppTypography.meta),
-          trailing: _Soon(colors: colors),
         ),
         // E1：占位**不发任何网络请求**（联网只会得到一个失败提示，反而像功能坏了）。
         ListTile(
@@ -101,23 +105,3 @@ class GeneralSection extends StatelessWidget {
 }
 
 /// 「即将推出」小标签：占位行不能只靠置灰让人猜它是坏了还是没做。
-class _Soon extends StatelessWidget {
-  const _Soon({required this.colors});
-
-  final AppColors colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppDimens.s8, vertical: AppDimens.s4),
-      decoration: BoxDecoration(
-        color: colors.surfaceHigh,
-        borderRadius: BorderRadius.circular(AppDimens.radiusDesktop),
-      ),
-      child: Text('即将推出',
-          style: AppTypography.meta.copyWith(
-              fontSize: 10, color: colors.textFaint)),
-    );
-  }
-}
