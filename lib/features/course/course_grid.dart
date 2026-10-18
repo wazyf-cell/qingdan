@@ -19,6 +19,7 @@ class CourseWeekGrid extends StatelessWidget {
     super.key,
     required this.days,
     required this.layout,
+    required this.week,
     required this.coursesOf,
     required this.dateOf,
     this.todayWeekday,
@@ -28,6 +29,10 @@ class CourseWeekGrid extends StatelessWidget {
 
   final List<int> days;
   final SectionLayout layout;
+
+  /// 这一页是第几周：透传给日列，让「换周就把同槽块的组内索引清回第一条」
+  /// 能看出来（细化 §2.4，2026-10-19）。
+  final int week;
   final List<Course> Function(int weekday) coursesOf;
   final DateTime Function(int weekday) dateOf;
 
@@ -71,6 +76,7 @@ class CourseWeekGrid extends StatelessWidget {
                             child: CourseDayColumn(
                               key: ValueKey<String>('day-$weekday'),
                               layout: layout,
+                              week: week,
                               groups: groupByOverlap(coursesOf(weekday)),
                               isToday: weekday == todayWeekday,
                               isMobile: isMobile,

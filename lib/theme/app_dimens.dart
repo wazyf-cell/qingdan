@@ -79,11 +79,25 @@ abstract final class AppDimens {
   static const EdgeInsets courseBlockPadding =
       EdgeInsets.fromLTRB(9, 4, 6, 4);
 
-  /// 同槽堆叠时块与块之间的间隙。
-  static const double courseStackGap = 2;
+  /// 同槽循环角标的视觉直径（细化 §2.4，2026-10-19 改版）。
+  static const double courseCycleBadge = 20;
 
-  /// 单条课程块的最低可读高度（低于此值整组降级为「首二字 + +N」）。
-  static const double courseMinBlockHeight = 28;
+  /// 循环角标的点击热区**上限**（不是保证值）。
+  ///
+  /// 视觉只有 20dp，但**手机上纯 20dp 图标点不准**（本项目真机走过的坑），
+  /// 所以命中框按 36dp 铺。块高 = `0.9 × 分钟数 − 2`，45 分钟一节 = 38.5dp，
+  /// 一节排到 43 分钟以下就不足 36dp（每节时长是自由输入，30 分钟能落库），
+  /// 所以调用方要给 [CourseCycleBadge.maxHeight] 把热区钳进块自身：块外那一截
+  /// 实测吃不到点击（2026-10-19 探针：30 分钟一节时点它等于点上一块），
+  /// 却会把 20dp 圆底剪掉一截。
+  static const double courseCycleTouchTarget = 36;
+
+  /// 块内「2/3」计数小字为课名让出的右侧留白（防止长课名的省略号压在数字上）。
+  static const double courseCycleCounterGap = 26;
+
+  /// 组内切换的动画时长：内容水平滑出 + 下一条从右侧滑入并淡入（2026-10-19 定案，
+  /// 不做翻转/缩放/弹跳）。
+  static const Duration courseCycleSwitchDuration = Duration(milliseconds: 200);
 
   /// 周导航 ‹ › 按钮边长。
   static const double courseNavButton = 40;

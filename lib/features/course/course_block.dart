@@ -8,6 +8,10 @@ import 'package:qingdan/theme/app_palette.dart';
 ///
 /// 底色 = 调色板色 16% 透明，左侧 3dp 实色竖条，课名用同色的前景变体。
 /// **不用阴影**（细化 §0:22：高程只用表面色差 + 1dp 分隔线表达）。
+///
+/// 同槽多门课时，块本身**只装当前选中的那一门**；循环角标与「2/3」计数由
+/// [CourseDayColumn] 叠在块上（见 course_cycle_badge.dart，2026-10-19 改版：
+/// 原来的均分堆叠与「+N」降级块一起废掉）。
 class CourseBlock extends StatelessWidget {
   const CourseBlock({
     super.key,
@@ -16,7 +20,7 @@ class CourseBlock extends StatelessWidget {
     required this.height,
     this.location,
     this.teacher,
-    this.badgeCount = 0,
+    this.trailingReserve = 0,
     this.isMobile = false,
     this.onTap,
   });
@@ -27,9 +31,11 @@ class CourseBlock extends StatelessWidget {
   final String? location;
   final String? teacher;
 
-  /// > 0 表示这是**降级容器块**：只显示课名首二字，右上角「+N」角标
-  /// （细化 §2.4:108-109：N 为被折进去的条数，角标不用错误色）。
-  final int badgeCount;
+  /// 右上角给组内计数小字让出的宽度（0 = 没有叠加物）。
+  ///
+  /// 窄屏一格只有 70dp 左右，课名本来就要省略号，不让位的话省略号会直接压在
+  /// 「2/3」上面（细化 §2.4，2026-10-19）。
+  final double trailingReserve;
   final bool isMobile;
   final VoidCallback? onTap;
 
@@ -40,14 +46,6 @@ class CourseBlock extends StatelessWidget {
   bool get _showTeacher =>
       !isMobile && height >= 72 && (teacher?.isNotEmpty ?? false);
   bool get _singleLineName => height < 72;
-
-  String get _displayName {
-    if (badgeCount > 0) {
-      // 降级：只留首二字。
-      return name.characters.take(2).string;
-    }
-    return name;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,13 +83,14 @@ class CourseBlock extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: AppDimens.courseBlockPadding,
+              padding: AppDimens.courseBlockPadding.copyWith(
+                  right: AppDimens.courseBlockPadding.right + trailingReserve),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    _displayName,
+                    name,
                     maxLines: _singleLineName ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -126,42 +125,7 @@ class CourseBlock extends StatelessWidget {
                 ],
               ),
             ),
-            if (badgeCount > 0)
-              Positioned(
-                right: 3,
-                top: 3,
-                child: _Badge(count: badgeCount, colors: colors),
-              ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 「+N」角标：次要文字色底 + 表面色字（细化 §2.4:109 写「反白字」又说「次要文字色底」，
-/// 两处自相矛盾；按「不用错误色」的硬约束取后者为准，2026-10-10 定案）。
-class _Badge extends StatelessWidget {
-  const _Badge({required this.count, required this.colors});
-
-  final int count;
-  final AppColors colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-      decoration: BoxDecoration(
-        color: colors.textSecondary,
-        borderRadius: BorderRadius.circular(AppDimens.radiusDesktop),
-      ),
-      child: Text(
-        '+$count',
-        style: TextStyle(
-          fontSize: 11,
-          height: 13 / 11,
-          fontWeight: FontWeight.w600,
-          color: colors.surface,
         ),
       ),
     );

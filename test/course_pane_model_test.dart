@@ -5,6 +5,7 @@ import 'package:qingdan/application/app_services.dart';
 import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/domain/course.dart';
+import 'package:qingdan/domain/course_conflict.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
@@ -146,7 +147,7 @@ void main() {
         reason: '今天是第 2 周的周一');
   });
 
-  test('groupsOn 把同槽课分到一组（渲染堆叠）', () async {
+  test('groupsOn 把同槽课分到一组（渲染成一块 + 循环角标）', () async {
     final Semester s = await semesterWithTimetable();
     await courses.create(
         name: '线性代数',
@@ -164,8 +165,40 @@ void main() {
         semesterId: s.id);
     final CoursePaneModel m = model();
     await m.load();
-    expect(m.groupsOn(2).single.courses, hasLength(2));
-    expect(m.groupsOn(2).single.shareSections, closeTo(1, 1e-9));
+    final OverlapGroup g = m.groupsOn(2).single;
+    expect(g.courses, hasLength(2));
+    // 原来这里钉的是 `shareSections == 1`（组跨度按条数均分）。2026-10-19 改版
+    // 成单块 + 角标后不再均分，改为钉「两条各自保留整跨度」+「默认第一条是谁」。
+    expect(g.courses.map((Course c) => '${c.startSection}-${c.endSection}').toSet(),
+        <String>{'1-2'});
+    expect(g.courses.first.name, '大学英语',
+        reason: '同起始节次按课名排，默认显示它（Q6）');
+  });
+
+  test('周次不重叠的两门课在同一周不成组 → 不该有角标（Q2）', () async {
+    final Semester s = await semesterWithTimetable(totalWeeks: 16);
+    await courses.create(
+        name: '分周课甲',
+        weekday: 2,
+        startSection: 1,
+        endSection: 2,
+        weeks: List<int>.generate(8, (int i) => i + 1),
+        semesterId: s.id);
+    await courses.create(
+        name: '分周课乙',
+        weekday: 2,
+        startSection: 1,
+        endSection: 2,
+        weeks: List<int>.generate(8, (int i) => i + 9),
+        semesterId: s.id);
+    final CoursePaneModel m = model();
+    await m.load();
+    // 第 1 周只上甲 → 一组一条；第 9 周只上乙 → 同样一条。分组拿不到「本周」，
+    // 靠的就是调用方传进来的是**已按当前周过滤**的集合。
+    await m.selectWeek(1);
+    expect(m.groupsOn(2).single.courses.single.name, '分周课甲');
+    await m.selectWeek(9);
+    expect(m.groupsOn(2).single.courses.single.name, '分周课乙');
   });
 
   test('节次超出作息表的课进「未排时间」，不被截断（§3.4）', () async {

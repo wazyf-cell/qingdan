@@ -134,7 +134,8 @@ void main() {
   Finder blockOf(String courseId) =>
       find.byKey(ValueKey<String>('block-$courseId'));
 
-  testWidgets('F31：同一时间槽的两门课都渲染，不丢任何一条', (tester) async {
+  testWidgets('F31：同一时间槽的两门课都不丢——一条在显示，另一条点角标就到',
+      (tester) async {
     await seedSemester(tester);
     final Course a =
         await addCourse(tester, name: '线性代数', weekday: 2, start: 1, end: 2);
@@ -147,16 +148,27 @@ void main() {
 
     await pump(tester, width: 1280);
 
-    expect(blockOf(a.id), findsOneWidget);
+    // ★ 这条原来钉的是「两条各占组跨度的一半、上下堆叠、两条高度相等」。
+    //   2026-10-19 用户裁决把渲染换成**单块 + 循环角标**：两条各自保留整跨度、
+    //   叠在同一位置上，只显示选中的那条，另一条靠角标切。堆叠份额与「+N」降级
+    //   一并废掉，所以这里的断言改写成：默认那条在、另一条不在但一触即达。
+    //   几何、动画、计数、状态归零的细节在 course_cycle_test.dart 与
+    //   course_cycle_geom_test.dart。
     expect(blockOf(b.id), findsOneWidget);
-    expect(find.text('线性代数'), findsOneWidget);
     expect(find.text('大学英语'), findsOneWidget);
-    // 堆叠：两条各占组跨度的一半，位置必须不同（谁在上取决于 DAO 的
-    // `name ASC` 排序，与创建顺序无关，所以只断言「不重叠在同一位置」）。
-    expect(tester.getTopLeft(blockOf(a.id)).dy,
-        isNot(equals(tester.getTopLeft(blockOf(b.id)).dy)));
-    expect(tester.getSize(blockOf(a.id)).height,
-        closeTo(tester.getSize(blockOf(b.id)).height, 1e-6));
+    expect(blockOf(a.id), findsNothing, reason: '组内其余条隐藏，不再压成半高块');
+    expect(find.byIcon(Icons.sync_alt), findsOneWidget);
+    // 两节整跨度 = 40.5 + 9 + 40.5 − 上下各缩 1 = 88dp（旧的堆叠只有 43dp）。
+    expect(tester.getSize(blockOf(b.id)).height, closeTo(88, 0.5));
+
+    await tester.tap(find.ancestor(
+        of: find.byIcon(Icons.sync_alt), matching: find.byType(Tooltip)));
+    await tester.pump(); // 起帧：退场动画从这一帧才开始计时
+    await tester.pump(const Duration(milliseconds: 220));
+    await tester.pump();
+    expect(blockOf(a.id), findsOneWidget);
+    expect(blockOf(b.id), findsNothing);
+    expect(find.text('线性代数'), findsOneWidget);
   });
 
   testWidgets('周标签与边界禁用：第 1 周禁 ‹、最后一周禁 ›', (tester) async {
