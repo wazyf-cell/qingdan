@@ -8,8 +8,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/course/course_setup.dart';
+import 'package:qingdan/features/course/export_sheet.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
@@ -54,11 +57,45 @@ class CourseSection extends StatelessWidget {
             '时间表管理', '按学期存多套作息，切换哪一套生效'),
         _placeholder(colors, kCourseManageScheduleKey, Icons.grid_on,
             '课表管理', '按课程批量改时间、地点、老师与周次'),
-        _placeholder(colors, kCourseExportKey, Icons.ios_share,
-            '导出课表文件', '导出 CSV / xlsx，可给别的课表应用用'),
-        _note(colors, '上面三行是下一批（D 批）的入口，现在还没有界面。'
+        _exportRow(context, colors, isMobile),
+        _note(colors, '上面两行「管理」是 D 批后面的入口，现在还没有界面。'
             '课表数据本身在「学期与作息」里改，导入课程表也在那里。'),
       ],
+    );
+  }
+
+  /// 导出行。课表数据从 [CoursePaneModel] 拿（UI 不碰 DAO，铁律）。
+  ///
+  /// 用**可空**读法：设置树在纯 UI 测试里、以及课表模型尚未装配时也要能渲染，
+  /// 拿不到就整行禁用并说明原因，而不是抛 ProviderNotFoundException。
+  Widget _exportRow(BuildContext context, AppColors colors, bool isMobile) {
+    final CoursePaneModel? model = context.watch<CoursePaneModel?>();
+    final bool ready =
+        model != null && model.semester != null && model.allCourses.isNotEmpty;
+    return ListTile(
+      key: const ValueKey<String>(kCourseExportKey),
+      enabled: ready,
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppDimens.s4),
+      // 导出朝上、导入朝下（M6-A A7 定案的对称）。
+      leading: Icon(Icons.file_upload_outlined,
+          size: 20, color: ready ? colors.textSecondary : colors.textFaint),
+      title: const Text('导出课表文件'),
+      subtitle: Text(
+        ready
+            ? '当前学期导出成 .ics 日历文件或 .csv 表格（.csv 能原样再导回来）'
+            : model == null
+                ? '课表数据未装配，先从底部「课表」页进来'
+                : '还没有学期或还没有课，导出无从取数据',
+        style: AppTypography.meta.copyWith(color: colors.textFaint),
+      ),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: () => showExportSheet(context,
+          semester: model!.semester!,
+          courses: model.allCourses,
+          details: model.details,
+          currentWeek: model.week,
+          isMobile: isMobile),
     );
   }
 

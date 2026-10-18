@@ -61,6 +61,9 @@ void main() {
     await tester.pump();
   }
 
+  Future<T?> io<T>(WidgetTester tester, Future<T?> Function() body) =>
+      tester.runAsync<T?>(body);
+
   /// 点一个会查库的入口：tap 与等待都放在真实异步区里，否则 sqflite 的
   /// future 在 FakeAsync 区永不完成（`course_setup_flow_test.dart` 的经验）。
   Future<void> tapIo(WidgetTester tester, String key) async {
@@ -87,13 +90,17 @@ void main() {
       for (final String k in <String>[
         kCourseManageTimetableKey,
         kCourseManageScheduleKey,
-        kCourseExportKey,
       ]) {
         final ListTile t = tester.widget<ListTile>(tile(k));
         expect(t.enabled, isFalse, reason: '$k 不是禁用行');
         expect(t.onTap, isNull, reason: '$k 接了 onTap 却没有实现，是死行');
       }
-      expect(find.textContaining('下一批开放'), findsNWidgets(3));
+      expect(find.textContaining('下一批开放'), findsNWidgets(2));
+      // 导出行已经不再是占位：本用例的模型里没学期没课，所以它禁用并说明原因
+      // （不是「点了没反应」）。有数据时能点开，见下面的用例。
+      final ListTile export = tester.widget<ListTile>(tile(kCourseExportKey));
+      expect(export.enabled, isFalse);
+      expect(find.textContaining('还没有学期或还没有课'), findsOneWidget);
     }
   });
 
@@ -128,10 +135,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('说明文字交代清楚：课表数据在哪改、三行为什么还没有',
+  testWidgets('有学期也有课时：导出行解禁，点得开导出弹层',
+      (WidgetTester tester) async {
+    await io(tester, () async {
+      final String id = (await semesters.createSemester(
+              name: '2026-2027-1', firstWeekDate: DateTime.utc(2026, 8, 31)))
+          .id;
+      await courses.create(
+          name: '高等数学',
+          weekday: 1,
+          startSection: 1,
+          endSection: 2,
+          weeks: <int>[1, 2, 3],
+          semesterId: id);
+      await paneModel.load();
+    });
+    await pump(tester, width: 411);
+
+    expect(tester.widget<ListTile>(tile(kCourseExportKey)).enabled, isTrue);
+    await tapIo(tester, kCourseExportKey);
+    expect(find.byType(BottomSheet), findsOneWidget,
+        reason: '导出走的是 export_sheet.dart 那一份，不是本节自己复制的界面');
+    expect(find.textContaining('.ics'), findsWidgets);
+  });
+
+  testWidgets('说明文字交代清楚：课表数据在哪改、两行为什么还没有',
       (WidgetTester tester) async {
     await pump(tester, width: 1280);
-    expect(find.textContaining('上面三行是下一批（D 批）的入口'), findsOneWidget);
+    expect(find.textContaining('上面两行「管理」是 D 批后面的入口'), findsOneWidget);
     expect(find.textContaining('学期名称、开学日期、总周数'), findsOneWidget);
   });
 }
