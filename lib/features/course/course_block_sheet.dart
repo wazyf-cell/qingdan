@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:qingdan/domain/course.dart';
-import 'package:qingdan/domain/course_uid.dart';
 import 'package:qingdan/domain/section_layout.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
@@ -148,7 +147,7 @@ class CourseBlockDetail extends StatelessWidget {
                 height: 12,
                 decoration: BoxDecoration(
                   color: CoursePalette.of(
-                      brightness, courseColorIndex(course.name)),
+                      brightness, course.effectiveColorIndex),
                   shape: BoxShape.circle,
                 ),
               ),

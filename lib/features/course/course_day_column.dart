@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/domain/course_conflict.dart';
-import 'package:qingdan/domain/course_uid.dart';
 import 'package:qingdan/domain/section_layout.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
@@ -112,7 +111,7 @@ class CourseDayColumn extends StatelessWidget {
           child: CourseBlock(
             key: ValueKey<String>('block-${first.id}'),
             name: first.name,
-            colorIndex: courseColorIndex(first.name),
+            colorIndex: first.effectiveColorIndex,
             height: groupHeight,
             badgeCount: group.badgeCount,
             isMobile: isMobile,
@@ -137,7 +136,7 @@ class CourseDayColumn extends StatelessWidget {
             name: group.courses[i].name,
             location: group.courses[i].location,
             teacher: group.courses[i].teacher,
-            colorIndex: courseColorIndex(group.courses[i].name),
+            colorIndex: group.courses[i].effectiveColorIndex,
             height: itemHeight,
             isMobile: isMobile,
             onTap: () => onBlockTap?.call(group.courses[i], group.courses),

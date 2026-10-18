@@ -5,6 +5,7 @@ import 'package:qingdan/domain/course_uid.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 
+import 'course_color_picker.dart';
 import 'course_steppers.dart';
 import 'week_chip_picker.dart';
 
@@ -49,6 +50,9 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
   late int _start;
   late int _end;
   late List<int> _weeks;
+
+  /// 手动选过的配色；null = 自动（跟随课名）。M6-D §十。
+  int? _colorIndex;
   String? _weeksTextError;
 
   @override
@@ -63,6 +67,7 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
     _start = c?.startSection ?? 1;
     _end = c?.endSection ?? (_start + 1 <= widget.maxSection ? _start + 1 : _start);
     _weeks = <int>[...?c?.weeks];
+    _colorIndex = c?.colorIndex;
   }
 
   @override
@@ -93,6 +98,8 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
           weeks: _weeks,
         );
     final Course next = source.copyWith(
+      colorIndex: _colorIndex,
+      clearColor: _colorIndex == null,
       name: name,
       teacher: Course.blankToNull(_teacher.text),
       location: Course.blankToNull(_location.text),
@@ -224,6 +231,12 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: AppDimens.s16),
+          CourseColorPicker(
+            value: _colorIndex,
+            courseName: _name.text.trim(),
+            onChanged: (int? v) => setState(() => _colorIndex = v),
           ),
           const SizedBox(height: AppDimens.s16),
           Text('周次', style: Theme.of(context).textTheme.labelLarge),
