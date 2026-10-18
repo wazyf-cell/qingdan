@@ -11,6 +11,7 @@ import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
 import 'course_pane_model.dart';
+import 'export_sheet.dart';
 import 'import_wizard/import_wizard.dart';
 import 'semester_timetable_cards.dart';
 
@@ -21,6 +22,9 @@ export 'course_editor_sheet.dart';
 /// 课表设置弹层（§4.2 步骤 3 的「学期卡 + 作息卡」，平时也从头部 ⚙ 进来）。
 ///
 /// 形态按 §2.6/§五 的双端约定：桌面 = 居中弹窗两卡并排；移动 = 底部抽屉上下堆叠。
+///
+/// 三条高频近路都在这一层：导入课表文件、从教务系统抓取（头部那一行的两个按钮），
+/// 以及导出课表文件（紧接其下的整行 [_ExportNearPath]，§9.2「近路」那条）。
 Future<void> showCourseSetup(BuildContext context, {required bool isMobile}) {
   return isMobile
       ? showModalBottomSheet<void>(
@@ -112,6 +116,10 @@ class _CourseSetupBodyState extends State<_CourseSetupBody> {
             ),
           ],
         ),
+        // 导出做成独立一整行，不塞进上面那个 Row：411dp 上「标题 + 两个按钮」
+        // 已经排满，第三个只会把 Row 撑爆（本项目吃过两次窄屏 Row 溢出的亏）。
+        const SizedBox(height: AppDimens.s4),
+        _ExportNearPath(model: model, isMobile: isMobile),
         const SizedBox(height: AppDimens.s12),
         SemesterCard(
           semester: model.semester,
@@ -200,6 +208,53 @@ class _CourseSetupBodyState extends State<_CourseSetupBody> {
       _saidTimetable = text;
       _timetableFailed = error;
     });
+  }
+}
+
+/// 「学期与作息」弹层里的导出近路（§9.2：高频操作要有近路）。
+///
+/// **不另开一份实现**：取数、禁用判据、点击行为与设置 → 课表 → 「导出课表文件」
+/// （`settings/course_section.dart` 的 `_exportRow`）逐字对齐，同一个
+/// [showExportSheet]。数据不齐时整行禁用并把原因写在副文案里——本项目定案
+/// 「占位要么说清原因，要么别出现」，绝不允许「点了没反应」。
+class _ExportNearPath extends StatelessWidget {
+  const _ExportNearPath({required this.model, required this.isMobile});
+
+  final CoursePaneModel model;
+  final bool isMobile;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    final Semester? semester = model.semester;
+    final bool ready = semester != null && model.allCourses.isNotEmpty;
+    return ListTile(
+      key: const ValueKey<String>('setup-export'),
+      enabled: ready,
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppDimens.s4),
+      // 导出朝上、导入朝下（M6-A A7 定案的对称）。
+      leading: Icon(Icons.file_upload_outlined,
+          size: 20, color: ready ? colors.textSecondary : colors.textFaint),
+      title: const Text('导出课表文件'),
+      subtitle: Text(
+        ready
+            ? '当前学期导出成 .ics 日历文件或 .csv 表格（.csv 能原样再导回来）'
+            : semester == null
+                ? '还没有学期，导出无从取数据：先在下面建一个学期'
+                : '这个学期还没有课，导出会是空文件：先加课或导入课表',
+        key: const ValueKey<String>('setup-export-reason'),
+        style: AppTypography.meta.copyWith(color: colors.textFaint),
+      ),
+      onTap: ready
+          ? () => showExportSheet(context,
+              semester: model.semester!,
+              courses: model.allCourses,
+              details: model.details,
+              currentWeek: model.week,
+              isMobile: isMobile)
+          : null,
+    );
   }
 }
 

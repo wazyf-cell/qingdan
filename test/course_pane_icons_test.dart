@@ -93,6 +93,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// 弹层里朝上的箭头**只允许有一个，而且必须挂在导出那一行**（M6-D §9.2 的近路）。
+  /// 原来的断言是「一个朝上的都没有」，导出接进来之后那句话已经不成立了。
+  void expectSingleUpArrowIsExport(WidgetTester tester) {
+    expect(iconOf(tester, 'setup-export').icon, Icons.file_upload_outlined,
+        reason: '导出 = 数据出应用，箭头朝上（与导入相反）');
+    expect(find.byIcon(Icons.file_upload_outlined), findsOneWidget,
+        reason: '除了导出那行，弹层里不许再有第二处朝上的：那说明某处导入还没改过来');
+  }
+
   testWidgets('桌面 1280：头部与「学期与作息」里的导入箭头都朝下', (tester) async {
     await pumpAt(tester, width: 1280);
 
@@ -100,8 +109,7 @@ void main() {
         reason: '导入 = 数据进应用，箭头必须朝下');
     await openSetup(tester);
     expect(iconOf(tester, 'setup-import').icon, Icons.file_download_outlined);
-    expect(find.byIcon(Icons.file_upload_outlined), findsNothing,
-        reason: '残留一个朝上的就说明还有一处没改');
+    expectSingleUpArrowIsExport(tester);
   });
 
   testWidgets('手机 411：头部不给导入按钮（既有定案），弹层里那个朝下',
@@ -112,6 +120,6 @@ void main() {
         reason: '411dp 头部一行已经排满，导入改从「学期与作息」进');
     await openSetup(tester);
     expect(iconOf(tester, 'setup-import').icon, Icons.file_download_outlined);
-    expect(find.byIcon(Icons.file_upload_outlined), findsNothing);
+    expectSingleUpArrowIsExport(tester);
   });
 }

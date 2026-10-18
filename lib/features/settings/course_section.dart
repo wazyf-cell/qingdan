@@ -2,14 +2,15 @@
 ///
 /// C 批只有一件事是真能用的：跳进已有的「学期与作息」弹层——与课表面板头部
 /// ⚙ 同一条 [showCourseSetup]，不另开一份实现。
-/// D 批 §7.3 已开放「时间表管理」（模板库整页）；「课表管理」仍是 D 批后面的
-/// 占位——按**禁用置灰 + 明说「下一批开放」**处理：用户看得见这节将来有什么，
-/// 但不会得到一次「点了没反应」的空反馈（M5 定案：占位要么说清原因，要么别出现）。
+/// D 批把这一节四个入口全部接通：时间表管理（模板库 §7.3）、课表管理（学期整页
+/// §7.4）、导出课表文件（§9.2）。**这一节不再有禁用行**——M5 定案「占位要么说清
+/// 原因，要么别出现」，现在四行都点得动，占位文本随之删掉，不留过期承诺。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:qingdan/features/course/course_manage_page.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/course/course_setup.dart';
 import 'package:qingdan/features/course/export_sheet.dart';
@@ -65,11 +66,21 @@ class CourseSection extends StatelessWidget {
           trailing: const Icon(Icons.chevron_right, size: 20),
           onTap: () => showTimetableLibrary(context, isMobile: isMobile),
         ),
-        _placeholder(colors, kCourseManageScheduleKey, Icons.grid_on,
-            '课表管理', '按课程批量改时间、地点、老师与周次'),
+        ListTile(
+          key: const ValueKey<String>(kCourseManageScheduleKey),
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: AppDimens.s4),
+          leading: const Icon(Icons.grid_on, size: 20),
+          title: const Text('课表管理'),
+          subtitle: Text('一屏管全部学期：切换、新建、改开学日期与总周数、删除，'
+              '两条导入入口也在这里',
+              style: AppTypography.meta),
+          trailing: const Icon(Icons.chevron_right, size: 20),
+          onTap: () => showCourseManagePage(context),
+        ),
         _exportRow(context, colors, isMobile),
-        _note(colors, '「课表管理」是 D 批后面的入口，现在还没有界面。'
-            '课表数据本身在「学期与作息」里改，导入课程表也在那里。'),
+        _note(colors, '改某一门课的时间、地点、老师是点周视图里的课程块；'
+            '按课程批量改目前只有导入向导的校正步里有，落库之后不再提供批量入口。'),
       ],
     );
   }
@@ -108,19 +119,6 @@ class CourseSection extends StatelessWidget {
           isMobile: isMobile),
     );
   }
-
-  static Widget _placeholder(AppColors colors, String key, IconData icon,
-          String title, String what) =>
-      ListTile(
-        key: ValueKey<String>(key),
-        enabled: false, // 置灰：不接 onTap，也就不会「点了没反应」
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppDimens.s4),
-        leading: Icon(icon, size: 20, color: colors.textFaint),
-        title: Text(title, style: AppTypography.meta.copyWith(fontSize: 14)),
-        subtitle: Text('$what · 下一批开放',
-            style: AppTypography.meta.copyWith(color: colors.textFaint)),
-      );
 
   static Widget _note(AppColors colors, String text) => Padding(
         padding: const EdgeInsets.only(top: AppDimens.s8),

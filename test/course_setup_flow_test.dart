@@ -76,6 +76,47 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// 用**例层**把数据写进库（provider 装配与本文件其余用例同一套）。
+  /// 查库必须包在 runAsync 里，且 runAsync 内不排任何 timer。
+  Future<void> seedData(WidgetTester tester, {bool withCourse = true}) async {
+    await tester.runAsync(() async {
+      final semester = await semesters.createSemester(
+          name: '2026-2027-1', firstWeekDate: DateTime.utc(2026, 8, 31));
+      if (withCourse) {
+        await courses.create(
+            name: '高等数学',
+            weekday: 1,
+            startSection: 1,
+            endSection: 2,
+            weeks: <int>[1, 2],
+            semesterId: semester.id);
+      }
+      await model.load();
+    });
+  }
+
+  /// 「学期与作息」弹层里那一行导出近路（§9.2「高频操作要有近路」）。
+  Finder exportRow() => find.byKey(const ValueKey<String>('setup-export'));
+
+  /// 数据不齐时那一行必须是**看得懂的禁用**：`enabled:false` + 摘掉 onTap +
+  /// 副文案写清原因 + 不许溢出屏幕。
+  void expectDisabledRow(WidgetTester tester, String reason, double width) {
+    expect(exportRow(), findsOneWidget, reason: '$width 上没有导出近路');
+    final ListTile tile = tester.widget<ListTile>(exportRow());
+    expect(tile.enabled, isFalse, reason: '$width 上数据不齐却给了个能点的行');
+    expect(tile.onTap, isNull, reason: '$width 上禁用了还留着 onTap = 死按钮');
+    expect(find.textContaining(reason), findsOneWidget,
+        reason: '$width 上没写清现在为什么不能导');
+    expect(tester.getRect(exportRow()).right, lessThanOrEqualTo(width),
+        reason: '$width 上这一行溢出屏幕');
+    expect(tester.takeException(), isNull, reason: '$width 出现布局异常');
+  }
+
+  Future<void> closeTopSheet(WidgetTester tester) async {
+    await tester.tapAt(const Offset(20, 20)); // 点遮罩
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('F28 端到端：建学期 → 保存作息 → 加课 → 周视图渲染课程块',
       (tester) async {
     await pumpPane(tester);
@@ -156,5 +197,72 @@ void main() {
 
     expect(model.details, isEmpty, reason: '校验失败一行都不写');
     expect(find.textContaining('重叠'), findsOneWidget);
+  });
+
+  testWidgets('导出近路 · 桌面 1280：有学期有课时可点，点开的是 export_sheet 那一份',
+      (tester) async {
+    await seedData(tester);
+    await pumpPane(tester);
+    await tapIo(tester, 'btn-setup');
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<ListTile>(exportRow()).enabled, isTrue);
+    expect(tester.widget<ListTile>(exportRow()).onTap, isNotNull);
+
+    await tapIo(tester, 'setup-export');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('export-sheet')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('export-count')), findsOneWidget);
+
+    // 先关掉层再收尾：退场动画里 dispose 控制器会红屏 `_dependents.isEmpty`。
+    await tapIo(tester, 'export-close');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('export-sheet')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('导出近路 · 窄屏 411：整行在屏内不溢出，照样点得开', (tester) async {
+    await seedData(tester);
+    await pumpPane(tester, width: 411);
+    await tapIo(tester, 'btn-setup');
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<ListTile>(exportRow()).enabled, isTrue);
+    final Rect row = tester.getRect(exportRow());
+    expect(row.left, greaterThanOrEqualTo(0));
+    expect(row.right, lessThanOrEqualTo(411), reason: '411dp 上这一行溢出屏幕');
+    expect(tester.takeException(), isNull, reason: '411dp 出现布局异常');
+
+    await tapIo(tester, 'setup-export');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('export-sheet')), findsOneWidget);
+    expect(tester.takeException(), isNull, reason: '411dp 上导出弹层自身溢出');
+  });
+
+  testWidgets('导出近路 · 还没有学期：禁用并写明原因（411 与 1280 各一次）',
+      (tester) async {
+    for (final double width in <double>[411, 1280]) {
+      // 空态那颗「建学期」进的就是同一个弹层，所以这里也能看见那一行。
+      await pumpPane(tester, width: width);
+      await tapIo(tester, 'empty-create-semester');
+      await tester.pumpAndSettle();
+      expectDisabledRow(tester, '导出无从取数据', width);
+
+      await tapIo(tester, 'setup-export'); // 禁用行点下去什么也不该开
+      expect(find.byKey(const ValueKey<String>('export-sheet')), findsNothing);
+      await closeTopSheet(tester);
+    }
+  });
+
+  testWidgets('导出近路 · 有学期但还没课：原因写的是「空文件」（411 与 1280 各一次）',
+      (tester) async {
+    await seedData(tester, withCourse: false);
+    for (final double width in <double>[411, 1280]) {
+      await pumpPane(tester, width: width);
+      await tapIo(tester, 'btn-setup');
+      await tester.pumpAndSettle();
+      expectDisabledRow(tester, '导出会是空文件', width);
+      await closeTopSheet(tester);
+    }
   });
 }

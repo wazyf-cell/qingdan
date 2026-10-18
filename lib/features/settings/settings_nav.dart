@@ -66,7 +66,7 @@ List<SettingsEntry> settingsEntries() => <SettingsEntry>[
         id: SettingsSectionId.course,
         icon: Icons.calendar_today_outlined,
         title: '课表',
-        subtitle: '学期与作息；模板、导出在下一批',
+        subtitle: '学期与作息、时间表模板、课表管理、导出课表文件',
         content: (bool showTitle) => CourseSection(showTitle: showTitle),
       ),
       SettingsEntry(
