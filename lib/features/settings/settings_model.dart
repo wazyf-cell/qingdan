@@ -17,6 +17,10 @@ class SettingsModel extends ChangeNotifier {
   static const String kDefaultTabKey = 'ui.defaultTab';
   static const String kShowBadgesKey = 'ui.showBadges';
 
+  /// 首启使用说明引导是否已看过（M6-C6，key 登记于总纲 §五）。
+  /// 「以后再说」也置 true——用户裁决 Q26：只打扰一次。
+  static const String kGuideSeenKey = 'ui.guideSeen';
+
   /// 回收站自动清空阈值（M6-A4，key 登记于总纲 §五）。`0` = 永不。
   /// 合法值固定四档，读回非法值（手改 prefs / 旧版本残留）一律回退 [kTrashPurgeDaysDefault]。
   static const String kTrashPurgeDaysKey = 'trash.purgeDays';
@@ -35,6 +39,9 @@ class SettingsModel extends ChangeNotifier {
   ShellTab defaultTab = ShellTab.tasks;
   bool showBadges = true;
 
+  /// 首启引导只在没看过时弹一次（`false` = 新装或清了应用数据）。
+  bool guideSeen = false;
+
   /// 回收站在「应用打开时检查」里超过该天数即物理清空（M6-A4）；0 = 永不。
   int trashPurgeDays = kTrashPurgeDaysDefault;
 
@@ -45,6 +52,7 @@ class SettingsModel extends ChangeNotifier {
         (ShellTab t) => t.name == raw,
         orElse: () => ShellTab.tasks);
     showBadges = p.getBool(kShowBadgesKey) ?? true;
+    guideSeen = p.getBool(kGuideSeenKey) ?? false;
     final int? days = p.getInt(kTrashPurgeDaysKey);
     trashPurgeDays =
         (days != null && kTrashPurgeDaysChoices.contains(days))
@@ -65,6 +73,14 @@ class SettingsModel extends ChangeNotifier {
     showBadges = value;
     notifyListeners();
     await (await _instance()).setBool(kShowBadgesKey, value);
+  }
+
+  /// 记下「引导已经看过」。**只在真要消失它时调**（两个按钮都算看过）。
+  Future<void> setGuideSeen(bool value) async {
+    if (guideSeen == value) return;
+    guideSeen = value;
+    notifyListeners();
+    await (await _instance()).setBool(kGuideSeenKey, value);
   }
 
   /// 设置回收站清空阈值；非法值（不在 [kTrashPurgeDaysChoices]）回退默认 30。
