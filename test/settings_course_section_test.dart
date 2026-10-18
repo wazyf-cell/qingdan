@@ -16,8 +16,9 @@ import 'dao_test_helper.dart';
 ///
 /// 断言两件事：① 「学期与作息」这一行真的把用户送进**已有的那个弹层**，而且
 /// 形态按断点走（411 = 底部抽屉 / 1280 = 居中弹窗），不是本节自己复制的一份界面；
-/// ② D 批的三行是**看得懂的禁用行**（`enabled: false` + 「下一批开放」），
-/// 而不是留着但点了没反应的死行。
+/// ② D 批 §7.3 后「时间表管理」已解禁成真入口（点开模板库页，入口连线见
+/// `timetable_library_test.dart`），「课表管理」仍是**看得懂的禁用行**
+/// （`enabled: false` + 「下一批开放」），而不是留着但点了没反应的死行。
 void main() {
   ensureSqfliteFfi();
 
@@ -87,15 +88,18 @@ void main() {
       expect(tile(kCourseOpenSetupKey), findsOneWidget);
       expect(tester.widget<ListTile>(tile(kCourseOpenSetupKey)).onTap, isNotNull);
 
-      for (final String k in <String>[
-        kCourseManageTimetableKey,
-        kCourseManageScheduleKey,
-      ]) {
+      // D 批 §7.3：「时间表管理」已开放成真入口（点开模板库页）。
+      final ListTile timetable = tester.widget<ListTile>(
+          tile(kCourseManageTimetableKey));
+      expect(timetable.onTap, isNotNull, reason: '§7.3 已实现，不许再留死行');
+      expect(timetable.enabled, isTrue);
+
+      for (final String k in <String>[kCourseManageScheduleKey]) {
         final ListTile t = tester.widget<ListTile>(tile(k));
         expect(t.enabled, isFalse, reason: '$k 不是禁用行');
         expect(t.onTap, isNull, reason: '$k 接了 onTap 却没有实现，是死行');
       }
-      expect(find.textContaining('下一批开放'), findsNWidgets(2));
+      expect(find.textContaining('下一批开放'), findsOneWidget);
       // 导出行已经不再是占位：本用例的模型里没学期没课，所以它禁用并说明原因
       // （不是「点了没反应」）。有数据时能点开，见下面的用例。
       final ListTile export = tester.widget<ListTile>(tile(kCourseExportKey));
@@ -159,10 +163,10 @@ void main() {
     expect(find.textContaining('.ics'), findsWidgets);
   });
 
-  testWidgets('说明文字交代清楚：课表数据在哪改、两行为什么还没有',
+  testWidgets('说明文字交代清楚：课表数据在哪改、剩下一行为什么还没有',
       (WidgetTester tester) async {
     await pump(tester, width: 1280);
-    expect(find.textContaining('上面两行「管理」是 D 批后面的入口'), findsOneWidget);
+    expect(find.textContaining('「课表管理」是 D 批后面的入口'), findsOneWidget);
     expect(find.textContaining('学期名称、开学日期、总周数'), findsOneWidget);
   });
 }
