@@ -66,15 +66,23 @@ class _SwipeRevealState extends State<SwipeReveal>
 
   /// 最近一次「命令」到的档位（0 或 1），用来判断外部回传的状态是不是自己
   /// 刚请求的那个，避免动画与回调互相打乒乓。
-  double _commanded = widget.open ? 1 : 0;
+  double _commanded = 0;
 
   double get _reveal => widget.actions.length * widget.actionWidth;
+
+  @override
+  void initState() {
+    super.initState();
+    // 字段初始化器里不能碰 `widget`，打开态的初值只能在 initState 同步。
+    _commanded = widget.open ? 1 : 0;
+  }
 
   @override
   void didUpdateWidget(SwipeReveal oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 外部把别的卡片设成打开、或滚动时统一收回，都从这里同步回来。
-    if (widget.open != _commanded) _go(widget.open ? 1 : 0, notify: false);
+    final double want = widget.open ? 1 : 0;
+    if (want != _commanded) _go(want, notify: false);
   }
 
   @override
@@ -132,10 +140,34 @@ class _SwipeRevealState extends State<SwipeReveal>
                       .toList(),
                 ),
               ),
+            // **必须拉满整行宽**：Stack(StackFit.loose) 会把 sliver 给的紧约束
+            // 放宽，卡片与手势热区会缩成内容宽（实测 123.5dp），右侧空白区
+            // 滑动/点击全部 hit-test 落空，底色也画不满整行。
             Transform.translate(
               offset: Offset(-_reveal * _controller.value, 0),
-              child: child,
+              child: SizedBox(
+                width: double.infinity,
+                child: child,
+              ),
             ),
+            // 打开态下点卡片主体 = 收回（B2 定案）。做成**盖在已让位的卡片区域上
+            // 的一层**而不是只靠外层 GestureDetector 的 onTap：那样要和卡内
+            // InkWell 的手势竞技场抢 tap，胜负不定；这层是 Stack 最顶子节点，
+            // 命中必归它，且 `right: _reveal` 保证不遮动作按钮。
+            if (_commanded == 1)
+              Positioned(
+                left: -_reveal,
+                right: _reveal,
+                top: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _go(0),
+                  onHorizontalDragUpdate: _onDragUpdate,
+                  onHorizontalDragEnd: _onDragEnd,
+                  child: const SizedBox.expand(),
+                ),
+              ),
           ],
         ),
       ),

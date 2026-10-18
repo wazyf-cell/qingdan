@@ -24,15 +24,17 @@ class ChaoxingModel extends ChangeNotifier {
     required SecureStore secure,
     ChaoxingPrefs? prefs,
     DateTime Function()? clock,
-    /// 测试注入点：真机走 `ChaoxingClient`（dart:io HttpClient），widget 测试
-    /// 里必须换成假实现，否则刷新会真的打网络。
     ChaoxingClient Function(String cookie)? clientFactory,
   })  : _secure = secure,
         _prefs = prefs ?? ChaoxingPrefs(),
         _clock = clock ?? DateTime.now,
-        _clientFactory = clientFactory ??
-            (String cookie) => ChaoxingClient(cookie: cookie),
+        _clientFactory = clientFactory ?? _defaultClientFactory,
         now = (clock ?? DateTime.now)();
+
+  /// 测试注入点：真机走 `ChaoxingClient`（dart:io HttpClient），widget 测试
+  /// 里必须换成假实现，否则刷新会真的打网络。
+  static ChaoxingClient _defaultClientFactory(String cookie) =>
+      ChaoxingClient(cookie: cookie);
 
   static const String kCookieKey = 'chaoxing.cookie';
 
@@ -203,25 +205,9 @@ class ChaoxingModel extends ChangeNotifier {
 
   /// 刷新后跟着更新隐藏项：还存在的把标题/截止同步成最新值（截止可能被老师改），
   /// 不再出现的标 `dead`（**不删**，让隐藏列表页给用户自己决定）。
+  /// 对齐本体在 `syncHiddenMetaWithTasks`（隐藏项元数据那一域，纯函数可单测）。
   Future<void> _syncHiddenMeta() async {
-    if (hiddenEntries.isEmpty) return;
-    final Set<String> present = tasks.map((ChaoxingTask t) => t.key).toSet();
-    final Map<String, ChaoxingTask> byKey = <String, ChaoxingTask>{
-      for (final ChaoxingTask t in tasks) t.key: t,
-    };
-    final List<ChaoxingHiddenEntry> next = hiddenEntries.map((ChaoxingHiddenEntry e) {
-      final ChaoxingTask? t = byKey[e.key];
-      if (t == null) return e.copyWith(dead: true);
-      return ChaoxingHiddenEntry(
-        key: e.key,
-        courseName: t.courseName,
-        title: t.title,
-        dueMs: t.dueAt?.millisecondsSinceEpoch,
-        hiddenAtMs: e.hiddenAtMs,
-        dead: !present.contains(e.key),
-      );
-    }).toList();
-    await _saveHiddenMeta(next);
+    await _saveHiddenMeta(syncHiddenMetaWithTasks(hiddenEntries, tasks));
   }
 
   void tick() {

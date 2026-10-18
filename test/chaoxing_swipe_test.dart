@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:qingdan/features/chaoxing/chaoxing_actions.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_card.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_detail_page.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_keys.dart';
@@ -36,8 +37,13 @@ void main() {
       expect(r.right, lessThanOrEqualTo(411));
       expect(r.left, greaterThanOrEqualTo(0));
     }
-    // 卡片主体向左让位（-144dp：两个 72dp 按钮的宽度）。
-    expect(tester.getRect(find.byType(ChaoxingCard).first).left, lessThan(0));
+    // 卡片主体向左让位（-144dp：两个 72dp 按钮的宽度）。**按 key 定位到被滑开
+    // 的那张**——列表按标题排序，tree 里第一张是「第10次作业」不是 tasks[0]。
+    expect(
+        tester.getRect(find.descendant(
+                of: h.cardOf(tasks[0]), matching: find.byType(ChaoxingCard)))
+            .left,
+        lessThan(0));
   });
 
   testWidgets('点「隐藏」→ 卡片从列表消失（无截止 → 不弹确认）',
@@ -103,11 +109,10 @@ void main() {
     await h.start(tasks: tasks);
     await h.pump(tester, width: 411);
 
-    await tester.runAsync(() async {
-      await tester.longPress(h.cardOf(tasks[0]));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-    });
+    // 长按识别靠 fake clock 推进（`tester.longPress` 内部 pump 假时间）；
+    // 包在 runAsync + 真实延时里 fake clock 不走，识别器永远等不到超时。
+    await tester.longPress(h.cardOf(tasks[0]));
+    await tester.pump();
     await tester.pumpAndSettle();
 
     expect(h.cardOf(tasks[0]), findsNothing);
@@ -123,7 +128,8 @@ void main() {
     await h.pump(tester, width: 411);
     await h.swipeLeft(tester, tasks[0]);
 
-    await h.tapIo(tester, find.byType(ChaoxingCard).first);
+    await h.tapIo(tester, find.descendant(
+        of: h.cardOf(tasks[0]), matching: find.byType(ChaoxingCard)));
 
     expect(h.detailOf(tasks[0]), findsNothing);
     expect(h.detailLaunches, 0);
@@ -167,6 +173,8 @@ void main() {
       ];
       await h.start(tasks: tasks);
       await h.pump(tester, width: 411);
+      // 活动条目不在「全部作业」页签里，得先切过去才看得见卡片。
+      await h.tapIo(tester, h.key(ChaoxingKeys.tabActivity));
       await h.swipeLeft(tester, tasks[0]);
 
       await h.tapIo(tester, h.detailOf(tasks[0]));

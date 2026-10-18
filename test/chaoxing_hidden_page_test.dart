@@ -104,8 +104,7 @@ void main() {
   });
 
   testWidgets('元数据是坏 JSON → 显示空态而不是崩', (WidgetTester tester) async {
-    final ChaoxingHarness h =
-        await openHiddenPage(tester, rawMeta: '{不是合法 JSON');
+    await openHiddenPage(tester, rawMeta: '{不是合法 JSON');
 
     expect(tester.takeException(), isNull);
     expect(find.text('没有隐藏的待办'), findsOneWidget);

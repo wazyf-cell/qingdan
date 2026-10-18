@@ -39,7 +39,7 @@ void main() {
     expect(h.key(ChaoxingKeys.menuRelogin), findsOneWidget);
     expect(h.key(ChaoxingKeys.menuHidden), findsOneWidget);
     expect(h.key(ChaoxingKeys.menuLogout), findsOneWidget);
-    final double y(String k) => tester.getTopLeft(h.key(k)).dy;
+    double y(String k) => tester.getTopLeft(h.key(k)).dy;
     expect(y(ChaoxingKeys.menuRelogin), lessThan(y(ChaoxingKeys.menuHidden)));
     expect(y(ChaoxingKeys.menuHidden), lessThan(y(ChaoxingKeys.menuLogout)));
   });
