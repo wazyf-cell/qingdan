@@ -1,126 +1,54 @@
-// 设置 · 通知节（M6-C2 §3）的 widget 测试。
+// 设置 · 通知节（M6-C2 §3）—— 窄屏 411 那一半（自 `notify_section_test.dart`
+// 按 group 边界拆出，断言一条未改）。
 //
 // 双端各 pump 一次（总纲铁律 8：411 与 1280 都要过）——本节的档位下拉与免打扰
 // 按钮两端布局不同，历史上「只 pump 桌面壳」让四条移动端布局缺陷溜到真机才发现。
 // 改档位的断言一律**读 prefs**，不只看 UI：UI 对了但没落盘 = 重启就丢。
 // 全文件不碰数据库（本节只依赖 NotifySettingsStore / NotificationService），
-// 所以不需要 tester.runAsync。
+// 所以不需要 `tester.runAsync`。
+//
+// Windows 置灰 / 桌面 1280 / 装配缺失降级在 `notify_section_platform_test.dart`；
+// 共用夹具在 `notify_section_harness.dart`。
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'
-    show DidReceiveNotificationResponseCallback;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
-import 'package:provider/single_child_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:qingdan/features/settings/notify_section.dart';
-import 'package:qingdan/notify/notification_service.dart';
 import 'package:qingdan/notify/notify_settings.dart';
-import 'package:qingdan/theme/app_theme.dart';
 
-class _FakeSink implements NotificationSink {
-  final List<String> calls = <String>[];
-  bool permission = true, enabled = true;
-
-  @override
-  Future<void> initialize(
-      {DidReceiveNotificationResponseCallback? onResponse}) async {
-    calls.add('initialize');
-  }
-
-  @override
-  Future<bool> requestPermission() async {
-    calls.add('requestPermission');
-    return permission;
-  }
-
-  @override
-  Future<bool> isEnabled() async => enabled;
-
-  @override
-  Future<void> cancelAll() async => calls.add('cancelAll');
-
-  @override
-  Future<void> schedule(ScheduledReminder item) async {}
-}
-
-const List<String> kAllKeys = <String>[
-  'notify-enabled',
-  'notify-task-lead',
-  'notify-task-lead-minutes',
-  'notify-task-due',
-  'notify-cx-lead1',
-  'notify-cx-lead1-minutes',
-  'notify-cx-lead2',
-  'notify-cx-lead2-minutes',
-  'notify-quiet',
-  'notify-quiet-start',
-  'notify-quiet-end',
-  'notify-perm-status',
-  'notify-perm-open',
-];
+import 'notify_section_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late NotifySectionHarness h;
+  // 以下本地位名只是把夹具接进本作用域，测试本体一字未改。
   late SharedPreferences prefs;
-  late _FakeSink sink;
+  late FakeNotifySink sink;
   late NotifySettingsStore store;
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    prefs = await SharedPreferences.getInstance();
-    sink = _FakeSink();
-    store = NotifySettingsStore(prefs: prefs);
-    await store.load();
+    h = await NotifySectionHarness.start();
+    prefs = h.prefs;
+    sink = h.sink;
+    store = h.store;
   });
 
-  tearDown(() {
-    debugDefaultTargetPlatformOverride = null;
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(const MethodChannel('qingdan/system'), null);
-  });
+  tearDown(() => h.stop());
 
   Future<void> pumpSection(WidgetTester tester,
-      {double width = 411,
-      bool supported = true,
-      bool withStore = true,
-      bool showTitle = true}) async {
-    tester.view.physicalSize = Size(width, 900);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(MultiProvider(
-      providers: <SingleChildWidget>[
-        if (withStore)
-          ChangeNotifierProvider<NotifySettingsStore>.value(value: store),
-        Provider<NotificationService>(
-            create: (_) =>
-                NotificationService(sink: sink, supported: () => supported)),
-      ],
-      // 必须走 AppTheme：AppColors.of 读的是它装的 ThemeExtension。
-      child: MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: NotifySection(showTitle: showTitle),
-          ),
-        ),
-      ),
-    ));
-    await tester.pumpAndSettle();
-  }
+          {double width = 411,
+          bool supported = true,
+          bool withStore = true,
+          bool showTitle = true}) =>
+      h.pumpSection(tester,
+          width: width, supported: supported, withStore: withStore,
+          showTitle: showTitle);
 
-  /// 打开档位下拉并选一项。测试里刻意选**页面上唯一出现**的那个文案，
-  /// 免得和别的下拉当前显示的值撞车（三个下拉都渲染各自的当前值）。
-  Future<void> pickLead(WidgetTester tester, String key, String label) async {
-    await tester.tap(find.byKey(ValueKey<String>(key)));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(label).last);
-    await tester.pumpAndSettle();
-  }
+  Future<void> pickLead(WidgetTester tester, String key, String label) =>
+      h.pickLead(tester, key, label);
 
   group('窄屏 411', () {
     testWidgets('13 个控件 key 全在场，进页才请求权限（不在启动时）',
@@ -244,61 +172,6 @@ void main() {
       expect(find.textContaining('打不开，请手动到 系统设置 → 应用 → 清单 里找'), findsOneWidget);
       // widget 测试的 invariant 检查在 tearDown 之前跑，debug 变量必须在本体内还原。
       debugDefaultTargetPlatformOverride = null;
-    });
-  });
-
-  group('Windows 端（§0.1：插件不支持）', () {
-    testWidgets('整节置灰 + 说明文字，开关点不动、也不弹权限框',
-        (WidgetTester tester) async {
-      await pumpSection(tester, supported: false);
-
-      expect(find.text('Windows 端暂不支持系统通知，提醒功能仅在 Android 上生效。'),
-          findsOneWidget);
-      expect(sink.calls, isNot(contains('requestPermission')),
-          reason: '不支持的平台不该弹权限框');
-      // 控件仍在场（隐藏会让人以为设置丢了），但被 IgnorePointer 挡住。
-      for (final String key in kAllKeys.where((String k) => !k.startsWith('notify-perm'))) {
-        expect(find.byKey(ValueKey<String>(key)), findsOneWidget, reason: '缺 $key');
-      }
-      await tester.tap(find.byKey(const ValueKey<String>('notify-enabled')),
-          warnIfMissed: false);
-      await tester.pumpAndSettle();
-      expect(prefs.getBool(NotifySettings.kEnabledKey), isNull,
-          reason: '置灰必须真的点不动（IgnorePointer 生效）');
-      expect(find.text('去开启'), findsNothing);
-    });
-  });
-
-  group('桌面 1280', () {
-    testWidgets('同一份组件：key 齐全，改档位同样落盘',
-        (WidgetTester tester) async {
-      await pumpSection(tester, width: 1280);
-      for (final String key in kAllKeys) {
-        expect(find.byKey(ValueKey<String>(key)), findsOneWidget, reason: '缺 $key');
-      }
-      await pickLead(tester, 'notify-task-lead-minutes', '60 分钟');
-      expect(prefs.getInt(NotifySettings.kTaskLeadMinutesKey), 60);
-
-      await tester.tap(find.byKey(const ValueKey<String>('notify-cx-lead2')));
-      await tester.pumpAndSettle();
-      expect(prefs.getBool(NotifySettings.kCxLead2EnabledKey), isFalse);
-    });
-
-    testWidgets('showTitle 默认 true：节名自绘一份，不多不少',
-        (WidgetTester tester) async {
-      await pumpSection(tester, width: 1280);
-      expect(find.text('通知'), findsOneWidget,
-          reason: '设置树传 showTitle:false 时不该再有第二份，默认才自绘');
-    });
-  });
-
-  group('装配缺失要降级，不许红屏', () {
-    testWidgets('没有 NotifySettingsStore → 一行可读提示',
-        (WidgetTester tester) async {
-      await pumpSection(tester, withStore: false);
-      expect(find.textContaining('NotifySettingsStore 未注册进 Provider 树'),
-          findsOneWidget);
-      expect(tester.takeException(), isNull);
     });
   });
 }

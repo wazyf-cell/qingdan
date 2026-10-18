@@ -1,0 +1,131 @@
+// 设置各二级节页的内容（自 `settings_page_test.dart` 按被测对象拆出，断言一条
+// 未改）：外观页收下「默认页签 + 角标」、数据与同步节（同步控件 + 回收站四档）、
+// 通用页的明说「没做」占位、关于页的版本/使用说明/开源许可。
+//
+// 一级树与进出在 `settings_tree_test.dart`，桌面对话框形态在
+// `settings_dialog_test.dart`；共用夹具在 `settings_page_harness.dart`。
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:qingdan/features/settings/about_section.dart';
+import 'package:qingdan/features/settings/settings_model.dart';
+import 'package:qingdan/features/shell/shell_tab.dart';
+
+import 'settings_page_harness.dart';
+
+void main() {
+  late SettingsPageHarness h;
+  // 以下本地位名只是把夹具接进本作用域，测试本体一字未改。
+  late SettingsModel settings;
+  late SharedPreferences prefs;
+
+  setUp(() async {
+    h = await SettingsPageHarness.open();
+    settings = h.settings;
+    prefs = h.prefs;
+  });
+
+  Future<void> pumpNarrow(WidgetTester tester, {double width = 411}) =>
+      h.pumpNarrow(tester, width: width);
+
+  Future<void> openRow(WidgetTester tester, String rowKey) =>
+      h.openRow(tester, rowKey);
+
+  Future<void> back(WidgetTester tester) => h.back(tester);
+
+  testWidgets('外观页收下了「默认页签」和「角标」（原来夹在通用里）',
+      (WidgetTester tester) async {
+    await pumpNarrow(tester);
+    await openRow(tester, 'settings-appearance');
+
+    expect(find.text('手机默认打开的页面'), findsOneWidget);
+    // 「设置」不当默认页：它是点进来的去处，不是开屏要看的东西。
+    expect(find.text('设置'), findsNothing);
+
+    await tester.tap(find.text('课表'));
+    await tester.pumpAndSettle();
+    expect(settings.defaultTab, ShellTab.course);
+    expect(prefs.getString(SettingsModel.kDefaultTabKey), 'course');
+
+    await tester.tap(find.text('显示待办数字'));
+    await tester.pumpAndSettle();
+    expect(settings.showBadges, isFalse);
+    expect(prefs.getBool(SettingsModel.kShowBadgesKey), isFalse);
+  });
+
+  testWidgets('数据与同步页：同步配置与回收站四档在同一节',
+      (WidgetTester tester) async {
+    await pumpNarrow(tester);
+    await openRow(tester, 'settings-data');
+
+    for (final String key in <String>[
+      'sync-enabled',
+      'sync-url',
+      'sync-user',
+      'sync-password',
+      'sync-test',
+      'sync-save',
+      'sync-clear',
+    ]) {
+      expect(find.byKey(ValueKey<String>(key)), findsOneWidget,
+          reason: '同步节缺控件 $key（原来整节零 key，测试只能靠文本定位）');
+    }
+    expect(find.text('回收站自动清空'), findsOneWidget);
+    for (final String label in <String>['永不', '7 天', '30 天', '90 天']) {
+      expect(find.text(label), findsOneWidget, reason: '回收站档位缺 $label');
+    }
+    await tester.tap(find.text('7 天'));
+    await tester.pumpAndSettle();
+    expect(settings.trashPurgeDays, 7);
+    expect(prefs.getInt(SettingsModel.kTrashPurgeDaysKey), 7);
+  });
+
+  testWidgets('通用页：语言与检查更新是明说「没做」的占位，不是死行',
+      (WidgetTester tester) async {
+    await pumpNarrow(tester);
+    await openRow(tester, 'settings-general');
+
+    final ListTile lang =
+        tester.widget<ListTile>(find.byKey(const ValueKey<String>('settings-language')));
+    expect(lang.enabled, isFalse, reason: '语言没做就该看着是灰的');
+    expect(find.textContaining('英文版尚未制作'), findsOneWidget);
+
+    expect(find.textContaining('更新源尚未配置'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey<String>('settings-update')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('等仓库发布第一个 Release 后启用'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey<String>('update-ok')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey<String>('general-permissions')));
+    await tester.pumpAndSettle();
+    expect(find.text('后台与省电'), findsWidgets);
+    expect(find.textContaining('本应用不在后台常驻'), findsOneWidget,
+        reason: '那句诚实边界不许省（提醒为什么有时不响）');
+    await back(tester);
+  });
+
+  testWidgets('关于页：版本 + 使用说明进 help-page + 开源许可',
+      (WidgetTester tester) async {
+    await pumpNarrow(tester);
+    await openRow(tester, 'settings-about');
+
+    expect(find.byKey(const ValueKey<String>('app-version')), findsOneWidget);
+    expect(find.text('v$kAppVersion'), findsOneWidget);
+    expect(find.textContaining('也不会自建任何服务器'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey<String>('settings-help')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('help-page')), findsOneWidget);
+    await back(tester);
+
+    await tester.tap(find.byKey(const ValueKey<String>('settings-licenses')));
+    await tester.pumpAndSettle();
+    // 项目没接 flutter_localizations（E2 定案：本批不半做 i18n），
+    // showLicensePage 的默认标题是英文，所以按**类型**而不是文案认它。
+    expect(find.byType(LicensePage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+}
