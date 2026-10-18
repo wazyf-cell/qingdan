@@ -56,8 +56,8 @@ void main() {
     expect(app.localizationsDelegates, isNull,
         reason: '接了 delegates 就是开始做半套国际化');
     // supportedLocales 不设置时框架给的是默认 [en_US]（非空、非 null），
-    // 拿它当证据会误判；真正被「半做 i18n」改变的是 delegates 与 locale 覆盖。
-    expect(app.supportedLocales, isNotNull);
+    // 拿它当「有没有做 i18n」的证据会误判；真正会被改变的是 delegates 与 locale。
+    expect(app.supportedLocales, isNotEmpty);
     expect(app.locale, isNull);
   });
 

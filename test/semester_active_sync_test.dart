@@ -67,7 +67,9 @@ void main() {
     final Semester a1 = await useCase(1).createSemester(
         name: 'A-大一上', firstWeekDate: DateTime.utc(2025, 9, 1));
     final Semester a2 = await useCase(1).createSemester(
-        name: 'A-大一下', firstWeekDate: DateTime.utc(2026, 2, 2));
+        name: 'A-大一下',
+        firstWeekDate: DateTime.utc(2026, 2, 2),
+        setActive: false); // M6-D §6.1：默认 setActive=true 会抢当前，这里要验的是不抢
     expect(await activeIds(1), <String>[a1.id],
         reason: '第二个学期建出来不该抢 active（DDL 默认 1 的陷阱）');
     await useCase(1).activeSemester(); // 读一次，确认自愈没改变结论
@@ -130,7 +132,10 @@ void main() {
     final Semester s1 =
         await uc.createSemester(name: '旧名', firstWeekDate: DateTime.utc(2025, 9, 1));
     final Semester s2 =
-        await uc.createSemester(name: '第二个', firstWeekDate: DateTime.utc(2026, 2, 2));
+        await uc.createSemester(
+            name: '第二个',
+            firstWeekDate: DateTime.utc(2026, 2, 2),
+            setActive: false); // 保持「当前仍是 s1」，旧名快照才有意义
     // 拿着 s1「还是当前学期」时的旧快照，等 s2 被切成当前之后再改 s1 的名字。
     final Semester stale = (await uc.activeSemester())!;
     await fx.device1.services.semesterDao.setActiveSemester(s2.id);

@@ -9,6 +9,9 @@ import '../domain/timestamps.dart';
 import 'op_log_writer.dart';
 import 'row_diff.dart';
 
+// M6-D §6.1/§6.2 的模板库与学期级联事务拆到 part 文件（本体已近 300 行红线）。
+part 'semester_dao_timetable.dart';
+
 /// 学期 + 作息表 DAO（F28 / F30）。
 ///
 /// 所有写方法自持事务，并在**同一事务**内追加 op-log（AGENTS.md 铁律）。
