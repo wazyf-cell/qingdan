@@ -143,9 +143,12 @@ class CoursePaneModel extends ChangeNotifier {
     };
   }
 
-  /// 局限必须写在界面上：`import_batches` 没有学期列，导入时间只能取全局最近一次。
+  /// 导入读数**按当前学期取**：v6 给 `import_batches` 补了 `semester_id`，
+  /// `latestBatch(semesterId)` 就是本学期最近一次（M6-D §八）。
+  /// 这句 tooltip 以前写「不区分学期」，那是补列之前的老实话，现在留着就成了
+  /// 假声明（2026-10-19 审计抓到）。
   String get freshnessTooltip => freshness.kind == CourseFreshnessKind.import
-      ? '最近一次导入（不区分学期）· 点此查看最近 10 次'
+      ? '本学期最近一次导入 · 点此查看最近 10 次'
       : '本学期课程最后一次改动 · 点此查看最近导入';
 
   /// 加载学期 + 作息 + 整学期课程 + 新鲜度。

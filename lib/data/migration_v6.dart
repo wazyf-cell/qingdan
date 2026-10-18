@@ -26,7 +26,7 @@ Future<void> migrateV6(DatabaseExecutor db) async {
   await _addColumnIfMissing(db, 'courses', 'color_index',
       'INTEGER'); // 可空：NULL = 沿用按课程名哈希的自动配色
   await _addColumnIfMissing(db, 'import_batches', 'semester_id',
-      'TEXT'); // 可空：老批次留 NULL（界面显示「不区分学期」，§八）
+      'TEXT'); // 可空：老批次留 NULL（历史面板显示「（学期未知）」，§八）
 
   await _bindLegacyTimetable(db);
   await _seedBuiltInTemplate(db);

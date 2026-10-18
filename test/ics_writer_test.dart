@@ -235,10 +235,13 @@ void main() {
     final IcsExport out = export(courses: <Course>[
       course(name: '正常课'),
       course(name: '第 5 节的课', start: 5, end: 5), // 作息表只到 4 节
+      course(name: '第 5 节的课', start: 7, end: 8), // 同名第二门：计数按门不按课名
       course(name: '跨节缺节', start: 3, end: 6), // 5、6 节缺失
     ]);
     expect(out.eventCount, 1);
-    expect(out.skippedCount, 2);
+    // 界面那句是「N 门课因节次不在作息表中被跳过」，所以 N 数的是**门**。
+    // 真实课表里同名课很常见（数据结构两门不同教室），按课名去重会把 3 门报成 2 门。
+    expect(out.skippedCount, 3);
     expect(out.skippedNames, <String>['第 5 节的课', '跨节缺节']);
     expect(out.text, contains('SUMMARY:正常课'));
     expect(out.text, isNot(contains('SUMMARY:第 5 节的课')));

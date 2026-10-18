@@ -33,6 +33,7 @@ class IcsExport {
     required this.text,
     required this.eventCount,
     required this.skippedNames,
+    required this.skippedCount,
   });
 
   final String text;
@@ -43,7 +44,9 @@ class IcsExport {
   /// 被跳过的课程名（去重，保持出现顺序）。
   final List<String> skippedNames;
 
-  int get skippedCount => skippedNames.length;
+  /// 实际被跳过的**门数**（不是课名个数）。界面那句写的是「N 门课…被跳过」，
+  /// 而真实课表里同名课很常见（同一门课两个班、不同教室），按课名去重会少报。
+  final int skippedCount;
 }
 
 /// 把 [courses] 按学期 [semester] 的周次展开成一份 ics 文本。
@@ -79,11 +82,12 @@ IcsExport writeIcs({
   ];
 
   final List<String> skipped = <String>[];
-  int eventCount = 0;
+  int skippedCount = 0, eventCount = 0;
   for (final Course c in courses) {
     if (c.deleted) continue; // 回收站里的课不进日历
     if (layout.missingSections(c.startSection, c.endSection).isNotEmpty) {
-      if (!skipped.contains(c.name)) skipped.add(c.name);
+      skippedCount++; // 按门计数
+      if (!skipped.contains(c.name)) skipped.add(c.name); // 名单按课名去重
       continue;
     }
     for (final int week in c.weeks) {
@@ -96,6 +100,7 @@ IcsExport writeIcs({
     text: '${<String>[for (final String l in lines) _foldLine(l)].join('\r\n')}\r\n',
     eventCount: eventCount,
     skippedNames: skipped,
+    skippedCount: skippedCount,
   );
 }
 
