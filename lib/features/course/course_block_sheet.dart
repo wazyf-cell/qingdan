@@ -36,11 +36,7 @@ Future<CourseBlockAction> showCourseBlockSheet(
     },
   );
   final CourseBlockAction? action = isMobile
-      ? await showModalBottomSheet<CourseBlockAction>(
-          context: context,
-          showDragHandle: true,
-          builder: (BuildContext ctx) => SafeArea(child: body),
-        )
+      ? await _mobileBlockSheet(context, body: body)
       : await showDialog<CourseBlockAction>(
           context: context,
           builder: (BuildContext ctx) => AlertDialog(
@@ -50,6 +46,26 @@ Future<CourseBlockAction> showCourseBlockSheet(
   // 点遮罩 / 返回键关掉：没有选任何动作。
   return action ?? CourseBlockAction.closed;
 }
+
+/// 移动形态的底部抽屉，**显式限高 60% 屏高 + 可滚动**（细化 §2.8:143）。
+///
+/// 不给限高时它靠的是 `showModalBottomSheet` 默认的 9/16≈56% 上限，内容一多
+/// 就被裁掉而且没有滚动（实测长课名 + 长地点溢出 11px）；这里把「不超 60%」
+/// 写成代码，而不是指望默认值。
+Future<CourseBlockAction?> _mobileBlockSheet(
+  BuildContext context, {
+  required Widget body,
+}) =>
+    showModalBottomSheet<CourseBlockAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext ctx) => ConstrainedBox(
+        key: const ValueKey<String>('block-sheet-shell'),
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.6),
+        child: SafeArea(child: SingleChildScrollView(child: body)),
+      ),
+    );
 
 /// 删除的二次确认框（块详情弹层与课程编辑器共用一份文案与语义）。
 ///

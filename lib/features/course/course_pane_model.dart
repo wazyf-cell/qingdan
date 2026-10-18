@@ -183,6 +183,16 @@ class CoursePaneModel extends ChangeNotifier {
   Future<void> goToday() =>
       todayInSemester ? selectWeek(todayWeek) : Future<void>.value();
 
+  /// 摘要条点击 = 定位到今天（细化 §2.8:140）。比 [goToday] 多做一件事：
+  /// 今天落在周末而周末折叠着的话，先把周末展开——否则「今天」那一列根本
+  /// 不在屏幕上，点摘要条等于没点（2026-10-18 模拟器：今天周日，摘要条写着
+  /// 「今天没有课」，但周日那列被「收起周末」藏着）。
+  Future<void> revealToday() async {
+    if (!todayInSemester) return;
+    if (today.weekday >= DateTime.saturday && !showWeekend) toggleWeekend();
+    await selectWeek(todayWeek);
+  }
+
   /// 一键校准（A5）：把第 [n] 周当作「本周」。
   ///
   /// 真正改的是 `semester.first_week_monday`——「今天是第几周」完全由它推出，

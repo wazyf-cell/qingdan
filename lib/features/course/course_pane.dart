@@ -165,6 +165,8 @@ class _CoursePaneState extends State<CoursePane> {
             today: model.today,
             courses: model.todayCourses,
             layout: model.layout,
+            // §2.8:140 摘要条点击定位今天（M5-S5 漏接的一条：参数一直留着没人传）。
+            onTap: model.revealToday,
           ),
         CourseWeekHeader(
           week: model.week,
@@ -173,7 +175,10 @@ class _CoursePaneState extends State<CoursePane> {
           canNext: model.canNext,
           isMobile: _isMobile,
           showWeekend: model.showWeekend,
-          todayButtonDisabled: model.week == model.todayWeek,
+          // 学期外 `todayWeek` 是 0，「今天」点了只会走一次空转的 selectWeek(0)，
+          // 看着能点其实没反应 = 真缺陷，直接置灰（2026-10-18 复核）。
+          todayButtonDisabled:
+              !model.todayInSemester || model.week == model.todayWeek,
           onPrev: model.prevWeek,
           onNext: model.nextWeek,
           onToday: model.goToday,
