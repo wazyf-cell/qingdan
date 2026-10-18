@@ -95,116 +95,131 @@ class _FilterBodyState extends State<_FilterBody> {
     return Consumer<ChaoxingModel>(
       builder: (BuildContext _, ChaoxingModel model, Widget? _) {
         final ChaoxingViewSettings s = model.settings;
-        return ListView(
-          controller: widget.controller,
-          padding: const EdgeInsets.fromLTRB(
-              AppDimens.s16, 0, AppDimens.s16, AppDimens.s16),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Text('筛选', style: AppTypography.panelTitle),
-            const SizedBox(height: AppDimens.s12),
-            TextField(
-              key: ChaoxingKeys.vkey(ChaoxingKeys.filterSearch),
-              controller: widget.search,
-              onChanged: (String v) {
-                setState(() {}); // 统计行跟着变
-                widget.onSearchChanged(v);
-              },
-              style: AppTypography.body,
-              decoration: InputDecoration(
-                isDense: true,
-                filled: true,
-                fillColor: colors.surfaceHigh,
-                hintText: '搜索标题或课程',
-                hintStyle:
-                    AppTypography.body.copyWith(color: colors.textFaint),
-                prefixIcon:
-                    Icon(Icons.search, size: 18, color: colors.textFaint),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppDimens.s12, vertical: AppDimens.s8),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none),
+            // 统计行与「重置 / 完成」固定在弹层底部：411×915 的 0.55 弹层里
+            // 排序五档已经贴到视口下缘，若把它们也排进滚动列表，「完成」会
+            // 落在视口外（真机上表现为「弹层关不掉」，测试里表现为 off-screen）。
+            Expanded(
+              child: ListView(
+                controller: widget.controller,
+                padding: const EdgeInsets.fromLTRB(
+                    AppDimens.s16, 0, AppDimens.s16, AppDimens.s12),
+                children: <Widget>[
+                  Text('筛选', style: AppTypography.panelTitle),
+                  const SizedBox(height: AppDimens.s12),
+                  _searchField(colors),
+                  const SizedBox(height: AppDimens.s12),
+                  _courseField(colors),
+                  SwitchListTile(
+                    key: ChaoxingKeys.vkey(ChaoxingKeys.filterUnfinished),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('仅看未完成', style: AppTypography.body),
+                    value: s.onlyUnfinished,
+                    onChanged: (bool v) => model.toggleOnlyUnfinished(),
+                  ),
+                  SwitchListTile(
+                    key: ChaoxingKeys.vkey(ChaoxingKeys.filterSubmittable),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('仅看可提交', style: AppTypography.body),
+                    value: s.onlySubmittable,
+                    onChanged: (bool v) => model.toggleOnlySubmittable(),
+                  ),
+                  const SizedBox(height: AppDimens.s4),
+                  Text('排序',
+                      style: AppTypography.groupHeader
+                          .copyWith(color: colors.textSecondary)),
+                  // 五档照抄扩展（脚本 :3258-3265）；用单选列表而不是 SegmentedButton：
+                  // 五段在 411dp 宽里放不下。
+                  // groupValue / onChanged 挂在 RadioGroup 上——3.32 之后
+                  // RadioListTile 的同名参数已被标记废弃，用它们会带红 flutter analyze。
+                  RadioGroup<ChaoxingSortBy>(
+                    groupValue: s.sortBy,
+                    onChanged: (ChaoxingSortBy? next) {
+                      if (next != null) model.setSortBy(next);
+                    },
+                    child: Column(
+                      key: ChaoxingKeys.vkey(ChaoxingKeys.filterSort),
+                      children: ChaoxingSortBy.values
+                          .map((ChaoxingSortBy v) => RadioListTile<ChaoxingSortBy>(
+                                key: ChaoxingKeys.vkey(
+                                    ChaoxingKeys.sortOption(v.name)),
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: Text(v.label, style: AppTypography.body),
+                                value: v,
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: AppDimens.s12),
-            _courseField(colors),
-            SwitchListTile(
-              key: ChaoxingKeys.vkey(ChaoxingKeys.filterUnfinished),
-              contentPadding: EdgeInsets.zero,
-              title: Text('仅看未完成', style: AppTypography.body),
-              value: s.onlyUnfinished,
-              onChanged: (bool v) => model.toggleOnlyUnfinished(),
-            ),
-            SwitchListTile(
-              key: ChaoxingKeys.vkey(ChaoxingKeys.filterSubmittable),
-              contentPadding: EdgeInsets.zero,
-              title: Text('仅看可提交', style: AppTypography.body),
-              value: s.onlySubmittable,
-              onChanged: (bool v) => model.toggleOnlySubmittable(),
-            ),
-            const SizedBox(height: AppDimens.s4),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('排序',
-                    style: AppTypography.groupHeader
-                        .copyWith(color: colors.textSecondary)),
-                // 五档照抄扩展（脚本 :3258-3265）；用单选列表而不是 SegmentedButton：
-                // 五段在 411dp 宽里放不下。
-                // groupValue / onChanged 挂在 RadioGroup 上——3.32 之后
-                // RadioListTile 的同名参数已被标记废弃，用它们会带红 flutter analyze。
-                RadioGroup<ChaoxingSortBy>(
-                  groupValue: s.sortBy,
-                  onChanged: (ChaoxingSortBy? next) {
-                    if (next != null) model.setSortBy(next);
-                  },
-                  child: Column(
-                    key: ChaoxingKeys.vkey(ChaoxingKeys.filterSort),
-                    children: ChaoxingSortBy.values
-                        .map((ChaoxingSortBy v) => RadioListTile<ChaoxingSortBy>(
-                              key: ChaoxingKeys.vkey(
-                                  ChaoxingKeys.sortOption(v.name)),
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                              title: Text(v.label, style: AppTypography.body),
-                              value: v,
-                            ))
-                        .toList(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  AppDimens.s16, 0, AppDimens.s16, AppDimens.s16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    key: ChaoxingKeys.vkey(ChaoxingKeys.filterCount),
+                    '${s.tab.label} · ${s.sortBy.label} · ${widget.count()} 项',
+                    style: AppTypography.meta.copyWith(color: colors.textFaint),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppDimens.s8),
-            Text(
-              key: ChaoxingKeys.vkey(ChaoxingKeys.filterCount),
-              '${s.tab.label} · ${s.sortBy.label} · ${widget.count()} 项',
-              style: AppTypography.meta.copyWith(color: colors.textFaint),
-            ),
-            const SizedBox(height: AppDimens.s12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: <Widget>[
-                TextButton(
-                  key: ChaoxingKeys.vkey(ChaoxingKeys.filterReset),
-                  onPressed: () {
-                    model.resetFilters();
-                    widget.search.clear();
-                    widget.onSearchChanged('');
-                    _setCourse('');
-                  },
-                  child: const Text('重置'),
-                ),
-                const SizedBox(width: AppDimens.s8),
-                FilledButton(
-                  key: ChaoxingKeys.vkey(ChaoxingKeys.filterApply),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('完成'),
-                ),
-              ],
+                  const SizedBox(height: AppDimens.s12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: <Widget>[
+                      TextButton(
+                        key: ChaoxingKeys.vkey(ChaoxingKeys.filterReset),
+                        onPressed: () {
+                          model.resetFilters();
+                          widget.search.clear();
+                          widget.onSearchChanged('');
+                          _setCourse('');
+                        },
+                        child: const Text('重置'),
+                      ),
+                      const SizedBox(width: AppDimens.s8),
+                      FilledButton(
+                        key: ChaoxingKeys.vkey(ChaoxingKeys.filterApply),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('完成'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _searchField(AppColors colors) {
+    return TextField(
+      key: ChaoxingKeys.vkey(ChaoxingKeys.filterSearch),
+      controller: widget.search,
+      onChanged: (String v) {
+        setState(() {}); // 统计行跟着变
+        widget.onSearchChanged(v);
+      },
+      style: AppTypography.body,
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: colors.surfaceHigh,
+        hintText: '搜索标题或课程',
+        hintStyle: AppTypography.body.copyWith(color: colors.textFaint),
+        prefixIcon: Icon(Icons.search, size: 18, color: colors.textFaint),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.s12, vertical: AppDimens.s8),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none),
+      ),
     );
   }
 

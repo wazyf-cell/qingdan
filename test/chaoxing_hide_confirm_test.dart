@@ -30,7 +30,12 @@ void main() {
 
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.textContaining('「第四章1」还没截止'), findsOneWidget);
-    expect(find.textContaining('10-18 15:00 截止（剩3小时0分）'), findsOneWidget);
+    // 截止行文本在卡片本体也出现过一次（对话框后面那张卡），必须限定在对话框里找。
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.textContaining('10-18 15:00 截止（剩3小时0分）')),
+        findsOneWidget);
     expect(find.widgetWithText(TextButton, '取消'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '仍然隐藏'), findsOneWidget);
 

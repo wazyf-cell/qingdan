@@ -85,9 +85,11 @@ void main() {
     await h.pump(tester);
 
     expect(find.text('2'), findsOneWidget);
-    final Badge badge = tester.widget<Badge>(find.ancestor(
-        of: find.byWidget(const Icon(Icons.tune)),
-        matching: find.byType(Badge)));
+    // 用 key 定位而不是 `find.byWidget(const Icon(Icons.tune))`：后者在
+    // IconButton(M3) 内部包装下匹配不到（实测 0 candidates），key 路径更稳。
+    final Badge badge = tester.widget<Badge>(
+        find.descendant(
+            of: h.key(ChaoxingKeys.filter), matching: find.byType(Badge)));
     // 默认底色是 colorScheme.error（红），必须被显式换成主题色（总纲陷阱表）。
     final AppColors colors =
         AppColors.of(tester.element(find.byType(Badge)));
@@ -127,6 +129,14 @@ void main() {
     await h.pump(tester);
     await h.tapIo(tester, h.key(ChaoxingKeys.filter));
     await h.tapIo(tester, h.key(ChaoxingKeys.filterUnfinished));
+    // 排序五档在弹层自己的滚动区里，最后一档默认在视口外——用户也是滑到它才点的
+    // （`ensureVisible` 对「顶部刚露出 7px」的档位在 3.47 下判成已可见，不滚）。
+    await tester.dragUntilVisible(
+      h.key(ChaoxingKeys.sortOption(ChaoxingSortBy.name.name)),
+      h.key(ChaoxingKeys.filterSort),
+      const Offset(0, -60),
+    );
+    await tester.pumpAndSettle();
     await h.tapIo(tester, h.key(ChaoxingKeys.sortOption(ChaoxingSortBy.name.name)));
     await h.tapIo(tester, h.key(ChaoxingKeys.filterApply));
 

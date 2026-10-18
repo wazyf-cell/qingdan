@@ -113,3 +113,29 @@ class ChaoxingHiddenEntry {
         for (final ChaoxingHiddenEntry e in entries) e.key: e.toJson(),
       });
 }
+
+/// 刷新成功后对齐隐藏元数据：还存在的条目把课程名/标题/截止更新成最新值
+/// （截止时间可能被老师改），本次刷新中不再出现的标 `dead`（**不删**，
+/// 让隐藏列表页给用户自己决定）。纯函数、无 IO，从 `ChaoxingModel` 抽出来
+/// 是为了让模型留在 300 行红线内（职责也本来就是「隐藏项元数据」这一域）。
+List<ChaoxingHiddenEntry> syncHiddenMetaWithTasks(
+  List<ChaoxingHiddenEntry> entries,
+  List<ChaoxingTask> tasks,
+) {
+  if (entries.isEmpty) return entries;
+  final Map<String, ChaoxingTask> byKey = <String, ChaoxingTask>{
+    for (final ChaoxingTask t in tasks) t.key: t,
+  };
+  return entries.map((ChaoxingHiddenEntry e) {
+    final ChaoxingTask? t = byKey[e.key];
+    if (t == null) return e.copyWith(dead: true);
+    return ChaoxingHiddenEntry(
+      key: e.key,
+      courseName: t.courseName,
+      title: t.title,
+      dueMs: t.dueAt?.millisecondsSinceEpoch,
+      hiddenAtMs: e.hiddenAtMs,
+      dead: false,
+    );
+  }).toList();
+}
