@@ -40,54 +40,54 @@ class SettingsEntry {
 }
 
 /// 顺序即界面顺序：外观 / 通知 / 数据与同步 / 课表 / 学习通 / 通用 / 关于。
-List<SettingsEntry> settingsEntries() => const <SettingsEntry>[
+List<SettingsEntry> settingsEntries() => <SettingsEntry>[
       SettingsEntry(
         id: SettingsSectionId.appearance,
         icon: Icons.palette_outlined,
         title: '外观',
         subtitle: '主题、底部角标、手机默认打开的页面',
-        content: AppearanceSection.new,
+        content: (bool showTitle) => AppearanceSection(showTitle: showTitle),
       ),
       SettingsEntry(
         id: SettingsSectionId.notify,
         icon: Icons.notifications_outlined,
         title: '通知',
         subtitle: '系统通知权限、到期与截止提醒、免打扰',
-        content: NotifySection.new,
+        content: (bool showTitle) => NotifySection(showTitle: showTitle),
       ),
       SettingsEntry(
         id: SettingsSectionId.data,
         icon: Icons.cloud_outlined,
         title: '数据与同步',
         subtitle: 'WebDAV 配置与测试连接、回收站自动清空',
-        content: DataSection.new,
+        content: (bool showTitle) => DataSection(showTitle: showTitle),
       ),
       SettingsEntry(
         id: SettingsSectionId.course,
         icon: Icons.calendar_today_outlined,
         title: '课表',
         subtitle: '学期与作息；模板、导出在下一批',
-        content: CourseSection.new,
+        content: (bool showTitle) => CourseSection(showTitle: showTitle),
       ),
       SettingsEntry(
         id: SettingsSectionId.chaoxing,
         icon: Icons.school_outlined,
         title: '学习通',
         subtitle: '账号状态、重新登录、退出与隐藏列表',
-        content: ChaoxingSection.new,
+        content: (bool showTitle) => ChaoxingSection(showTitle: showTitle),
       ),
       SettingsEntry(
         id: SettingsSectionId.general,
         icon: Icons.tune,
         title: '通用',
         subtitle: '语言、后台与省电权限、检查更新',
-        content: GeneralSection.new,
+        content: (bool showTitle) => GeneralSection(showTitle: showTitle),
       ),
       SettingsEntry(
         id: SettingsSectionId.about,
         icon: Icons.info_outline,
         title: '关于',
         subtitle: '版本、使用说明与开源许可',
-        content: AboutSection.new,
+        content: (bool showTitle) => AboutSection(showTitle: showTitle),
       ),
     ];

@@ -93,7 +93,7 @@ IcsExport writeIcs({
   }
   lines.add('END:VCALENDAR');
   return IcsExport(
-    text: <String>[for (final String l in lines) _foldLine(l)].join('\r\n') + '\r\n',
+    text: '${<String>[for (final String l in lines) _foldLine(l)].join('\r\n')}\r\n',
     eventCount: eventCount,
     skippedNames: skipped,
   );
@@ -124,7 +124,7 @@ List<String> _eventLines(
   return <String>[
     'BEGIN:VEVENT',
     // UID 稳定：同一份 ics 重复导入不会产生重复事件（§9.1）。
-    'UID:${c.uid}-${week}@qingdan',
+    'UID:${c.uid}-$week@qingdan',
     stamp,
     'DTSTART;TZID=$kIcsTzId:${_localDateTime(day, start.startMinutes)}',
     'DTEND;TZID=$kIcsTzId:${_localDateTime(day, end.endMinutes)}',

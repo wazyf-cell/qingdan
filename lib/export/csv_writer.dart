@@ -52,4 +52,4 @@ String weeksCell(Course c) {
 /// 含 `,` `"` 换行的单元格由 `csv` 包按 RFC 4180 加引号转义，读回时自动去引号，
 /// 因此课程名/地点里带逗号也不会串列。
 String writeCsv({required List<Course> courses}) =>
-    Csv(addBom: true).encode(scheduleRows(courses)) + '\r\n';
+    '${Csv(addBom: true).encode(scheduleRows(courses))}\r\n';

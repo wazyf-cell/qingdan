@@ -67,7 +67,7 @@ class AboutSection extends StatelessWidget {
               style: AppTypography.meta),
           trailing: const Icon(Icons.chevron_right, size: 20),
           onTap: () => pushSettingsSection(context,
-              title: '使用说明', content: HelpSection.new),
+              title: '使用说明', content: (bool showTitle) => HelpSection(showTitle: showTitle)),
         ),
         ListTile(
           key: const ValueKey<String>('settings-licenses'),

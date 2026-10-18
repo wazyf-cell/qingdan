@@ -216,7 +216,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('实验课'), findsOneWidget,
         reason: '课不能因为作息表没这节就消失');
-    expect(find.text('第 13-14 节'), findsOneWidget);
+    // 收纳区一行必须带星期（M6-A 收口那轮加的）：一屏十几条时同名课分不清，
+    // 而且不带星期就看不出这门课落在哪一天。
+    expect(find.text('周三 · 第 13-14 节'), findsOneWidget);
   });
 
   testWidgets('移动端默认折叠周末，点「周末」展开到 7 列', (tester) async {

@@ -7,6 +7,7 @@ import 'package:provider/single_child_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:qingdan/features/chaoxing/chaoxing_model.dart';
+import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 import 'package:qingdan/features/settings/about_section.dart';
 import 'package:qingdan/features/settings/settings_dialog.dart';
 import 'package:qingdan/features/settings/settings_model.dart';
@@ -27,6 +28,7 @@ import 'chaoxing_harness.dart';
 void main() {
   late SettingsModel settings;
   late NotifySettingsStore notifySettings;
+  late SharedPreferences prefs;
   late ChaoxingHarness cx;
 
   const List<String> rowKeys = <String>[
@@ -50,13 +52,16 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    settings = SettingsModel(prefs: prefs);
-    notifySettings = NotifySettingsStore(prefs: prefs);
     cx = ChaoxingHarness();
-    await cx.start(tasks: <dynamic>[], loggedIn: false, seeded: false);
+    await cx.start(tasks: <ChaoxingTask>[], loggedIn: false, seeded: false);
     cx.stubSeams();
     addTearDown(cx.restoreSeams);
+    // harness 内部也会 setMockInitialValues（学习通 prefs 有自己的种子），
+    // 所以**必须在其之后再取一次**：先取到的那份会被重置掉，
+    // 之后「写进去再读回来」的断言就全成了 null。
+    prefs = await SharedPreferences.getInstance();
+    settings = SettingsModel(prefs: prefs);
+    notifySettings = NotifySettingsStore(prefs: prefs);
   });
 
   Future<void> pumpNarrow(WidgetTester tester, {double width = 411}) async {
@@ -86,8 +91,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<T?> io<T>(WidgetTester tester, Future<T?> Function() body) =>
+      tester.runAsync<T?>(body);
+
   Future<void> openRow(WidgetTester tester, String rowKey) async {
     await tester.tap(find.byKey(ValueKey<String>(rowKey)));
+    await tester.pumpAndSettle();
+    // 「数据与同步」里的 SyncSection 在 initState 里读配置（SharedPreferences
+    // 走真异步）。runAsync 之外假时钟不会替它把 Future 跑完，页面会一直停在
+    // 「读取中…」——所以开完页给一次真实延时，再回假时钟推帧。
+    await io(tester, () => Future<void>.delayed(const Duration(milliseconds: 120)));
     await tester.pumpAndSettle();
   }
 
@@ -145,14 +158,12 @@ void main() {
     await tester.tap(find.text('课表'));
     await tester.pumpAndSettle();
     expect(settings.defaultTab, ShellTab.course);
-    expect((await SharedPreferences.getInstance())
-        .getString(SettingsModel.kDefaultTabKey), 'course');
+    expect(prefs.getString(SettingsModel.kDefaultTabKey), 'course');
 
     await tester.tap(find.text('显示待办数字'));
     await tester.pumpAndSettle();
     expect(settings.showBadges, isFalse);
-    expect((await SharedPreferences.getInstance())
-        .getBool(SettingsModel.kShowBadgesKey), isFalse);
+    expect(prefs.getBool(SettingsModel.kShowBadgesKey), isFalse);
   });
 
   testWidgets('数据与同步页：同步配置与回收站四档在同一节',
@@ -179,8 +190,7 @@ void main() {
     await tester.tap(find.text('7 天'));
     await tester.pumpAndSettle();
     expect(settings.trashPurgeDays, 7);
-    expect((await SharedPreferences.getInstance())
-        .getInt(SettingsModel.kTrashPurgeDaysKey), 7);
+    expect(prefs.getInt(SettingsModel.kTrashPurgeDaysKey), 7);
   });
 
   testWidgets('通用页：语言与检查更新是明说「没做」的占位，不是死行',
@@ -224,7 +234,9 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey<String>('settings-licenses')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('许可证'), findsWidgets);
+    // 项目没接 flutter_localizations（E2 定案：本批不半做 i18n），
+    // showLicensePage 的默认标题是英文，所以按**类型**而不是文案认它。
+    expect(find.byType(LicensePage), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -256,12 +268,19 @@ void main() {
     await tester.tap(find.text('open-settings'));
     await tester.pumpAndSettle();
 
-    final Size dialog = tester.getSize(find.byType(Dialog).first);
+    // `Dialog` 自己的 RenderBox 吃满路由约束，量它恒等于屏幕；
+    // 量对话框内容区最外层那个 Row（导航 + 分隔线 + 内容）才是 640×440。
+    final Size dialog = tester.getSize(find
+        .descendant(of: find.byType(Dialog), matching: find.byType(Row))
+        .first);
     expect(dialog, const Size(640, 440), reason: '既有范式，不该被顺手改掉');
     for (final String nav in titles) {
       expect(find.text(nav), findsWidgets, reason: '对话框左栏缺 $nav');
     }
     await tester.tap(find.text('数据与同步').first);
+    await tester.pumpAndSettle();
+    // 同 openRow：同步节要真异步读一次配置才出控件。
+    await io(tester, () => Future<void>.delayed(const Duration(milliseconds: 150)));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey<String>('sync-enabled')), findsOneWidget);
     expect(find.text('回收站自动清空'), findsOneWidget);

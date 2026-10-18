@@ -40,7 +40,7 @@ class GeneralSection extends StatelessWidget {
               style: AppTypography.meta),
           trailing: const Icon(Icons.chevron_right, size: 20),
           onTap: () => pushSettingsSection(context,
-              title: '通知', content: NotifySection.new),
+              title: '通知', content: (bool showTitle) => NotifySection(showTitle: showTitle)),
         ),
         ListTile(
           key: const ValueKey<String>('general-permissions'),

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qingdan/domain/course.dart';
+import 'package:qingdan/domain/course_uid.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/time_table.dart';
 
@@ -140,6 +141,7 @@ void main() {
       List<int> weeks = const <int>[1, 2, 3],
       String? teacher,
       String? location,
+      int? colorIndex,
     }) =>
         Course(
           id: 'c1',
@@ -151,6 +153,7 @@ void main() {
           weeks: weeks,
           teacher: teacher,
           location: location,
+          colorIndex: colorIndex,
         );
 
     test('构造即排序去重（渲染与 UID 都依赖它）', () {
@@ -194,9 +197,23 @@ void main() {
       expect(course(start: 5, end: 6).overlaps(course()), isFalse);
     });
 
-    test('配色索引由课名派生，不落库（避免改名后与列不一致）', () {
-      expect(course().colorIndex, course(name: '高等数学').colorIndex);
-      expect(course().toMap().containsKey('color_index'), isFalse);
+    test('配色：没手动选过就按课名派生；选过的落库（M6-D §十改了这条）', () {
+      // 旧契约是「颜色不落库」，D 批加了可空列 `color_index` 之后：
+      // null = 跟随课名自动配色（跨设备稳定），非 null = 用户显式选过。
+      expect(course().colorIndex, isNull, reason: '默认没有显式配色');
+      expect(course().effectiveColorIndex, courseColorIndex('高等数学'),
+          reason: '没选过时实际用的就是课名派生值');
+      expect(course().toMap()['color_index'], isNull,
+          reason: '列存在但值为空，渲染端据此回落到自动配色');
+
+      final Course picked = course(colorIndex: 5);
+      expect(picked.toMap()['color_index'], 5);
+      expect(picked.effectiveColorIndex, 5);
+      expect(Course.fromMap(picked.toMap()).colorIndex, 5,
+          reason: '往返要能把选过的颜色带回来');
+      // 「恢复自动配色」必须能把列清回 null——copyWith 的 `??` 会吞掉这件事。
+      expect(picked.copyWith(name: '改名了').colorIndex, 5);
+      expect(picked.copyWith(clearColor: true).colorIndex, isNull);
     });
   });
 }

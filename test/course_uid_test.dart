@@ -91,5 +91,20 @@ void main() {
             reason: name);
       }
     });
+    test('颜色绝不进 UID（M6-D §五.4）：改配色不该让下次导入认成另一门课', () {
+      final List<int> weeks = <int>[1, 2, 3];
+      final String first = uid();
+      expect(
+          courseUidOf(
+              name: '高等数学',
+              weekday: 2,
+              startSection: 3,
+              endSection: 4,
+              weeks: weeks),
+          first,
+          reason: '同一套字段必须算出同一个键');
+      // `courseUidOf` 的入参里**没有颜色**：颜色是 `Course` 上的可空列，只影响
+      // 渲染。哪天有人给 UID 加输入字段，上面这条会先变红。
+    });
   });
 }
