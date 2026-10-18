@@ -6,7 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:qingdan/application/semester_use_case.dart';
+import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/import/course/schedule_file.dart';
@@ -114,7 +114,8 @@ class _ImportWizardPageState extends State<ImportWizardPage> {
     }
   }
 
-  /// 课排到学期外面时把总周数抬上去（2026-10-18 定案）。
+  /// 课排到学期外面时把总周数抬上去（2026-10-18 定案，M6-D §7.5 起针对
+  /// **步 3 选中的那个学期**，不再假设 active 学期）。
   ///
   /// 不抬的后果不是数据错，是**数据看不见**：周数是翻页上限，排在第 19 周的课
   /// 静静躺在库里，› 按钮在第 16 周就灰了。教务抓取那条路拿不到总周数（强智那张
@@ -123,8 +124,8 @@ class _ImportWizardPageState extends State<ImportWizardPage> {
     final Semester? s = _model.semester;
     if (s == null || _model.maxImportedWeek <= s.totalWeeks) return;
     final Semester? after = await context
-        .read<SemesterUseCase>()
-        .raiseTotalWeeks(_model.maxImportedWeek);
+        .read<CourseUseCase>()
+        .raiseSemesterWeeks(s.id, _model.maxImportedWeek);
     if (after == null) return;
     _model.semester = after;
     _model.weeksRaisedTo = after.totalWeeks;

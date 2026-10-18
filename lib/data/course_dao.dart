@@ -1,6 +1,7 @@
 import 'package:sqflite_common_ffi/sqflite_common_ffi.dart';
 
 import '../domain/course.dart';
+import '../domain/course_freshness.dart';
 import '../domain/field_change.dart';
 import '../domain/ids.dart';
 import '../domain/op_log_entry.dart';
@@ -39,9 +40,14 @@ class CourseDao {
   Future<int> countActive({String? semesterId}) =>
       _queries.countActive(semesterId: semesterId);
 
-  /// 最近 [limit] 次导入批次（A8）。**不区分学期**：`import_batches` 没有学期列。
-  Future<List<ImportBatch>> recentBatches({int limit = 10}) =>
+  /// 最近 [limit] 次导入批次（A8 历史面板），每条带学期归属（M6-D §八）。
+  Future<List<ImportBatchEntry>> recentBatches({int limit = 10}) =>
       _queries.recentBatches(limit: limit);
+
+  /// **该学期**的最近一次导入批次（M6-D §八）。老批次（semester_id NULL）
+  /// 不属于任何学期，不会从这里返回。
+  Future<ImportBatchEntry?> latestBatch(String semesterId) =>
+      _queries.latestBatch(semesterId);
 
   /// 本学期课程的最后编辑时刻，无记录返回 null（A8）。
   Future<DateTime?> lastCourseModified(String semesterId) =>
@@ -192,7 +198,12 @@ class CourseDao {
           (Transaction txn) async {
         // 批次行**必须先写**：`courses.import_batch_id` 外键指向它，晚一步就
         // 是 FK 787（M3 的 kEntityTypes 顺序坑同源）。计数最后在同一事务里回填。
-        if (batch != null) await txn.insert('import_batches', batch.toMap());
+        // `semester_id`（M6-D §八，v6 列）在这里盖上：[ImportBatch.toMap] 不带它
+        // （`import_batches` 不同步，不许把学期归属混进序列化路径）。
+        final Map<String, Object?>? batchRow = batch == null
+            ? null
+            : <String, Object?>{...batch.toMap(), 'semester_id': semesterId};
+        if (batchRow != null) await txn.insert('import_batches', batchRow);
         final int removed = softDeleteImportedFirst
             ? await _writeSoftDeleteImported(txn, semesterId)
             : 0;
@@ -203,12 +214,12 @@ class CourseDao {
         for (final Course c in insert) {
           await _writeInsert(txn, _newRowForInsert(c));
         }
-        if (batch != null) {
+        if (batch != null && batchRow != null) {
           batch
             ..countImported = insert.length
             ..countUpdated = updated
             ..countSkipped = skippedCount;
-          await txn.update('import_batches', batch.toMap(),
+          await txn.update('import_batches', batchRow,
               where: 'id = ?', whereArgs: <Object?>[batch.id]);
         }
         return (inserted: insert.length, updated: updated, removed: removed);
@@ -218,8 +229,10 @@ class CourseDao {
 
   /// 单独记一批（测试与「先建批次再逐行挂」的路径用）；正常导入走
   /// [applyImport]，批次行与课程行在同一事务写。
-  Future<ImportBatch> insertBatch(ImportBatch batch) async {
-    await _db.insert('import_batches', batch.toMap());
+  /// [semesterId] 缺省 null = 老形状（学期归属未知，历史面板显示「（学期未知）」）。
+  Future<ImportBatch> insertBatch(ImportBatch batch, {String? semesterId}) async {
+    await _db.insert('import_batches',
+        <String, Object?>{...batch.toMap(), 'semester_id': semesterId});
     return batch;
   }
 }

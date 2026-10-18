@@ -179,6 +179,17 @@ class CoursePaneModel extends ChangeNotifier {
   Future<void> nextWeek() =>
       canNext ? selectWeek(week + 1) : Future<void>.value();
 
+  /// 切换当前学期（M6-D §7.1）：调用例层 `setActiveSemester` 后**必须重读**。
+  ///
+  /// 不重读的话，`semester` / `allCourses` / `week` 全是旧学期那一套，周视图会
+  /// 继续显示上一个学期的课（面板只在首帧 load 一次，这是 S6-4 真机已经栽过的
+  /// 同一个坑）。`is_active` 是设备本地列，用例层不记 op-log，所以切学期不会
+  /// 惊动同步、也不会改到另一台设备的当前学期。
+  Future<void> switchSemester(String id) async {
+    await _semesters.setActiveSemester(id);
+    await load();
+  }
+
   /// 回到今天所在的那一周（[今天] 按钮）。
   Future<void> goToday() =>
       todayInSemester ? selectWeek(todayWeek) : Future<void>.value();

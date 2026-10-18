@@ -188,6 +188,9 @@ void main() {
       expect(last['count_imported'], 1, reason: '只有 C 是新行');
       expect(last['count_updated'], 1, reason: 'A 改了老师');
       expect(last['count_skipped'], 1, reason: '文件内重复那条');
+      // M6-D §八：v6 列 semester_id 由 applyImport 同事务盖上（本地簿记，不同步）。
+      expect(last['semester_id'], semesterId,
+          reason: '批次必须落在导入目标学期上，否则学期维度的导入读数无从谈起');
     });
 
     test('批次簿记不写 op-log；课程写必须写 op-log', () async {

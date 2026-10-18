@@ -32,6 +32,28 @@ void main() {
       firstWeekDate: DateTime.utc(2025, 9, 3),
       totalWeeks: totalWeeks);
 
+  test('raiseSemesterWeeks：只抬「选中的那个学期」，当前学期不动（M6-D §7.5）',
+      () async {
+    final Semester a = await newSemester(); // active，16 周
+    final Semester b = await semesters.createSemester(
+        name: '第二学期',
+        firstWeekDate: DateTime.utc(2025, 9, 1),
+        totalWeeks: 16,
+        setActive: false);
+
+    final Semester? raised = await courses.raiseSemesterWeeks(b.id, 20);
+    expect(raised, isNotNull);
+    expect(raised!.totalWeeks, 20);
+    final List<Semester> all = await semesters.allSemesters();
+    expect(all.firstWhere((Semester s) => s.id == b.id).totalWeeks, 20);
+    expect(all.firstWhere((Semester s) => s.id == a.id).totalWeeks, 16,
+        reason: '导入目标是 B：扩周数不许顺手改到当前学期 A');
+    expect(await courses.raiseSemesterWeeks(b.id, 20), isNull,
+        reason: '同值再抬 = no-op');
+    expect(await courses.raiseSemesterWeeks(b.id, 10), isNull,
+        reason: '只抬不缩：缩周数会让已有课程翻不到');
+  });
+
   test('F28 端到端：建学期 + 录作息 + 录一门课，重新装配后仍读得到', () async {
     final Semester s = await newSemester();
     expect(s.firstWeekMonday, DateTime.utc(2025, 9, 1),

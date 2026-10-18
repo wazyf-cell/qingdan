@@ -34,6 +34,7 @@ class CourseWeekHeader extends StatelessWidget {
     this.freshnessLabel,
     this.freshnessTooltip,
     this.onFreshnessTap,
+    this.semesterSwitcher,
   });
 
   final int week;
@@ -63,6 +64,10 @@ class CourseWeekHeader extends StatelessWidget {
   final String? freshnessLabel;
   final String? freshnessTooltip;
   final VoidCallback? onFreshnessTap;
+
+  /// 周次行**最左边**的学期名按钮（M6-D §7.1）。由 `course_pane.dart` 传
+  /// `SemesterSwitcher` 进来——头部只管排版，不认识学期这件事。
+  final Widget? semesterSwitcher;
 
   /// 移动端一行要摆 7 个元素，默认内边距会把周次标签挤到换行（真机 411dp 实测
   /// 第二行「16 周」压在星期轴上），加了 maxLines 又会被省略号截断。
@@ -106,6 +111,7 @@ class CourseWeekHeader extends StatelessWidget {
                 : AppDimens.courseHeaderDesktop,
             child: Row(
               children: <Widget>[
+                ?semesterSwitcher,
                 _NavButton(
                   icon: Icons.chevron_left,
                   tooltip: '上一周',

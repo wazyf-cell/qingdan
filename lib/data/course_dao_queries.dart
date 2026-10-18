@@ -1,6 +1,7 @@
 import 'package:sqflite_common_ffi/sqflite_common_ffi.dart';
 
 import '../domain/course.dart';
+import '../domain/course_freshness.dart';
 import '../domain/timestamps.dart';
 
 /// `courses` / `import_batches` 的**只读**查询（M6-A A8）。
@@ -52,17 +53,33 @@ class CourseQueries {
     return result.first['n']! as int;
   }
 
-  /// 最近 [limit] 次导入批次，新的在前（A8 历史面板）。
+  /// 最近 [limit] 次导入批次，新的在前（A8 历史面板，M6-D §八 带学期归属）。
   ///
-  /// `import_batches` **没有学期列**，所以这份只能是全学期的最近导入；
-  /// 界面 tooltip 必须写「不区分学期」，别让用户以为它跟着学期走。
-  Future<List<ImportBatch>> recentBatches({int limit = 10}) async {
-    final List<Map<String, Object?>> rows = await _db.query(
-      'import_batches',
-      orderBy: 'imported_at DESC',
-      limit: limit,
+  /// LEFT JOIN `semesters` 带出学期名：老批次 `semester_id IS NULL`、
+  /// 或学期已删，都拿不到名字——历史面板显示「（学期未知）」，
+  /// **不许假装它们属于当前学期**。
+  Future<List<ImportBatchEntry>> recentBatches({int limit = 10}) async {
+    final List<Map<String, Object?>> rows = await _db.rawQuery(
+      'SELECT b.*, s.name AS semester_name FROM import_batches b '
+      'LEFT JOIN semesters s ON s.id = b.semester_id '
+      'ORDER BY b.imported_at DESC LIMIT ?',
+      <Object?>[limit],
     );
-    return [for (final Map<String, Object?> r in rows) ImportBatch.fromMap(r)];
+    return [for (final Map<String, Object?> r in rows) ImportBatchEntry.fromRow(r)];
+  }
+
+  /// **该学期**最近一次导入批次（M6-D §八：A8 的 `latestBatch()` 补上学期维度）。
+  ///
+  /// 只认 `semester_id = ?` 的行——老批次（NULL）不属于任何学期，导进 A 学期
+  /// 的批次也不得让 B 学期显示「N 分钟前导入」。没有则返回 null。
+  Future<ImportBatchEntry?> latestBatch(String semesterId) async {
+    final List<Map<String, Object?>> rows = await _db.rawQuery(
+      'SELECT b.*, s.name AS semester_name FROM import_batches b '
+      'LEFT JOIN semesters s ON s.id = b.semester_id '
+      'WHERE b.semester_id = ? ORDER BY b.imported_at DESC LIMIT 1',
+      <Object?>[semesterId],
+    );
+    return rows.isEmpty ? null : ImportBatchEntry.fromRow(rows.first);
   }
 
   /// 本学期未删除课程里最晚的一次编辑时刻（`MAX(modified_time)`）。

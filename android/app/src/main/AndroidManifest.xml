@@ -5,6 +5,12 @@
          而 release 包会在真机上静默地每次同步都失败（SocketException）。
          2026-10-09 S7 Android 真机验收时发现，故显式声明在主清单里。 -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 通知（M6-C2）。插件自己的清单已经带了这一条，仍然在这里显式写一遍：
+         依赖的清单哪天变了，我们的功能不该跟着静默失效。
+         **刻意不声明 SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM** —— 排程用非精确闹钟
+         （`AndroidScheduleMode.inexactAllowWhileIdle`），精确闹钟在 Android 12+
+         要用户单独授权且政策收紧，而分钟级的提醒晚几十秒完全可以接受。 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="qingdan"
         android:name="${applicationName}"
@@ -45,6 +51,33 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- 定时通知的三个 receiver（M6-C2）。**必须由应用自己声明**：
+             `flutter_local_notifications 22.3.1` 自己的清单里只有两条 uses-permission，
+             一个 receiver 都没声明（插件 README 明确要求宿主应用补上），
+             manifest merger 也就不会替我们合。少了声明，AlarmManager 发出的
+             广播没有接收方 —— 排程全部静默失效，界面上却一切「正常」，
+             是比报错更糟的形状。
+             核查方式（2026-10-18 实跑）：跑一次 debug 构建，再 grep
+             `build/app/intermediates/merged_manifests/debug` 下合并出来的清单，
+             当时里面只有 inappwebview 与 profileinstaller 两个 receiver，没有插件的。
+             （注：XML 注释里不能写连续两个减号，所以构建命令不照抄在这里。） -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <!-- 重启 / 覆盖安装后把已排程的提醒重新装回 AlarmManager。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

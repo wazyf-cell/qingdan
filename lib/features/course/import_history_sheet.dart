@@ -6,13 +6,15 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
-/// 最近导入历史（M6-A A8）：点顶部那行「上次更新 / 导入时间」弹出。
+/// 最近导入历史（M6-A A8，M6-D §八 带学期归属）：点顶部那行「上次更新 / 导入时间」弹出。
 ///
 /// 数据来自 `import_batches`，**本地簿记、不参与同步**（2026-10-10 定案 3），
 /// 所以这份历史是「这台设备导入过什么」，不是「账号里导入过什么」。
+/// v6 起每条标注所属学期；老批次（semester_id NULL）显示「（学期未知）」，
+/// 不许假装它们属于当前学期。
 Future<void> showImportHistorySheet(
   BuildContext context, {
-  required List<ImportBatch> batches,
+  required List<ImportBatchEntry> batches,
   required bool isMobile,
 }) {
   final Widget body = _ImportHistory(batches: batches);
@@ -36,7 +38,7 @@ Future<void> showImportHistorySheet(
 class _ImportHistory extends StatelessWidget {
   const _ImportHistory({required this.batches});
 
-  final List<ImportBatch> batches;
+  final List<ImportBatchEntry> batches;
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +50,11 @@ class _ImportHistory extends StatelessWidget {
         if (batches.isEmpty)
           const Text('还没有导入记录', style: AppTypography.body)
         else ...<Widget>[
-          // 局限必须写在界面上：这张表没有学期列，历史是全局的。
-          Text('最多 10 次 · 本表不区分学期，可能混入其他学期的导入',
+          // 这份表仍是「这台设备最近的 10 次」，跨学期混排——但每条标注归属。
+          Text('最多 10 次 · 每条标注所属学期（老批次学期未知）',
               style: AppTypography.meta.copyWith(color: colors.textFaint)),
           const SizedBox(height: AppDimens.s8),
-          for (final ImportBatch b in batches) _BatchRow(batch: b),
+          for (final ImportBatchEntry b in batches) _BatchRow(entry: b),
         ],
       ],
     );
@@ -60,13 +62,14 @@ class _ImportHistory extends StatelessWidget {
 }
 
 class _BatchRow extends StatelessWidget {
-  const _BatchRow({required this.batch});
+  const _BatchRow({required this.entry});
 
-  final ImportBatch batch;
+  final ImportBatchEntry entry;
 
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
+    final ImportBatch batch = entry.batch;
     return ListTile(
       key: ValueKey<String>('import-batch-${batch.id}'),
       dense: true,
@@ -76,6 +79,7 @@ class _BatchRow extends StatelessWidget {
           style: AppTypography.body),
       subtitle: Text(
         '${courseStamp(batch.importedAt)} · '
+        '${entry.semesterLabel} · '
         '新增 ${batch.countImported} · 更新 ${batch.countUpdated} · '
         '跳过 ${batch.countSkipped}',
         style: AppTypography.meta.copyWith(color: colors.textSecondary),

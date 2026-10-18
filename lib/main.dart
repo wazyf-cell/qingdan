@@ -10,6 +10,7 @@ import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/application/task_list_use_case.dart';
 import 'package:qingdan/application/task_use_case.dart';
+import 'package:qingdan/application/timetable_use_case.dart';
 import 'package:qingdan/application/trash_purge_scheduler.dart';
 import 'package:qingdan/app.dart';
 import 'package:qingdan/app_lifecycle.dart';
@@ -96,6 +97,9 @@ Future<void> main() async {
   CoursePaneModel? courseModel;
   SemesterUseCase? semesterUseCase;
   CourseUseCase? courseUseCase;
+  // 作息模板库用例：导入向导步 3 的「换成某个模板」下拉要读模板列表
+  // （SyncConfigStore 漏注册栽过跟头，装配了就必须在 provider 树里）。
+  TimetableUseCase? timetableUseCase;
   ImportService? importService;
   SyncCoordinator? syncCoordinator;
   SyncStatusModel? syncStatusModel;
@@ -137,7 +141,10 @@ Future<void> main() async {
     // 课表域（M4a）：用例 + 周视图状态模型。不在启动时 load()——
     // 首次打开课表面板时才拉数据（CoursePane.initState 触发）。
     semesterUseCase = SemesterUseCase(services);
+    // 作息模板库（M6-D §6.2/§7.2）：新建学期要选模板，漏注册会让那一节静默不可用
+    // （SyncConfigStore 就是这么栽过的）。
     courseUseCase = CourseUseCase(services);
+    timetableUseCase = TimetableUseCase(services);
     courseModel = CoursePaneModel(
         semesterUseCase: semesterUseCase, courseUseCase: courseUseCase);
     // 导入服务在装配根里建：它要拿 CourseDao，而 UI 层不许碰 DAO。
@@ -210,6 +217,8 @@ Future<void> main() async {
           Provider<SemesterUseCase>.value(value: semesterUseCase),
         if (courseUseCase != null)
           Provider<CourseUseCase>.value(value: courseUseCase),
+        if (timetableUseCase != null)
+          Provider<TimetableUseCase>.value(value: timetableUseCase),
         if (importService != null)
           Provider<ImportService>.value(value: importService),
         if (chaoxingModel != null)

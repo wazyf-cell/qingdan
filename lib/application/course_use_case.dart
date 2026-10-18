@@ -1,4 +1,5 @@
 import 'package:qingdan/application/app_services.dart';
+import 'package:qingdan/data/semester_dao.dart';
 import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/domain/course_freshness.dart';
 import 'package:qingdan/domain/course_uid.dart';
@@ -122,34 +123,51 @@ class CourseUseCase {
 
   Future<List<Course>> coursesToday() => coursesOn(DateTime.now());
 
-  /// 顶部「上次更新 / 导入时间」的读数（M6-A A8）。只读，不写库。
+  /// 顶部「上次更新 / 导入时间」的读数（M6-A A8，M6-D §八 补学期维度）。只读。
   ///
-  /// 取「最近一次导入」与「本学期最后编辑」里较新的那个：导入完又手改过一门课，
-  /// 显示导入时间就是在骗人。
-  ///
-  /// **已知局限**：`import_batches` 没有 `semester_id` 列（M6-D 迁移 v6 才加，
-  /// A 批不许动库结构），所以导入那条只能取**全局**最近一次——切到别的学期时
-  /// 它可能来自另一个学期。界面 tooltip 里如实写着，别当成 per-semester 读数。
+  /// 取「**该学期**最近一次导入」与「本学期最后编辑」里较新的那个：导入完又手改
+  /// 过一门课，显示导入时间就是在骗人。v6 给 `import_batches` 加了
+  /// `semester_id` 后，导进 A 学期的批次不再让 B 学期显示「N 分钟前导入」；
+  /// 老批次（归属 NULL）不参与任何学期的导入读数，只在历史面板里以
+  /// 「（学期未知）」出现。
   Future<CourseFreshness> freshness(String semesterId) async {
-    final List<ImportBatch> batches = await _services.courseDao.recentBatches();
+    final ImportBatchEntry? latest =
+        await _services.courseDao.latestBatch(semesterId);
+    final List<ImportBatchEntry> batches =
+        await _services.courseDao.recentBatches();
     final DateTime? edited =
         await _services.courseDao.lastCourseModified(semesterId);
-    final ImportBatch? latest = batches.isEmpty ? null : batches.first;
     if (latest != null &&
-        (edited == null || !latest.importedAt.isBefore(edited))) {
+        (edited == null || !latest.batch.importedAt.isBefore(edited))) {
       return CourseFreshness(
-        at: latest.importedAt,
+        at: latest.batch.importedAt,
         kind: CourseFreshnessKind.import,
-        fileName: latest.fileName,
-        imported: latest.countImported,
-        updated: latest.countUpdated,
-        skipped: latest.countSkipped,
+        fileName: latest.batch.fileName,
+        imported: latest.batch.countImported,
+        updated: latest.batch.countUpdated,
+        skipped: latest.batch.countSkipped,
         batches: batches,
       );
     }
     if (edited == null) return CourseFreshness(batches: batches);
     return CourseFreshness(
         at: edited, kind: CourseFreshnessKind.edit, batches: batches);
+  }
+
+  /// 把**指定学期**（导入向导选中的那个，不一定是当前学期）的总周数抬到
+  /// [needed]（M6-D §7.5：扩周必须落在选中的学期上）。
+  ///
+  /// 只抬不缩（缩周数让已有课程翻不到，那是用户在学期设置里自己做的事）；
+  /// 读的是库内**现值**再写回，不拿调用方的旧快照（学期保存「后一次写盖掉
+  /// 前一次」就是旧快照整行写回栽的坑）。无需改动或学期不存在返回 null。
+  Future<Semester?> raiseSemesterWeeks(String semesterId, int needed) async {
+    final Semester? s = await _services.semesterDao.findSemester(semesterId);
+    if (s == null || s.totalWeeks >= needed) return null;
+    final int target =
+        needed > Semester.maxTotalWeeks ? Semester.maxTotalWeeks : needed;
+    final Semester next = s.copyWith(totalWeeks: target);
+    await _services.semesterDao.update(next);
+    return next;
   }
 
   void _validate({

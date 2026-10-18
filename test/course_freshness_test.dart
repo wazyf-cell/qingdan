@@ -8,6 +8,7 @@ import 'package:qingdan/application/app_services.dart';
 import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/domain/course.dart';
+import 'package:qingdan/domain/course_freshness.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_pane.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
@@ -17,11 +18,12 @@ import 'package:qingdan/data/migrations.dart';
 
 import 'dao_test_helper.dart';
 
-/// 顶部「上次更新 / 导入时间」与点开的导入历史（M6-A A8）。
+/// 顶部「上次更新 / 导入时间」与点开的导入历史（M6-A A8 + M6-D §八 学期维度）。
 ///
-/// 局限必须被断言钉住：`import_batches` 没有学期列，导入时间是**全局**最近一次，
-/// 所以界面上的 tooltip 得写「不区分学期」——这条以后谁想改成「看起来更精确」
-/// 而把 tooltip 删掉，就该被这条测试拦住。
+/// v6 给 `import_batches` 补了 `semester_id` 后：
+/// * 导进 A 学期的批次**不得**让 B 学期显示「N 分钟前导入」；
+/// * 老批次（semester_id NULL）不参与任何学期的导入读数，历史面板里
+///   显示「（学期未知）」，不许假装属于当前学期。
 void main() {
   ensureSqfliteFfi();
 
@@ -68,8 +70,10 @@ void main() {
   Future<T?> io<T>(WidgetTester tester, Future<T?> Function() body) =>
       tester.runAsync<T?>(body);
 
-  Future<void> addBatch(WidgetTester tester, ImportBatch batch) =>
-      io(tester, () => services.courseDao.insertBatch(batch));
+  Future<void> addBatch(WidgetTester tester, ImportBatch batch,
+          {String? semesterId}) =>
+      io(tester,
+          () => services.courseDao.insertBatch(batch, semesterId: semesterId));
 
   Future<void> pumpAt(WidgetTester tester, {required double width}) async {
     tester.view.physicalSize = Size(width, 1400);
@@ -97,7 +101,8 @@ void main() {
       tester.widget<Text>(find.byKey(const ValueKey<String>('course-freshness'))).data ??
       '';
 
-  testWidgets('导入过：那一行写「导入 · 文件名」，点开能看到批次', (tester) async {
+  testWidgets('导入过（本学期批次）：那一行写「导入 · 文件名」，点开能看到批次',
+      (tester) async {
     await addBatch(tester,
         ImportBatch(
             id: 'b1',
@@ -105,7 +110,8 @@ void main() {
             importedAt: DateTime.utc(2025, 9, 7, 6, 32),
             countImported: 5,
             countUpdated: 1,
-            countSkipped: 2));
+            countSkipped: 2),
+        semesterId: semesterId);
     await pumpAt(tester, width: 1280);
 
     expect(freshnessText(tester), contains('导入'));
@@ -116,11 +122,8 @@ void main() {
     expect(find.byKey(const ValueKey<String>('import-batch-b1')), findsOneWidget);
     expect(find.textContaining('新增 5'), findsOneWidget);
     expect(find.textContaining('跳过 2'), findsOneWidget);
-    // 局限写在界面上，不是只写在文档里。
-    final Tooltip tip = tester.widget<Tooltip>(find.descendant(
-        of: find.byKey(const ValueKey<String>('course-freshness-tap')),
-        matching: find.byType(Tooltip)));
-    expect(tip.message, contains('不区分学期'));
+    // 历史面板每条标注归属：这条是本学期（2025-2026-1）的批次。
+    expect(find.textContaining('2025-2026-1'), findsWidgets);
   });
 
   testWidgets('没导入但手改过课：那一行写「更新」', (tester) async {
@@ -142,13 +145,63 @@ void main() {
     expect(find.byKey(const ValueKey<String>('course-freshness')), findsNothing);
   });
 
+  test('导进 A 学期的批次不得让 B 学期显示「导入」（§八 学期维度）', () async {
+    final String bId = (await semesters.createSemester(
+            name: '第二学期',
+            firstWeekDate: DateTime.utc(2025, 2, 2),
+            totalWeeks: 16,
+            setActive: false))
+        .id;
+    await services.courseDao.insertBatch(
+        ImportBatch(
+            id: 'only-a',
+            fileName: 'A的课表.csv',
+            importedAt: DateTime.utc(2025, 9, 7, 6, 32)),
+        semesterId: semesterId);
+
+    final CourseFreshness onB = await courses.freshness(bId);
+    expect(onB.kind, isNot(CourseFreshnessKind.import),
+        reason: 'B 学期没导过：哪怕只查了学期名，也不能借用 A 的导入时刻');
+    final CourseFreshness onA = await courses.freshness(semesterId);
+    expect(onA.kind, CourseFreshnessKind.import);
+    expect(onA.fileName, 'A的课表.csv');
+  });
+
+  testWidgets('老批次（semester_id NULL）：不算导入读数，历史面板显示「（学期未知）」',
+      (tester) async {
+    await services.courseDao.insertBatch(ImportBatch(
+        id: 'legacy',
+        fileName: 'v6 前的导入.csv',
+        importedAt: DateTime.utc(2025, 9, 7)));
+    // 造一条「更新」：没有它整行不渲染，历史面板无从点开。
+    await courses.create(
+        name: '高等数学',
+        weekday: 1,
+        startSection: 1,
+        endSection: 1,
+        weeks: const <int>[5],
+        semesterId: semesterId);
+    await pumpAt(tester, width: 1280);
+
+    expect(freshnessText(tester), contains('更新'),
+        reason: '归属未知的老批次不许伪装成本学期的「导入」');
+    expect(freshnessText(tester), isNot(contains('导入')));
+
+    await tester.tap(find.byKey(const ValueKey<String>('course-freshness-tap')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('import-batch-legacy')),
+        findsOneWidget);
+    expect(find.textContaining('（学期未知）'), findsOneWidget);
+  });
+
   testWidgets('历史面板的行数 = 批次条数（只留最近 10 次）', (tester) async {
     for (int i = 1; i <= 12; i++) {
       await addBatch(tester,
           ImportBatch(
               id: 'b$i',
               fileName: '第$i份.csv',
-              importedAt: DateTime.utc(2025, 9, 1).add(Duration(days: i))));
+              importedAt: DateTime.utc(2025, 9, 1).add(Duration(days: i))),
+          semesterId: semesterId);
     }
     await pumpAt(tester, width: 411);
     expect(freshnessText(tester), contains('导入'));

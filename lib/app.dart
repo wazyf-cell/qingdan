@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:qingdan/features/settings/first_run_guide.dart';
+import 'package:qingdan/features/settings/settings_model.dart';
 import 'package:qingdan/features/shell/app_shell.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_theme.dart';
@@ -34,7 +36,7 @@ class QingdanApp extends StatelessWidget {
             darkTheme: AppTheme.dark(),
             themeMode: theme.mode,
             home: dbInitError == null
-                ? const AppShell()
+                ? const _FirstRunGate(child: AppShell())
                 : _DbInitErrorScreen(message: dbInitError!),
           );
         },
@@ -73,4 +75,36 @@ class _DbInitErrorScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 首启引导的挂载点（M6-C6）：首帧之后弹一次，两个按钮都置 `ui.guideSeen`。
+///
+/// 为什么挂在 `home` 外面而不是 `main.dart` 里：弹框要一个**在 MaterialApp 之下**的
+/// `BuildContext`（拿 Navigator 与主题），而 `runApp` 之前根本没有这样的 context。
+class _FirstRunGate extends StatefulWidget {
+  const _FirstRunGate({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_FirstRunGate> createState() => _FirstRunGateState();
+}
+
+class _FirstRunGateState extends State<_FirstRunGate> {
+  @override
+  void initState() {
+    super.initState();
+    // 等第一帧画完再弹：启动路径上任何 await 都会把首屏拖慢，而引导框晚一帧无感。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _show());
+  }
+
+  Future<void> _show() async {
+    if (!mounted) return;
+    final SettingsModel? settings = context.read<SettingsModel?>();
+    if (settings == null) return; // 纯 UI 冒烟测试没装配设置层时照常启动
+    await maybeShowFirstRunGuide(context, settings);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

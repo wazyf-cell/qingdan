@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:qingdan/application/course_use_case.dart';
+import 'package:qingdan/application/semester_use_case.dart';
+import 'package:qingdan/application/timetable_use_case.dart';
 import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/features/shell/sidebar/sync_status_model.dart';
 import 'package:qingdan/theme/app_colors.dart';
@@ -17,6 +19,8 @@ import 'course_toast.dart';
 import 'course_week_header.dart';
 import 'import_history_sheet.dart';
 import 'import_wizard/import_wizard.dart';
+import 'semester_sheet.dart';
+import 'semester_switcher.dart';
 import 'today_summary_bar.dart';
 import 'week_picker_sheet.dart';
 
@@ -146,6 +150,21 @@ class _CoursePaneState extends State<CoursePane> {
     _toast.show('已把开学第一周改为 ${weekMondayText(calibrated)}');
   }
 
+  /// 学期面板（M6-D §7.1）：切 / 改 / 删 / 新建学期都从这里进。切换与校准的回执
+  /// 由面板**返回**给这里显示——面板一关它自己那行字就没了，而「切过去了没有」
+  /// 必须让用户看得见（仍走行内回执，不用 SnackBar）。
+  Future<void> _openSemesters(CoursePaneModel model) async {
+    final SemesterUseCase semesters = context.read<SemesterUseCase>();
+    final TimetableUseCase? templates = context.read<TimetableUseCase?>();
+    final String? said = await showSemesterSheet(context,
+        model: model,
+        semesters: semesters,
+        templates: templates,
+        isMobile: _isMobile);
+    if (said == null || !mounted) return;
+    _toast.show(said);
+  }
+
   @override
   Widget build(BuildContext context) {
     final CoursePaneModel model = context.watch<CoursePaneModel>();
@@ -171,6 +190,14 @@ class _CoursePaneState extends State<CoursePane> {
         CourseWeekHeader(
           week: model.week,
           totalWeeks: model.totalWeeks,
+          // §7.1：周次行最左边的学期名按钮（点开学期面板）。放在最左是因为
+          // 这一行在 411dp 上只剩 ~123dp 给周次标签，任何新入口都只能去挤
+          // 自己该挤的地方——学期名有定宽上限（`semester_switcher.dart`）。
+          semesterSwitcher: SemesterSwitcher(
+            name: model.semester?.name ?? '',
+            isMobile: _isMobile,
+            onTap: () => _openSemesters(model),
+          ),
           canPrev: model.canPrev,
           canNext: model.canNext,
           isMobile: _isMobile,

@@ -16,8 +16,10 @@ import 'package:sqflite_common_ffi/sqflite_common_ffi.dart';
 import 'package:qingdan/application/app_services.dart';
 import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
+import 'package:qingdan/application/timetable_use_case.dart';
 import 'package:qingdan/data/migrations.dart';
 import 'package:qingdan/domain/course.dart';
+import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/course/import_wizard/import_wizard.dart';
@@ -33,8 +35,10 @@ void main() {
   ensureSqfliteFfi();
 
   late Database db;
+  late AppServices services;
   late SemesterUseCase semesters;
   late CourseUseCase courses;
+  late TimetableUseCase timetables;
   late ImportService importer;
   late CoursePaneModel pane;
   late Uint8List xlsxBytes;
@@ -52,9 +56,10 @@ void main() {
         },
       ),
     );
-    final AppServices services = AppServices(db: db);
+    services = AppServices(db: db);
     semesters = SemesterUseCase(services);
     courses = CourseUseCase(services);
+    timetables = TimetableUseCase(services);
     importer = ImportService(services.courseDao);
     pane = CoursePaneModel(semesterUseCase: semesters, courseUseCase: courses);
     // 学期与 12 节作息先备好：步 3 只负责展示与改，不是本用例的验证点。
@@ -86,6 +91,8 @@ void main() {
       providers: <SingleChildWidget>[
         Provider<SemesterUseCase>.value(value: semesters),
         Provider<CourseUseCase>.value(value: courses),
+        // 步 3 的「换成某个模板」两选读它（M6-D §7.5）。
+        Provider<TimetableUseCase>.value(value: timetables),
         Provider<ImportService>.value(value: importer),
         ChangeNotifierProvider<CoursePaneModel>.value(value: pane),
       ],
@@ -259,6 +266,47 @@ void main() {
     await next(tester);
     final List<Course> saved = await readCourses(tester);
     expect(saved.map((Course c) => c.name), <String>['高等数学']);
+  });
+
+  testWidgets('步 3 学期下拉：导进非当前学期，扩周数落在那个学期（M6-D §7.5）',
+      (tester) async {
+    // B 学期不是当前学期：向导步 3 的下拉要能把导入目标指过去，
+    // 之后建课 / 扩周数都必须落在 B 上（不再假设 active）。
+    final String bId = (await semesters.createSemester(
+            name: '第二学期',
+            firstWeekDate: DateTime(2026, 3, 2),
+            totalWeeks: 16,
+            setActive: false))
+        .id;
+    final Uint8List csv = Uint8List.fromList(utf8.encode(
+        '课程名称,星期,开始节数,结束节数,老师,地点,周数\n'
+        '高等数学,1,1,2,小明,逸夫201,1-20\n'));
+    await openWizard(tester, width: 1280, loadFile: loader(csv, name: 'b.csv'));
+    await tapIo(tester, 'pick-file');
+    await next(tester); // → 步 2
+    await next(tester); // → 步 3
+
+    expect(find.byKey(const ValueKey<String>('adopt-semester')), findsOneWidget,
+        reason: '步 3 应有「导入到学期」下拉（§7.5 取代「沿用现有学期」）');
+    await tapIo(tester, 'adopt-semester');
+    await tapTextIo(tester, '第二学期 · 16 周');
+
+    await next(tester); // → 步 4（buildRows 落在选中的 B 学期）
+    expect(find.byKey(const ValueKey<String>('gate-banner')), findsOneWidget);
+    await next(tester); // → 步 5
+    await next(tester); // 开始导入 + 扩周数
+
+    late List<Course> inB;
+    await tester.runAsync(() async =>
+        inB = await courses.activeCourses(semesterId: bId));
+    expect(inB.map((Course c) => c.name), <String>['高等数学'],
+        reason: '课程必须进选中的 B 学期');
+    late List<Semester> all;
+    await tester.runAsync(() async => all = await semesters.allSemesters());
+    expect(all.firstWhere((Semester s) => s.id == bId).totalWeeks, 20,
+        reason: '1-20 周的课要求把**选中学期**扩到 20 周');
+    expect(all.firstWhere((Semester s) => s.isActive).totalWeeks, 16,
+        reason: '当前学期不是导入目标，不许被扩');
   });
 
   testWidgets('回跳到映射步先问「校正作废」，确认后重算', (tester) async {

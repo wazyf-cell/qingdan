@@ -74,7 +74,14 @@ void main() {
     settings = SettingsModel();
     // 顶栏右侧的同步状态槽读 SyncStatusModel（真机由 main.dart 注入）。
     // 本文件不测同步行为，给一个「同步未配置」的协调器就够。
-    SharedPreferences.setMockInitialValues(<String, Object>{});
+    // 壳类用例要的是「已经看过首启引导」的稳态：引导框由
+    // `first_run_guide_test.dart` 专门测，留在这里会盖住每一个点击。
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      SettingsModel.kGuideSeenKey: true,
+    });
+    // 必须 load()：`guideSeen` 只在 load 里从 prefs 读，光造对象仍是 false，
+    // 于是首启引导会在每一个壳用例里弹出来盖住点击。
+    await settings.load();
     syncStatus = SyncStatusModel(
       coordinator: SyncCoordinator(
         configStore: SyncConfigStore(

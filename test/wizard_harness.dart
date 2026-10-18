@@ -16,6 +16,7 @@ import 'package:sqflite_common_ffi/sqflite_common_ffi.dart';
 import 'package:qingdan/application/app_services.dart';
 import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
+import 'package:qingdan/application/timetable_use_case.dart';
 import 'package:qingdan/data/migrations.dart';
 import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/domain/time_table.dart';
@@ -34,6 +35,7 @@ class WizardHarness {
 
   late final SemesterUseCase semesters = SemesterUseCase(services);
   late final CourseUseCase courses = CourseUseCase(services);
+  late final TimetableUseCase timetables = TimetableUseCase(services);
   late final ImportService importer = ImportService(services.courseDao);
 
   /// 默认备好一个 16 周学期 + 12 节作息：步 3 只负责展示，不是验证点。
@@ -93,6 +95,8 @@ class WizardHarness {
       providers: <SingleChildWidget>[
         Provider<SemesterUseCase>.value(value: semesters),
         Provider<CourseUseCase>.value(value: courses),
+        // 步 3 的模板下拉读它（M6-D §7.5）；漏注册会在进步 3 时直接抛。
+        Provider<TimetableUseCase>.value(value: timetables),
         Provider<ImportService>.value(value: importer),
         ChangeNotifierProvider<CoursePaneModel>.value(value: pane),
       ],
