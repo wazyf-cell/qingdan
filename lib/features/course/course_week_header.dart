@@ -13,6 +13,9 @@ import 'package:qingdan/theme/app_typography.dart';
 /// 周次标签本身可点（M6-A A5：弹周次网格选择器）。A8 的「上次更新 / 导入时间」
 /// 在周次行**下方单独一行**，绝不塞进这一行——411dp 真机实测这一行已经排到
 /// 只剩 123dp 标签余量，再塞就重演「周次标签换行压住星期轴」（S4b 事故）。
+/// 标签外套了 `FittedBox(scaleDown)`（2026-10-19）：两位数/三位数周在 411dp
+/// 上曾被省略号截断（「第 10 周 / 共 16 …」），缩放让步兜底，但**别指望它腾地方**——
+/// 往这一行加元素仍然要自己算宽度预算。
 class CourseWeekHeader extends StatelessWidget {
   const CourseWeekHeader({
     super.key,
@@ -122,14 +125,22 @@ class CourseWeekHeader extends StatelessWidget {
                   child: InkWell(
                     onTap: onPickWeek,
                     child: Center(
-                      child: Text(
-                        weekLabel(week, totalWeeks),
-                        // key 挂在 Text 上：测试既要点它（tap 命中的是外面的
-                        // InkWell），又要读它的文案（断言周次真的翻了）。
-                        key: const ValueKey<String>('week-label'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.panelTitle, // 16sp / w600（2026-10-10 定案）
+                      // 411dp 真机实测两位数周被省略号截成「第 10 周 / 共 16 …」
+                      // （2026-10-19 截图）。FittedBox(scaleDown) 给孩子**无界**
+                      // 约束再整体缩放进可用宽：文案永远单行（不会重演 S4b 的
+                      // 「换行压住星期轴」）、永远完整（不删「共 M 周」），最坏
+                      // 只是字号略缩；宽屏余量足时 scale 恒为 1，观感不变。
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          weekLabel(week, totalWeeks),
+                          // key 挂在 Text 上：测试既要点它（tap 命中的是外面的
+                          // InkWell），又要读它的文案（断言周次真的翻了）。
+                          key: const ValueKey<String>('week-label'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.panelTitle, // 16sp / w600（2026-10-10 定案）
+                        ),
                       ),
                     ),
                   ),
