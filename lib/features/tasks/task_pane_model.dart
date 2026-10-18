@@ -190,6 +190,22 @@ class TaskPaneModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 「请推一次全屏详情页」的请求计数（M6-C2 通知落点）。
+  ///
+  /// 为什么用计数器而不是直接调壳的回调：通知回调发生在 `main.dart` 装配的
+  /// 对象上，那里没有 `BuildContext`；而壳要的是「模型变了 → 我推页」。
+  /// 计数只增不减，壳比对自己上次看到的值即可判定「这是新请求」，
+  /// 重复回调（用户连点两条通知）也不会被当成已处理吞掉。
+  int detailPageRequest = 0;
+
+  /// 点通知进来：选中并打开该任务，另请壳推全屏详情页（窄屏详情不是内嵌面板）。
+  void openDetailFromNotification(String taskId) {
+    // 顺序不能反：`openDetail` 自己就 notifyListeners 了，计数要是加在后面，
+    // 壳在那次回调里看到的仍是旧值 → 永远不推页（第一版就是这么测出来的）。
+    detailPageRequest++;
+    openDetail(taskId);
+  }
+
   void focusQuickAdd() => quickAddFocus.requestFocus();
 
   // ---- 写操作（全部走用例层）----

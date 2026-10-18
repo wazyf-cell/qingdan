@@ -67,6 +67,8 @@ class NotificationRouter {
       return;
     }
     sidebar?.selectTab(ShellTab.tasks);
-    pane?.openDetail(payload);
+    // 窄屏的详情是**全屏页**，只设 `detailTaskId` 用户仍然停在列表页上
+    // （M6-C2 交付时留的口子）：这里改走带请求计数的入口，由壳推页。
+    pane?.openDetailFromNotification(payload);
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:qingdan/features/tasks/task_pane_model.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'narrow_shell.dart';
@@ -26,8 +28,42 @@ class _AppShellState extends State<AppShell> {
   /// 三栏形态下详情面板是否整栏收起（收起后列表区变宽，§1.7）。
   bool _detailCollapsed = false;
 
+  TaskPaneModel? _pane;
+  int _seenDetailRequest = 0;
+
   void _toggleDetail() =>
       setState(() => _detailCollapsed = !_detailCollapsed);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final TaskPaneModel pane = context.read<TaskPaneModel>();
+    if (identical(pane, _pane)) return;
+    _pane?.removeListener(_onPaneChanged);
+    _pane = pane;
+    _seenDetailRequest = pane.detailPageRequest;
+    pane.addListener(_onPaneChanged);
+  }
+
+  @override
+  void dispose() {
+    _pane?.removeListener(_onPaneChanged);
+    super.dispose();
+  }
+
+  /// 点通知进来时，窄屏要的是「直接看见那条任务」，不是回到列表页。
+  /// 三栏 / 两栏形态详情本来就挂在右侧，只需模型选中即可，不推页。
+  void _onPaneChanged() {
+    final TaskPaneModel pane = _pane!;
+    if (pane.detailPageRequest == _seenDetailRequest) return;
+    _seenDetailRequest = pane.detailPageRequest;
+    if (!mounted) return;
+    if (MediaQuery.sizeOf(context).width >= AppDimens.breakpointNarrow) return;
+    // 监听器可能在 build 期间被触发（模型在帧中通知），推路由要等这一帧画完。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openFullScreenDetail(context);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

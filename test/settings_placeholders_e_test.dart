@@ -55,9 +55,9 @@ void main() {
     final MaterialApp app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.localizationsDelegates, isNull,
         reason: '接了 delegates 就是开始做半套国际化');
-    // supportedLocales 不设置时框架自带 [en_US] 默认值，不能拿它当证据；
-    // 真正被「半做 i18n」改变的是 delegates 与 locale 覆盖。
-    expect(app.supportedLocales ?? const <Locale>[], isNotEmpty);
+    // supportedLocales 不设置时框架给的是默认 [en_US]（非空、非 null），
+    // 拿它当证据会误判；真正被「半做 i18n」改变的是 delegates 与 locale 覆盖。
+    expect(app.supportedLocales, isNotNull);
     expect(app.locale, isNull);
   });
 
