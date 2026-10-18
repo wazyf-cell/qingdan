@@ -2,9 +2,9 @@
 ///
 /// C 批只有一件事是真能用的：跳进已有的「学期与作息」弹层——与课表面板头部
 /// ⚙ 同一条 [showCourseSetup]，不另开一份实现。
-/// 「时间表管理 / 课表管理 / 导出课表文件」属于 D 批，这里按**禁用置灰 + 明说
-/// 「下一批开放」**占位：用户看得见这节将来有什么，但不会得到一次「点了没反应」
-/// 的空反馈（M5 定案：占位要么说清原因，要么别出现）。
+/// D 批 §7.3 已开放「时间表管理」（模板库整页）；「课表管理」仍是 D 批后面的
+/// 占位——按**禁用置灰 + 明说「下一批开放」**处理：用户看得见这节将来有什么，
+/// 但不会得到一次「点了没反应」的空反馈（M5 定案：占位要么说清原因，要么别出现）。
 library;
 
 import 'package:flutter/material.dart';
@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/course/course_setup.dart';
 import 'package:qingdan/features/course/export_sheet.dart';
+import 'package:qingdan/features/course/timetable_library_page.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
@@ -53,12 +54,21 @@ class CourseSection extends StatelessWidget {
           trailing: const Icon(Icons.chevron_right, size: 20),
           onTap: () => showCourseSetup(context, isMobile: isMobile),
         ),
-        _placeholder(colors, kCourseManageTimetableKey, Icons.schedule,
-            '时间表管理', '按学期存多套作息，切换哪一套生效'),
+        ListTile(
+          key: const ValueKey<String>(kCourseManageTimetableKey),
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: AppDimens.s4),
+          leading: const Icon(Icons.schedule, size: 20),
+          title: const Text('时间表管理'),
+          subtitle: Text('模板库：多套作息，按学期复制使用（改模板不影响已建学期）',
+              style: AppTypography.meta),
+          trailing: const Icon(Icons.chevron_right, size: 20),
+          onTap: () => showTimetableLibrary(context, isMobile: isMobile),
+        ),
         _placeholder(colors, kCourseManageScheduleKey, Icons.grid_on,
             '课表管理', '按课程批量改时间、地点、老师与周次'),
         _exportRow(context, colors, isMobile),
-        _note(colors, '上面两行「管理」是 D 批后面的入口，现在还没有界面。'
+        _note(colors, '「课表管理」是 D 批后面的入口，现在还没有界面。'
             '课表数据本身在「学期与作息」里改，导入课程表也在那里。'),
       ],
     );

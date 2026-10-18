@@ -25,7 +25,12 @@ class GenerateParams {
   final int lunchMinutes;
 }
 
-/// 作息表「快速生成」表单（§2.3）：预设下拉 + 四个参数 + 可选午休 + 生成预览。
+/// 作息表「快速生成」表单（§2.3）：自由参数（首节开始 / 每节时长 / 课间 /
+/// 节数 / 午休）+ 生成预览。
+///
+/// M6-D §三 末段：原「大学默认 / 大学紧凑 / 中学」三档预设下拉**已删**——
+/// 预设的语义被模板库（`timetable_library_page.dart`）取代，默认模板只留
+/// 用户那张内置的 12 节表；本表单只保留自由参数。
 ///
 /// 只产出参数，不直接改草稿表——预览与保存由 [TimetableEditPanel] 管理，
 /// 保证「用户确认前不落库」。
@@ -49,14 +54,6 @@ class _TimetableGenerateFormState extends State<TimetableGenerateForm> {
   /// 溢出（实测 25px），所以改成 Wrap + 定宽。
   static const double _fieldWidth = 122;
 
-  /// 预设名 → (每节时长, 课间, 每天节数)。
-  static const Map<String, (int, int, int)> presets =
-      <String, (int, int, int)>{
-    '大学默认（45 分钟 / 课间 10）': (45, 10, 12),
-    '大学紧凑（40 分钟 / 课间 5）': (40, 5, 12),
-    '中学（45 分钟 / 课间 10 / 8 节）': (45, 10, 8),
-  };
-
   late final TextEditingController _firstStart =
       TextEditingController(text: formatMinutes(widget.initialFirstStart));
   final TextEditingController _lesson = TextEditingController(text: '45');
@@ -65,7 +62,6 @@ class _TimetableGenerateFormState extends State<TimetableGenerateForm> {
   final TextEditingController _lunchMinutes =
       TextEditingController(text: '90');
 
-  String _preset = '大学默认（45 分钟 / 课间 10）';
   int _lunchAfterSection = 0;
   String? _error;
 
@@ -81,17 +77,6 @@ class _TimetableGenerateFormState extends State<TimetableGenerateForm> {
 
   int _intOf(TextEditingController c, int fallback) =>
       int.tryParse(c.text.trim()) ?? fallback;
-
-  void _applyPreset(String? name) {
-    if (name == null) return;
-    final (int lesson, int gap, int count) = presets[name]!;
-    setState(() {
-      _preset = name;
-      _lesson.text = '$lesson';
-      _break.text = '$gap';
-      _count.text = '$count';
-    });
-  }
 
   void _submit() {
     final int? first = parseMinutes(_firstStart.text);
@@ -117,20 +102,6 @@ class _TimetableGenerateFormState extends State<TimetableGenerateForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        DropdownButtonFormField<String>(
-          key: const ValueKey<String>('tt-preset'),
-          // isExpanded：DropdownButton 在 dense 模式下不给条目套 Expanded，
-          // 「大学默认（45 分钟 / 课间 10）」这种长值会把内部 Row 撑爆（实测 25px）。
-          isExpanded: true,
-          initialValue: _preset,
-          decoration: const InputDecoration(labelText: '快速生成'),
-          items: <DropdownMenuItem<String>>[
-            for (final String name in presets.keys)
-              DropdownMenuItem<String>(value: name, child: Text(name)),
-          ],
-          onChanged: _applyPreset,
-        ),
-        const SizedBox(height: AppDimens.s8),
         // Wrap + 定宽：卡片被压到半栏宽时四个字段各分不到 90dp，
         // 用 Expanded 会让 InputDecorator 里的 label+输入框横向溢出（实测 25px）。
         Wrap(
