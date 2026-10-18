@@ -127,6 +127,29 @@ class ReminderCoordinator {
   Future<List<Task>> _readTasks() async =>
       _taskSource == null ? const <Task>[] : await _taskSource();
 
+  /// 退出学习通（M6B §B4 那句「已排的到期提醒会一并取消」的兑现处）：只清学习通
+  /// 这一路的数据源，然后**立刻**重排——不等 500ms 防抖、也不等下一次任务变更。
+  ///
+  /// 清单提醒不受影响：它们的来源是 [_taskSource]，与本方法无关，重排会把它们照
+  /// 原样再排一遍。`NotificationService.rescheduleAll` 是「先 cancelAll 再全量排」，
+  /// 所以外部判据只能是「重排后还剩哪些 kind」（测试用的就是这个）。
+  ///
+  /// 先撤还在飞的防抖 Timer：否则 logout 之后那个旧回调会带着**新**快照重排一次，
+  /// 语义没错，但会多一轮无谓的插件调用，测试里也难断言「这一轮就是退出触发的」。
+  /// 失败只打类型：这条路径走在退出登录之后，不该把用户挡住。
+  Future<void> dropChaoxingReminders() async {
+    if (_disposed) return;
+    _timer?.cancel();
+    _timer = null;
+    try {
+      await _snapshot.clearSnapshot();
+      _snapshotCleared = true; // 此刻快照确实是空的，别再让停用分支重复 remove
+    } catch (e) {
+      debugPrint('学习通提醒快照清理失败：${e.runtimeType}');
+    }
+    await rescheduleNow();
+  }
+
   Future<void> dispose() async {
     _disposed = true;
     _timer?.cancel();

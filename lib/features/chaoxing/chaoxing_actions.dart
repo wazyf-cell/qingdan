@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_time.dart';
+import 'package:qingdan/notify/reminder_coordinator.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
 import 'chaoxing_detail_page.dart';
@@ -84,11 +85,17 @@ Future<void> confirmAndLogout(BuildContext context) async {
 /// 真正执行退出。顺序：清凭据与内存态 → 按需清隐藏集 → 取消已排提醒 →
 /// 清 WebView cookie jar（**这条是 M6B §B4 修的既有缺陷**：以前只删凭据库那串，
 /// jar 里的 `_uid` 还在，退出后点登录直接是已登录首页）。
+///
+/// 协调器必须在**任何 await 之前**取：那是个 Provider，async gap 之后再摸 context
+/// 会撞 `use_build_context_synchronously`，而确认框退场后这个 context 未必还在。
+/// 用可空读法（`read<T?>`）——建库失败时 `main.dart` 不注册它，取不到就走
+/// [cancelChaoxingReminders] 里的降级路径，退出这条路径不能因此半途抛异常。
 Future<void> chaoxingLogout(BuildContext context,
     {required bool clearHiddenList}) async {
   final ChaoxingModel model = context.read<ChaoxingModel>();
+  final ReminderCoordinator? coordinator = context.read<ReminderCoordinator?>();
   await model.logout(clearHiddenList: clearHiddenList);
-  await cancelChaoxingReminders();
+  await cancelChaoxingReminders(coordinator);
   await chaoxingCookieJarCleaner();
 }
 
