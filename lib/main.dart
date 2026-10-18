@@ -12,6 +12,7 @@ import 'package:qingdan/application/task_list_use_case.dart';
 import 'package:qingdan/application/task_use_case.dart';
 import 'package:qingdan/application/trash_purge_scheduler.dart';
 import 'package:qingdan/app.dart';
+import 'package:qingdan/app_lifecycle.dart';
 import 'package:qingdan/data/database.dart';
 import 'package:qingdan/data/device_id.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_model.dart';
@@ -21,6 +22,10 @@ import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 import 'package:qingdan/import/course/import_service.dart';
 import 'package:qingdan/features/shell/sidebar/sync_status_model.dart';
 import 'package:qingdan/features/tasks/task_pane_model.dart';
+import 'package:qingdan/notify/chaoxing_snapshot.dart';
+import 'package:qingdan/notify/notification_service.dart';
+import 'package:qingdan/notify/notify_settings.dart';
+import 'package:qingdan/notify/reminder_coordinator.dart';
 import 'package:qingdan/sync/secure_store.dart';
 import 'package:qingdan/sync/sync_config_store.dart';
 import 'package:qingdan/sync/sync_coordinator.dart';
@@ -46,6 +51,26 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('界面偏好读取失败，用默认值：$e');
   }
+
+  // ── 通知（M6-C2）：只在 Android 生效（§0.1）。这三件都必须**照常启动**：
+  // Windows 上 initialize() 走不通、prefs 读不到、插件通道缺失，统统只打一行日志。
+  final NotificationService notificationService = NotificationService();
+  // 路由器要点通知时才用得到侧栏与任务面板模型，而那两者在建库成功后才有；
+  // 回调捕获的是这个局部变量，运行时（点通知）早已装配完毕。
+  NotificationRouter? notificationRouter;
+  try {
+    await notificationService.initialize(
+        onResponse: (response) => notificationRouter?.handle(response.payload));
+  } catch (e) {
+    debugPrint('通知初始化失败，提醒功能本次会话不可用：${e.runtimeType}');
+  }
+  final NotifySettingsStore notifySettings = NotifySettingsStore();
+  try {
+    await notifySettings.load();
+  } catch (e) {
+    debugPrint('通知设置读取失败，用默认值：${e.runtimeType}');
+  }
+  final ChaoxingSnapshotStore chaoxingSnapshot = ChaoxingSnapshotStore();
 
 
   // Windows 桌面窗口：初始 1280×800（≥1040 可见三栏形态），最小 720×480。
@@ -77,6 +102,7 @@ Future<void> main() async {
   SyncConfigStore? syncConfigStore;
   ChaoxingModel? chaoxingModel;
   TrashPurgeScheduler? trashPurgeScheduler;
+  ReminderCoordinator? reminderCoordinator;
   try {
     final db = await openAppDatabase();
 
@@ -134,8 +160,28 @@ Future<void> main() async {
 
     // 学习通（外部只读待办）：cookie 走系统凭据库，与同步层同一个 SecureStore
     // 实现。启动只恢复「有没有登录过」，不自动拉取——拉取发生在打开面板时。
-    chaoxingModel = ChaoxingModel(secure: SecureStorageStore());
-    await chaoxingModel.restore();
+    final ChaoxingModel chaoxing = ChaoxingModel(secure: SecureStorageStore());
+    await chaoxing.restore();
+    chaoxingModel = chaoxing;
+
+    // 提醒装配（M6-C2 §6）：C4 §2 的写入时机 = refresh 成功后；筛选函数在
+    // `reminder_coordinator.dart`，落盘走 `ChaoxingSnapshotStore`（prefs，不进库）。
+    chaoxing.onReminderSnapshot = (tasks, hidden, now) async {
+      await chaoxingSnapshot
+          .writeSnapshot(chaoxingSnapshotOf(tasks, hidden, now));
+    };
+    // 变更源：任务面板（创建/改/完成/删除/进回收站都会 notify）+ 侧栏（回收站
+    // 「恢复」只走 TrashPane→SidebarModel.load，不经任务面板，漏了它恢复出来的
+    // 任务要等下次切视图才会重新排提醒）+ 学习通（refresh 结束会 notify）。
+    // 通知设置本身的 notify 由协调器自己订阅。
+    reminderCoordinator = ReminderCoordinator(
+      service: notificationService,
+      settings: notifySettings,
+      snapshot: chaoxingSnapshot,
+      taskSource: taskUseCase.findAllActive,
+      sources: <Listenable>[paneModel, sidebarModel, chaoxing],
+    );
+    notificationRouter = NotificationRouter(sidebar: sidebarModel, pane: paneModel);
 
     // Windows 关窗钩子（M3 §2.1）：先同步一次（10s 超时兜底）再真正退出。
     if (Platform.isWindows) {
@@ -144,6 +190,14 @@ Future<void> main() async {
   } catch (e, st) {
     dbInitError = '$e\n$st';
   }
+
+  // 触发点「从后台回到前台」→ 重排提醒（项目第一个 WidgetsBindingObserver）。
+  // 协调器缺席（建库失败）时也要挂：它只发一次空回调，不排任何提醒。
+  final ReminderCoordinator? reminder = reminderCoordinator;
+  final AppLifecycleObserver lifecycle = AppLifecycleObserver(
+      onResume: () => reminder?.notifyChanged());
+  lifecycle.attach();
+  reminder?.start(); // 内含「应用启动」那次首排（500ms 防抖）
 
   runApp(
     MultiProvider(
@@ -174,6 +228,13 @@ Future<void> main() async {
         ],
         if (syncCoordinator != null)
           Provider<SyncCoordinator>.value(value: syncCoordinator),
+        // 通知设置与通知引擎必须注册：设置页的「通知」节靠这两个 Provider 渲染
+        // （SyncConfigStore 当年就是漏注册让设置里那一节静默不可用的）。
+        // 装配缺失时 NotifySection 自己降级成一行提示，不炸整棵设置树。
+        ChangeNotifierProvider<NotifySettingsStore>.value(value: notifySettings),
+        Provider<NotificationService>.value(value: notificationService),
+        if (reminder != null)
+          Provider<ReminderCoordinator>.value(value: reminder),
         // 设置界面的「同步」节经 provider 读它（sync_section.dart 的
         // context.read<SyncConfigStore>()）。漏注册会让点开设置直接抛
         // ProviderNotFoundException —— 单测里是手工注入 provider 的，
