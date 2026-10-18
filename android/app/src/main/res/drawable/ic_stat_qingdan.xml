@@ -1,0 +1,13 @@
+<!-- 通知小图标。插件按 `drawable/<name>` 直接找资源，`@mipmap/ic_launcher` 不在
+     这个命名空间里，之前用 'ic_launcher' 的结果是通知照发、小图标空白
+     （2026-10-18 变更日志 M6-C 遗留项）。Android 把小图标渲染成剪影，只认 alpha，
+     所以固定纯白、不做主题色。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM10,17l-5,-5 1.41,-1.41L10,14.17l7.59,-7.59L19,8l-9,9z" />
+</vector>

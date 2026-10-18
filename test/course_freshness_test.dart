@@ -169,18 +169,20 @@ void main() {
 
   testWidgets('老批次（semester_id NULL）：不算导入读数，历史面板显示「（学期未知）」',
       (tester) async {
-    await services.courseDao.insertBatch(ImportBatch(
+    // 两条写库都必须走 io()：testWidgets 跑在 FakeAsync 区域里，真异步的库调用
+    // 不包 runAsync 就永远不返回（本文件曾因此整条挂死）。
+    await io(tester, () => services.courseDao.insertBatch(ImportBatch(
         id: 'legacy',
         fileName: 'v6 前的导入.csv',
-        importedAt: DateTime.utc(2025, 9, 7)));
+        importedAt: DateTime.utc(2025, 9, 7))));
     // 造一条「更新」：没有它整行不渲染，历史面板无从点开。
-    await courses.create(
+    await io(tester, () => courses.create(
         name: '高等数学',
         weekday: 1,
         startSection: 1,
         endSection: 1,
         weeks: const <int>[5],
-        semesterId: semesterId);
+        semesterId: semesterId));
     await pumpAt(tester, width: 1280);
 
     expect(freshnessText(tester), contains('更新'),

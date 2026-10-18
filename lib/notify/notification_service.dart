@@ -27,10 +27,10 @@ const AndroidScheduleMode kAndroidScheduleMode =
     AndroidScheduleMode.inexactAllowWhileIdle;
 
 /// 通知小图标名。插件按 **drawable/** 解析它（`...Plugin.java:855` →
-/// `getIdentifier(name, DRAWABLE, packageName)`），而本工程只有 mipmap 里的
-/// `ic_launcher.png`，真机上大概率没有小图标（通知照发、图形残缺）；补一个
-/// `res/drawable/ic_stat_qingdan.xml` 是 C2 §4（动 AndroidManifest 那一轮）的活。
-const String kNotificationIcon = 'ic_launcher';
+/// `getIdentifier(name, DRAWABLE, packageName)`），`@mipmap/ic_launcher` 不在这个
+/// 命名空间里，早前写 'ic_launcher' 的结果是通知照发、小图标空白。
+/// 资源在 `res/drawable/ic_stat_qingdan.xml`（纯白剪影，Android 只认 alpha）。
+const String kNotificationIcon = 'ic_stat_qingdan';
 
 /// 通知只在 Android 生效（§0.1）。补充实测：22.3.1 带了 windows 子包，但
 /// `initialize()` 在 windows 分支要求 `settings.windows != null` 否则抛

@@ -272,11 +272,14 @@ void main() {
       (tester) async {
     // B 学期不是当前学期：向导步 3 的下拉要能把导入目标指过去，
     // 之后建课 / 扩周数都必须落在 B 上（不再假设 active）。
-    final String bId = (await semesters.createSemester(
-            name: '第二学期',
-            firstWeekDate: DateTime(2026, 3, 2),
-            totalWeeks: 16,
-            setActive: false))
+    // 建学期是真异步写库，必须包在 runAsync 里——裸 await 在 FakeAsync 区域永远
+    // 不返回，整条 test 挂死（本文件曾因此卡 8 分钟不结束）。
+    final String bId = (await tester
+            .runAsync(() => semesters.createSemester(
+                name: '第二学期',
+                firstWeekDate: DateTime(2026, 3, 2),
+                totalWeeks: 16,
+                setActive: false)))!
         .id;
     final Uint8List csv = Uint8List.fromList(utf8.encode(
         '课程名称,星期,开始节数,结束节数,老师,地点,周数\n'

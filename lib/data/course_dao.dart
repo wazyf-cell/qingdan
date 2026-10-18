@@ -219,8 +219,13 @@ class CourseDao {
             ..countImported = insert.length
             ..countUpdated = updated
             ..countSkipped = skippedCount;
-          await txn.update('import_batches', batchRow,
-              where: 'id = ?', whereArgs: <Object?>[batch.id]);
+          // 回填用的 map 必须在改完计数**之后**再取一份：`batchRow` 是事务开头
+          // 的快照（那时三个计数都还是 0），拿它 update 就等于把「新增 0 · 更新 0
+          // · 跳过 0」写进库——导入历史面板从此永远报 0。
+          await txn.update('import_batches',
+              <String, Object?>{...batch.toMap(), 'semester_id': semesterId},
+              where: 'id = ?',
+              whereArgs: <Object?>[batch.id]);
         }
         return (inserted: insert.length, updated: updated, removed: removed);
       });

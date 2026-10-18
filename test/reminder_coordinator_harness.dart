@@ -100,7 +100,13 @@ class ReminderHarness {
   ReminderHarness._(this.prefs, this.sink, this.service, this.store, this.snapshot);
 
   static Future<ReminderHarness> create() async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
+    // 免打扰**显式关掉**：默认 23:00–07:00 开着时，任何「提前量已经过期」的提醒
+    // 都会被顺延到次日 07:00（那是未来，过不了 `_finalize` 的过期滤网），于是
+    // 同一条测试白天排 3 条、半夜排 4 条。套件曾在 23:00 跑，当场多出一条看不见
+    // 来历的失败。顺延本身有专项测试（reminder_plan_quiet_and_limit_test，用固定
+    // 的 now），协调器这边只关心「排了几条、id 连不连」，必须与墙上钟无关。
+    SharedPreferences.setMockInitialValues(
+        <String, Object>{'notify.quietHoursEnabled': false});
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final FakeNotificationSink sink = FakeNotificationSink();
     final ReminderHarness h = ReminderHarness._(

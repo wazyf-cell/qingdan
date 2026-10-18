@@ -50,24 +50,33 @@ class WizardSetupPickers extends StatelessWidget {
                     style: TextStyle(fontSize: 13, color: colors.textSecondary)),
               ),
               Expanded(
-                child: DropdownButton<Semester>(
+                // 值用 **id（String）**而不是 Semester 对象：`Semester` 没有重写
+                // `==`，下拉框按身份比相等。而 `selected` 来自课表模型、`semesters`
+                // 是这一步重新查库的结果——同一个学期是两个不同实例，按对象当值就
+                // 永远匹配不上，Flutter 直接 assert「There should be exactly one
+                // item with [DropdownButton]'s value」，向导第 3 步整屏红（自动化
+                // 测试抓到，2026-10-18）。
+                child: DropdownButton<String>(
                   key: const ValueKey<String>('adopt-semester'),
                   isExpanded: true,
                   value: semesters.any((Semester s) => s.id == selected?.id)
-                      ? selected
+                      ? selected!.id
                       : null,
                   hint: const Text('（还没有学期——下面先建一个）'),
-                  items: <DropdownMenuItem<Semester>>[
+                  items: <DropdownMenuItem<String>>[
                     for (final Semester s in semesters)
-                      DropdownMenuItem<Semester>(
-                        value: s,
+                      DropdownMenuItem<String>(
+                        value: s.id,
                         child: Text(
                             '${s.name}${s.isActive ? '（当前）' : ''} · ${s.totalWeeks} 周',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
                       ),
                   ],
-                  onChanged: onPickSemester,
+                  onChanged: (String? id) => onPickSemester(
+                      id == null
+                          ? null
+                          : semesters.firstWhere((Semester s) => s.id == id)),
                 ),
               ),
             ],
