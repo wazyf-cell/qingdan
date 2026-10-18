@@ -44,6 +44,18 @@ class SyncStateWriter {
     row['id'] = entityId;
     final String baseJson = jsonEncodeLegacy(merged);
     await db.transaction((Transaction txn) async {
+      if (table == 'semesters') {
+        // 「当前学期」是设备本地状态，上云时被剔除（见 local_only_columns），
+        // 所以 merged 里永远不会有它。而这里是 `INSERT OR REPLACE`——
+        // **不显式给值就会吃到 DDL 的 `DEFAULT 1`**，拉一次对端学期本地就多一个
+        // active，课表页读哪个学期变成看运气。读回本地原值是最保守的做法。
+        final List<Map<String, Object?>> old = await txn.query(table,
+            columns: <String>['is_active'],
+            where: 'id = ?',
+            whereArgs: <Object?>[entityId],
+            limit: 1);
+        row['is_active'] = old.isEmpty ? 0 : old.first['is_active'];
+      }
       await txn.insert(
         table,
         row,
@@ -73,6 +85,11 @@ class SyncStateWriter {
     final String table = kEntityTable[type]!;
     final Map<String, Object?> row = toEntityRow(remote);
     row['id'] = remote['id']?.toString() ?? row['id'];
+    if (table == 'semesters') {
+      // 远端新学期一律「非当前」：本地已经有自己的当前学期，凭什么被另一台设备
+      // 的浏览动作改掉（M6-D §四.2）。同 `INSERT OR REPLACE` 的 DEFAULT 1 陷阱。
+      row['is_active'] = 0;
+    }
     final String baseJson = jsonEncodeLegacy(remote);
     await db.transaction((Transaction txn) async {
       await txn.insert(
@@ -157,7 +174,7 @@ class SyncStateWriter {
           if (e.key != 'rev' &&
             e.key != 'deviceId' &&
             e.key != 'sortOrder' &&
-            e.key != 'importBatchId')
+            !kLocalOnlyJsonKeys.contains(e.key))
             snakeCaseField(e.key): e.value,
       };
 }
@@ -172,7 +189,7 @@ Map<String, Object?> rowToSyncJson(Map<String, Object?> row) =>
             e.key != 'rev' &&
             e.key != 'device_id' &&
             e.key != 'sort_order' &&
-            e.key != 'import_batch_id')
+            !kLocalOnlyRowColumns.contains(e.key))
           camelFieldName(e.key): e.value,
     };
 

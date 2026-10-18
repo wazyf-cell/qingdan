@@ -82,6 +82,10 @@ const Set<String> kDefaultIgnoredFields = <String>{
   'sortOrder',
   'sort_order',
   'lastSyncedJson',
+  // 「当前学期」是设备本地状态（M6-D）：远端 JSON 本来就没有这两个键
+  // （`kLocalOnly*` 剔除），列进 ignore 只是让合并结论不去动本地值。
+  'isActive',
+  'is_active',
 };
 
 /// LWW 决胜时间戳字段：实体级 modifiedTime（UTC 毫秒，见 `Task.toJson`）。

@@ -177,6 +177,7 @@ class _SyncSectionState extends State<SyncSection> {
             const SizedBox(height: AppDimens.s8),
           ],
           SwitchListTile(
+            key: const ValueKey<String>("sync-enabled"),
             contentPadding: EdgeInsets.zero,
             dense: true,
             value: _enabled,
@@ -185,17 +186,21 @@ class _SyncSectionState extends State<SyncSection> {
                 style: AppTypography.body.copyWith(color: colors.textPrimary)),
           ),
           _field(colors, "服务器地址", _baseUrl,
+              fieldKey: "sync-url",
               hint: "https://dav.jianguoyun.com/dav/qingdan/"),
           Text("地址必须带非空子路径（如 /dav/qingdan/），直接指向根目录会失败。",
               style: AppTypography.meta.copyWith(color: colors.textFaint)),
           const SizedBox(height: AppDimens.s12),
-          _field(colors, "账号", _username, hint: "name@example.com"),
+          _field(colors, "账号", _username,
+              fieldKey: "sync-user", hint: "name@example.com"),
           const SizedBox(height: AppDimens.s12),
-          _field(colors, "应用密码", _password, obscure: true),
+          _field(colors, "应用密码", _password,
+              fieldKey: "sync-password", obscure: true),
           const SizedBox(height: AppDimens.s12),
           Row(
             children: <Widget>[
               OutlinedButton(
+                key: const ValueKey<String>("sync-test"),
                 onPressed: _test == _TestState.testing ? null : _testConnection,
                 child: const Text("测试连接"),
               ),
@@ -214,9 +219,13 @@ class _SyncSectionState extends State<SyncSection> {
           const SizedBox(height: AppDimens.s16),
           Row(
             children: <Widget>[
-              FilledButton(onPressed: _save, child: const Text("保存")),
+              FilledButton(
+                  key: const ValueKey<String>("sync-save"),
+                  onPressed: _save,
+                  child: const Text("保存")),
               const SizedBox(width: AppDimens.s12),
               TextButton(
+                key: const ValueKey<String>("sync-clear"),
                 onPressed: _clear,
                 child: Text("解除配置",
                     style: TextStyle(color: colors.overdue)),
@@ -244,6 +253,7 @@ class _SyncSectionState extends State<SyncSection> {
         ],
         Flexible(
           child: Text(_testMessage,
+              key: const ValueKey<String>("sync-result"),
               style: AppTypography.meta.copyWith(color: color)),
         ),
       ],
@@ -254,6 +264,7 @@ class _SyncSectionState extends State<SyncSection> {
     AppColors colors,
     String label,
     TextEditingController controller, {
+    String? fieldKey,
     String? hint,
     bool obscure = false,
   }) {
@@ -264,6 +275,7 @@ class _SyncSectionState extends State<SyncSection> {
             style: AppTypography.meta.copyWith(color: colors.textSecondary)),
         const SizedBox(height: AppDimens.s4),
         TextField(
+          key: fieldKey == null ? null : ValueKey<String>(fieldKey),
           controller: controller,
           obscureText: obscure,
           style: AppTypography.body.copyWith(color: colors.textPrimary),

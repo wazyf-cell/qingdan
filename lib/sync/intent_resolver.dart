@@ -24,6 +24,7 @@ import 'dart:convert';
 
 import '../data/row_diff.dart' show camelFieldName;
 import '../domain/op_log_entry.dart';
+import 'local_only_columns.dart';
 
 /// 同步意图的传输态。六态判定只影响 `resolvedFromKind`（调试/测试用），
 /// 传输层实际塌缩为两态：整实体 JSON PUT（upsert）或删文件（delete）。
@@ -76,9 +77,7 @@ const Set<String> _kRowSkipKeys = <String>{
   'rev',
   'device_id',
   'sort_order',
-  // 批次是本地簿记、`import_batches` 不同步 → 这列上了云也没人能把行落库
-  // （外键指向对端不存在的行，必 787）。M4a S6。
-  'import_batch_id',
+  ...kLocalOnlyRowColumns, // import_batch_id / is_active，见 sync_serializer
 };
 
 /// diff 时跳过的同步 JSON 键（camelCase，来自 `sync_state.base_json`）。
@@ -88,7 +87,7 @@ const Set<String> _kJsonSkipKeys = <String>{
   'rev',
   'deviceId',
   'sortOrder',
-  'importBatchId', // 与 _kRowSkipKeys 的 import_batch_id 成对，见 M4a S6
+  ...kLocalOnlyJsonKeys, // 与 _kRowSkipKeys 成对，见 sync_serializer
 };
 
 /// 来源 B：base vs current 的终态 diff。

@@ -3,16 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
-import 'about_section.dart';
-import 'appearance_section.dart';
-import 'general_section.dart';
-import 'sync_section.dart';
 
-/// 设置入口：桌面端对话框容器（四节：外观 / 同步 / 通用 / 关于）。
+import 'settings_nav.dart';
+
+/// 设置入口：桌面端对话框容器（七节，与手机一级页同一份 [settingsEntries]）。
 ///
 /// 形态：左侧导航 + 右侧内容区。窄屏不用这个对话框（640×440 比手机屏还宽，
 /// 右栏被挤没），走 `settings_page.dart` 的「一级列表 → 二级整页」。
-/// 两端共用同一批节组件，不复制。
+/// 节组件两端共用，不复制。
 void showSettingsDialog(BuildContext context) {
   showGeneralDialog(
     context: context,
@@ -33,11 +31,14 @@ class _SettingsDialog extends StatefulWidget {
   State<_SettingsDialog> createState() => _SettingsDialogState();
 }
 
-/// 导航项 id。
-enum _SettingsSection { appearance, sync, general, about }
-
 class _SettingsDialogState extends State<_SettingsDialog> {
-  _SettingsSection _section = _SettingsSection.appearance;
+  /// 当前选中的节 id；默认第一行（外观）。
+  SettingsSectionId _section = SettingsSectionId.appearance;
+
+  static final List<SettingsEntry> _entries = settingsEntries();
+
+  SettingsEntry get _current =>
+      _entries.firstWhere((SettingsEntry e) => e.id == _section);
 
   @override
   Widget build(BuildContext context) {
@@ -81,38 +82,19 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                   style: AppTypography.panelTitle
                       .copyWith(color: colors.textPrimary)),
             ),
-            _NavItem(
-              icon: Icons.palette_outlined,
-              label: '外观',
-              selected: _section == _SettingsSection.appearance,
-              colors: colors,
-              onTap: () => setState(() => _section = _SettingsSection.appearance),
-            ),
-            _NavItem(
-              icon: Icons.cloud_outlined,
-              label: '同步',
-              selected: _section == _SettingsSection.sync,
-              colors: colors,
-              onTap: () => setState(() => _section = _SettingsSection.sync),
-            ),
-            _NavItem(
-              icon: Icons.tune,
-              label: '通用',
-              selected: _section == _SettingsSection.general,
-              colors: colors,
-              onTap: () => setState(() => _section = _SettingsSection.general),
-            ),
-            _NavItem(
-              icon: Icons.info_outline,
-              label: '关于',
-              selected: _section == _SettingsSection.about,
-              colors: colors,
-              onTap: () => setState(() => _section = _SettingsSection.about),
-            ),
+            for (final SettingsEntry entry in _entries)
+              _NavItem(
+                icon: entry.icon,
+                label: entry.title,
+                selected: _section == entry.id,
+                colors: colors,
+                onTap: () => setState(() => _section = entry.id),
+              ),
             const Spacer(),
             Padding(
               padding: const EdgeInsets.all(AppDimens.s16),
-              child: Text('关闭', style: AppTypography.meta.copyWith(color: colors.textFaint)),
+              child: Text('关闭',
+                  style: AppTypography.meta.copyWith(color: colors.textFaint)),
             ),
           ],
         ),
@@ -123,14 +105,16 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   // ---- 右侧内容区 ----
   Widget _buildContent(AppColors colors) {
     return Expanded(
+      // key 让切换节时整棵子树重建：各节都有自己的 StatefulWidget 状态
+      // （同步节的输入框、通知节的回执），不换 key 会被 Flutter 复用成串台。
       child: Padding(
         padding: const EdgeInsets.all(AppDimens.s24),
-        child: switch (_section) {
-          _SettingsSection.appearance => const AppearanceSection(),
-          _SettingsSection.sync => const SyncSection(),
-          _SettingsSection.general => const GeneralSection(),
-          _SettingsSection.about => const AboutSection(),
-        },
+        child: SingleChildScrollView(
+          child: KeyedSubtree(
+            key: ValueKey<SettingsSectionId>(_current.id),
+            child: _current.content(true),
+          ),
+        ),
       ),
     );
   }

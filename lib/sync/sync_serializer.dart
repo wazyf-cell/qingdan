@@ -8,6 +8,9 @@ import 'dart:convert';
 
 import 'intent_resolver.dart' show SyncIntent;
 
+// 剔除表单独成文件：`intent_resolver` 与本文件互相 import 会绕成环。
+export 'local_only_columns.dart';
+
 /// 实体类型 → 业务表名的静态映射（读库用）。
 const Map<String, String> kEntityTable = <String, String>{
   'semester': 'semesters',

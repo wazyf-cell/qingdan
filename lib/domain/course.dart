@@ -21,6 +21,7 @@ class Course {
     this.teacher,
     this.location,
     this.rawWeeksText,
+    this.colorIndex,
     this.origin = CourseOrigin.manual,
     this.importBatchId,
     this.deleted = false,
@@ -47,9 +48,19 @@ class Course {
   /// 原始周次字符串，仅供展示与回溯，不参与任何逻辑（§2.4:140）。
   String? rawWeeksText;
   String? semesterId;
+  /// 用户手动选过的配色（0..7）；null = 跟随课名自动配色。
+  ///
+  /// **不参与 UID**（`courseUidOf` 只算名称/星期/节次/周次）：改个颜色不该让
+  /// 下一次导入把它认成另一门课（M6-D §五.4，有单测钉住）。
+  final int? colorIndex;
   CourseOrigin origin;
   String? importBatchId;
-  int get colorIndex => courseColorIndex(name);
+  /// 按课名派生的自动配色索引（跨设备稳定，见 `courseColorIndex`）。
+  int get autoColorIndex => courseColorIndex(name);
+
+  /// 实际用的颜色：**用户显式选过的优先**，没选过才回落到课名派生（M6-D §十）。
+  /// 渲染处一律走这里，不要在各处各写一遍 `colorIndex ?? courseColorIndex(name)`。
+  int get effectiveColorIndex => colorIndex ?? autoColorIndex;
   bool deleted;
   final DateTime? createdTime;
   DateTime? modifiedTime;
@@ -84,6 +95,8 @@ class Course {
     List<int>? weeks,
     String? rawWeeksText,
     String? semesterId,
+    int? colorIndex,
+    bool clearColor = false,
     CourseOrigin? origin,
     String? importBatchId,
     bool? deleted,
@@ -101,6 +114,7 @@ class Course {
         weeks: weeks ?? this.weeks,
         rawWeeksText: rawWeeksText ?? this.rawWeeksText,
         semesterId: semesterId ?? this.semesterId,
+        colorIndex: clearColor ? null : (colorIndex ?? this.colorIndex),
         origin: origin ?? this.origin,
         importBatchId: importBatchId ?? this.importBatchId,
         deleted: deleted ?? this.deleted,
@@ -123,6 +137,7 @@ class Course {
         origin: (map['origin'] as String?) == 'import'
             ? CourseOrigin.import
             : CourseOrigin.manual,
+        colorIndex: map['color_index'] as int?,
         importBatchId: map['import_batch_id'] as String?,
         deleted: (map['deleted'] ?? 0) as int == 1,
         createdTime: msToDateTime(map['created_time'] as int?),
@@ -141,6 +156,7 @@ class Course {
         'weeks': encodeWeeks(weeks),
         'raw_weeks_text': rawWeeksText,
         'semester_id': semesterId,
+        'color_index': colorIndex,
         'origin': origin == CourseOrigin.import ? 'import' : 'manual',
         'import_batch_id': importBatchId,
         'deleted': deleted ? 1 : 0,

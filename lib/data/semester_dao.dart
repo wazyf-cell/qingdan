@@ -29,14 +29,41 @@ class SemesterDao {
     return [for (final Map<String, Object?> r in rows) Semester.fromMap(r)];
   }
 
-  /// 当前激活学期（自用单学期，最多一个）。
+  /// 当前激活学期（多学期之后仍然最多一个，但**每台设备各选各的**）。
+  ///
+  /// 查不到时自愈：把 `created_time` 最新的那一行置为当前。这不是多余的兜底——
+  /// `is_active` 从 M6-D 起不再从同步来（远端来的学期一律 0），所以
+  /// 「本地一个 active 都没有、但库里有学期」是**正常可达状态**（首次拉到学期、
+  /// 手改过库、迁移边缘形状）。不选一个出来，`CoursePaneModel.load()` 拿到 null，
+  /// 整个课表页空白，而用户看不出为什么。
   Future<Semester?> findActive() async {
     final List<Map<String, Object?>> rows = await _db.query(
       'semesters',
       where: 'is_active = 1',
       limit: 1,
     );
-    return rows.isEmpty ? null : Semester.fromMap(rows.first);
+    if (rows.isNotEmpty) return Semester.fromMap(rows.first);
+    final List<Map<String, Object?>> newest = await _db.query(
+      'semesters',
+      orderBy: 'created_time DESC',
+      limit: 1,
+    );
+    if (newest.isEmpty) return null;
+    final Semester fallback = Semester.fromMap(newest.first);
+    await setActiveSemester(fallback.id);
+    return fallback;
+  }
+
+  /// 切换当前学期。**不写 op-log**：`is_active` 是设备本地列、上云时被剔除
+  /// （见 `sync/local_only_columns.dart`），记意图只会产出一条被剔成空白的变更，
+  /// 白跑一轮同步，还会让审计日志里出现「用户改了什么？什么都没改」。
+  Future<void> setActiveSemester(String id) async {
+    await _db.transaction((Transaction txn) async {
+      await txn.rawUpdate(
+          'UPDATE semesters SET is_active = 0 WHERE is_active = 1');
+      await txn.rawUpdate(
+          'UPDATE semesters SET is_active = 1 WHERE id = ?', <Object?>[id]);
+    });
   }
 
   Future<Semester> insert({
@@ -46,12 +73,17 @@ class SemesterDao {
     String? id,
   }) async {
     final DateTime now = DateTime.now().toUtc();
+    // 「当前学期」必须只有一个，而 DDL 的列默认值是 1 —— 不显式决定就会出现
+    // 第二个学期也 active=1，`findActive()` 拿到哪一行看 SQLite 心情（M6-D 多学期）。
+    // 建学期时想切过去，调用方随后显式 `setActiveSemester`。
+    final bool isFirst = (await _db.query('semesters', limit: 1)).isEmpty;
     final Semester semester = Semester(
       id: id ?? IdGenerator.next(),
       name: name,
       // 统一归一到该周的周一，并按纯日期存（§2.1）。
       firstWeekMonday: Semester.mondayOf(firstWeekMonday),
       totalWeeks: totalWeeks,
+      isActive: isFirst,
       createdTime: now,
       modifiedTime: now,
     );
@@ -70,13 +102,21 @@ class SemesterDao {
     final Map<String, Object?>? before = await _row('semesters', semester.id);
     if (before == null) throw StateError('学期 ${semester.id} 不存在');
     // modified_time 不参与「有没有变化」的判定（同 CourseDao.update 的理由）。
+    // `is_active` 与 `modified_time` 都不参与判定：前者是设备本地状态（M6-D），
+    // 后者每次都是新值。更要命的是**写出去的 payload 里也不能带 `is_active`**——
+    // 调用方拿的是加载时的旧快照，一旦它和库里的当前值不同，这条 UPDATE 就会
+    // 把用户刚刚在学期面板里选的当前学期悄悄改回去。
     final List<FieldChange> changes = diffRowMaps(
-      <String, Object?>{...before}..remove('modified_time'),
-      <String, Object?>{...semester.toMap()}..remove('modified_time'),
+      <String, Object?>{...before}
+        ..remove('modified_time')
+        ..remove('is_active'),
+      <String, Object?>{...semester.toMap()}
+        ..remove('modified_time')
+        ..remove('is_active'),
     );
     if (changes.isEmpty) return;
     final Map<String, Object?> after = <String, Object?>{
-      ...semester.toMap(),
+      ...semester.toMap()..remove('is_active'),
       'modified_time': dateTimeToMs(DateTime.now().toUtc()),
     };
     await _db.transaction((Transaction txn) async {
