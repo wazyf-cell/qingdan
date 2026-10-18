@@ -44,7 +44,13 @@ String courseUidOf({
   return sha1.convert(utf8.encode(key)).toString();
 }
 
-/// 调色板大小（§1.1:73：不做用户自定义配色，按课名 hash 取 8 色之一）。
+/// 调色板大小（§1.1:73 按课名 hash 取 8 色之一）。
+///
+/// 那句「**不做**用户自定义配色」已过期于 M6-D §十：选择器在
+/// `features/course/course_color_picker.dart`（`field-color-<i>` /
+/// `field-color-auto`），选中的档位存进可空列 `courses.color_index`（迁移 v6）。
+/// [courseColorIndex] 没有被废弃——它就是 `colorIndex == null`（「自动」那一档）
+/// 时的回落，仍然是跨设备稳定的按课名派生配色。
 const int kCoursePaletteSize = 8;
 
 /// 课程配色索引：**跨设备稳定**（同一个课名在两台机器上必须同色）。

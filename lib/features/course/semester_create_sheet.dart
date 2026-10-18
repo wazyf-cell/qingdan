@@ -5,13 +5,14 @@ import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/application/timetable_use_case.dart';
 import 'package:qingdan/domain/default_timetable.dart';
 import 'package:qingdan/domain/semester.dart';
-import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
+import 'semester_create_templates.dart';
 import 'semester_switcher.dart' show showSemesterSheetShell;
+import 'timetable_library_page.dart';
 import 'week_picker_sheet.dart' show weekMondayText;
 
 /// prefs key：新建学期时默认选中的作息模板（§7.2 + 总纲 §五）。
@@ -36,16 +37,6 @@ Future<Semester?> showSemesterCreateSheet(
       isMobile: isMobile, body: (BuildContext _) => form);
 }
 
-/// 一行模板候选：[name] 给回执（{模板名}），[label] 给下拉展示，[count] 是节数。
-typedef _TemplateChoice = ({String id, String name, String label, int count});
-
-_TemplateChoice _builtinChoice() => (
-      id: kBuiltInTimetableId,
-      name: kBuiltInTimetableName,
-      label: '$kBuiltInTimetableName（默认）',
-      count: kBuiltInTimeDetails.length,
-    );
-
 class _CreateForm extends StatefulWidget {
   const _CreateForm({
     required this.model,
@@ -69,7 +60,7 @@ class _CreateFormState extends State<_CreateForm> {
   DateTime _firstWeek = Semester.mondayOf(DateTime.now());
   int _totalWeeks = Semester.defaultTotalWeeks;
   bool _setActive = true;
-  List<_TemplateChoice> _choices = const <_TemplateChoice>[];
+  List<SemesterTemplateChoice> _choices = const <SemesterTemplateChoice>[];
   String _templateId = kBuiltInTimetableId;
 
   /// 保存回执。**不能是 SnackBar**：本弹层是 modal route，SnackBar 画在它
@@ -93,12 +84,13 @@ class _CreateFormState extends State<_CreateForm> {
   /// 候选 = `templates()`（内置排第一、标「默认」），默认选中 prefs
   /// `course.defaultTemplateId`；那个模板已被删掉时回落到第一项。
   Future<void> _loadChoices() async {
-    final List<_TemplateChoice> choices = await _readChoices();
+    final List<SemesterTemplateChoice> choices =
+        await readTemplateChoices(widget.templates);
     String picked = choices.first.id;
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       final String? saved = prefs.getString(kDefaultTemplateIdKey);
-      if (saved != null && choices.any((_TemplateChoice c) => c.id == saved)) {
+      if (saved != null && choices.any((SemesterTemplateChoice c) => c.id == saved)) {
         picked = saved;
       }
     } catch (_) {
@@ -109,23 +101,6 @@ class _CreateFormState extends State<_CreateForm> {
       _choices = choices;
       _templateId = picked;
     });
-  }
-
-  Future<List<_TemplateChoice>> _readChoices() async {
-    final TimetableUseCase? useCase = widget.templates;
-    if (useCase == null) return <_TemplateChoice>[_builtinChoice()];
-    final List<_TemplateChoice> out = <_TemplateChoice>[];
-    for (final TimeTable t in await useCase.templates()) {
-      // 节数逐个查：回执里的 {N} 必须是复制进学期的那个真值，不能拿文案凑。
-      final int n = (await useCase.templateDetails(t.id)).length;
-      out.add((
-        id: t.id,
-        name: t.name,
-        label: t.isBuiltin ? '${t.name}（默认）' : '${t.name}（$n 节）',
-        count: n,
-      ));
-    }
-    return out.isEmpty ? <_TemplateChoice>[_builtinChoice()] : out;
   }
 
   bool get _ok => _name.text.trim().isNotEmpty;
@@ -141,12 +116,32 @@ class _CreateFormState extends State<_CreateForm> {
     if (picked != null) setState(() => _firstWeek = picked);
   }
 
-  _TemplateChoice get _choice => _choices
-      .firstWhere((_TemplateChoice c) => c.id == _templateId,
-          orElse: _builtinChoice);
+  SemesterTemplateChoice get _choice => _choices
+      .firstWhere((SemesterTemplateChoice c) => c.id == _templateId,
+          orElse: builtinTemplateChoice);
+
+  /// 「管理时间表…」**在本表单之上**再开一层模板库模态，不先关这张表单：用户
+  /// 多半就是发现缺一个模板才点过去的，已填的名字/日期不能丢。两层都挂在 root
+  /// navigator 上（`showModalBottomSheet` / `showDialog` 默认 useRootNavigator:
+  /// true），关掉库里那层就回到这层；库自己内部本来也这么叠（新建 → 逐节编辑）。
+  /// 回来重扫候选：库里新建的模板要能立刻被选中（进候选），被删掉的那条不能再
+  /// 挂在选中项上。
+  Future<void> _openLibrary() async {
+    await showTimetableLibrary(context,
+        isMobile: MediaQuery.sizeOf(context).width < AppDimens.breakpointNarrow);
+    if (!mounted) return;
+    final List<SemesterTemplateChoice> cs =
+        await readTemplateChoices(widget.templates);
+    if (!mounted) return;
+    setState(() {
+      _choices = cs;
+      if (cs.any((SemesterTemplateChoice c) => c.id == _templateId)) return;
+      _templateId = cs.first.id;
+    });
+  }
 
   Future<void> _save() async {
-    final _TemplateChoice choice = _choice;
+    final SemesterTemplateChoice choice = _choice;
     try {
       final Semester created = await widget.semesters.createSemester(
           name: _name.text,
@@ -235,7 +230,7 @@ class _CreateFormState extends State<_CreateForm> {
             initialValue: _templateId,
             decoration: const InputDecoration(labelText: '作息模板'),
             items: <DropdownMenuItem<String>>[
-              for (final _TemplateChoice c in _choices)
+              for (final SemesterTemplateChoice c in _choices)
                 DropdownMenuItem<String>(value: c.id, child: Text(c.label)),
             ],
             onChanged: (String? v) =>
@@ -249,19 +244,17 @@ class _CreateFormState extends State<_CreateForm> {
           value: _setActive,
           onChanged: (bool v) => setState(() => _setActive = v),
         ),
-        // §7.3 的入口：那一页由并行的另一批做，这里先挂位置并禁用，
-        // 不留一个点了没反应的死按钮（也不引它的类名）。
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Tooltip(
-            message: '下一批开放',
+        // §7.2 契约的「管理时间表… → §7.3」这一行。模板用例没装配（`templates`
+        // 为 null = 只剩内置模板那条退化路径）时**整行不出现**：那个壳里
+        // `context.read<TimetableUseCase>()` 会当场抛，比没有这行更糟。
+        if (widget.templates != null)
+          Align(
+            alignment: Alignment.centerLeft,
             child: TextButton(
-              key: const ValueKey<String>('create-manage-timetable'),
-              onPressed: null,
-              child: const Text('管理时间表…'),
-            ),
+                key: const ValueKey<String>('create-manage-timetable'),
+                onPressed: _openLibrary,
+                child: const Text('管理时间表…')),
           ),
-        ),
         if (_said != null)
           Text(_said!,
               key: const ValueKey<String>('create-said'),

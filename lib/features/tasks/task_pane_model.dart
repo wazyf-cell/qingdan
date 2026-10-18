@@ -113,7 +113,9 @@ class TaskPaneModel extends ChangeNotifier {
     await load();
   }
 
-  /// 右键「编辑日期」（仅支持改到未来某天，清除日期 M1 不做）。
+  /// 右键「编辑日期」。**不限未来**：选择器 `date_time_pick.dart` 的 `firstDate`
+  /// 是两年前（:14），选到过去完全允许——原括注「仅支持改到未来某天」已过期于
+  /// M6-A §A3 换成 `pickDateWithOptionalTime` 那一批。「清除日期」仍不做（M1 定）。
   Future<void> setDueDate(Task task, DateTime dueLocal) async {
     await _useCase?.update(task.copyWith(dueDate: dueLocal.toUtc()));
     await load();

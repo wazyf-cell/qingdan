@@ -7,8 +7,11 @@ import 'package:sqflite_common_ffi/sqflite_common_ffi.dart';
 // 由实现方定案（见 `待执行-M4a课表导入.md` 定案 6）。
 //
 // **不建 `last_synced_json` 列**：同步基线自 v3 起集中在 `sync_state` 表。
-// **不建 `color_index` 列**：配色由课名派生（`Course.colorIndex`），
-// 落库反而会与改名后的课名不一致。
+// **`color_index` 不在这份 v4 DDL 里**，但不是「永远不建」：M6-D §十 用迁移 v6
+// 补了这列（`migration_v6.dart` :26 `ALTER TABLE courses ADD COLUMN
+// color_index INTEGER`，可空，NULL = 沿用按课名派生的自动配色）。原来下面这句
+// ——「不建 color_index 列：配色由课名派生，落库反而与改名后的课名不一致」
+// ——已过期于 M6-D（颜色选择器 `features/course/course_color_picker.dart`）。
 
 /// 学期表。
 ///

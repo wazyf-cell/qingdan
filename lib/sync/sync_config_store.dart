@@ -32,7 +32,13 @@ class SyncConfig {
   /// 同步开关；关 = 停掉全部自动触发（手动同步仍可用，§3.2）。
   final bool enabled;
 
-  /// 后端类型；仅 [kBackendWebDav] 会在 UI 露出（localFolder 未实现）。
+  /// 后端类型；配置与 UI 目前只认 [kBackendWebDav] 这一个取值。
+  ///
+  /// 原括注「localFolder 未实现」已过期于 M2 收口：本地文件夹后端早就在
+  /// `local_folder_backend.dart`（配套 `test/local_folder_backend_test.dart`），
+  /// 缺的只是把它接进配置——它没有自己的常量、设置页也不露出，而 [isConfigured]
+  /// 对 webdav 以外的一律判未配置（所以下面那行 `backendType == kBackendWebDav`
+  /// 不是冗余）。
   final String backendType;
 
   /// 服务器地址（WebDAV 根，**必须带非空子路径**，见 §6.1）。

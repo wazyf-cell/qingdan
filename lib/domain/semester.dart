@@ -1,9 +1,13 @@
 import 'timestamps.dart';
 
-/// 学期（F28）。当前版本全局只有一个激活学期（[isActive] == true）。
+/// 学期（F28）。当前版本全局只有一个激活学期（[isActive] == true）——这条仍成立。
 ///
 /// 模型上 `Course`/`TimeTable` 都带可空 `semesterId`，是为了将来做「上学期
-/// 归档」时不必迁数据；**不做**并显示多个学期的 UI（§零.1）。
+/// 归档」时不必迁数据。
+///
+/// 「**不做**并显示多个学期的 UI（§零.1）」这句已过期于 M6-D §7.1/§7.4：多学期
+/// 界面已经落地，三个入口 = 周视图行内的 `features/course/semester_switcher.dart`、
+/// 学期面板 `semester_sheet.dart`、课表管理整页 `course_manage_page.dart`。
 class Semester {
   Semester({
     required this.id,
