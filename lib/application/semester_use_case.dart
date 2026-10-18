@@ -1,32 +1,49 @@
 import 'package:qingdan/application/app_services.dart';
+import 'package:qingdan/data/semester_dao.dart';
+import 'package:qingdan/domain/default_timetable.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/time_table.dart';
 
-/// 学期与作息用例（F28 / F30 的配置部分）。
+/// 学期用例（M6-D §6.1，F28 / F30 的配置部分）。
 ///
-/// UI 层只能调这里（AGENTS.md 铁律）。写库与记 op-log 由 DAO 在同一事务内完成。
+/// UI 层只能调这里（AGENTS.md 铁律）。写库与记 op-log 由 DAO 在同一事务内完成；
+/// 作息**模板库**的部分拆到 `timetable_use_case.dart`。
 class SemesterUseCase {
   SemesterUseCase(this._services);
 
   final AppServices _services;
 
-  Future<Semester?> activeSemester() => _services.semesterDao.findActive();
+  SemesterDao get _dao => _services.semesterDao;
 
-  Future<List<Semester>> allSemesters() => _services.semesterDao.findAll();
+  Future<Semester?> activeSemester() => _dao.findActive();
 
-  /// 新建学期。[firstWeekDate] 可以是开学第一周的**任意一天**，
-  /// 由 DAO 归一化到该周周一（§2.1）。周数越界直接拒绝，不静默夹取。
+  Future<List<Semester>> allSemesters() => _dao.findAll();
+
+  /// 新建学期：同事务「插学期 → 建该学期专属作息 → 从 [templateId] 复制全部
+  /// 节次快照」（§6.1，顺序即 `kEntityTypes` 的外键顺序）。改模板不影响已建
+  /// 学期，改学期作息不污染模板——复制的就是快照。
+  ///
+  /// [firstWeekDate] 可以是开学第一周的**任意一天**，归一化到该周周一（§2.1）。
+  /// [templateId] 缺省为内置模板——契约签名是 required，但既有 features 调用点
+  /// 在 M6-D §7 界面并行改造前还不带该参数，给默认值让它们保持可编译。
+  /// [setActive] 默认 true（§7.2「创建后设为当前学期」默认开）。
   Future<Semester> createSemester({
     required String name,
     required DateTime firstWeekDate,
     int totalWeeks = Semester.defaultTotalWeeks,
+    String templateId = kBuiltInTimetableId,
+    bool setActive = true,
   }) async {
     _check(name, totalWeeks);
-    return _services.semesterDao.insert(
+    final ({Semester semester, TimeTable timetable}) created =
+        await _dao.insertSemesterWithTemplate(
       name: name.trim(),
       firstWeekMonday: firstWeekDate,
       totalWeeks: totalWeeks,
+      templateId: templateId,
+      setActive: setActive,
     );
+    return created.semester;
   }
 
   /// 保存学期配置（名称 + 开学周 + 总周数），**一次 UPDATE 写完**。
@@ -47,7 +64,7 @@ class SemesterUseCase {
       firstWeekMonday: Semester.mondayOf(firstWeekDate),
       totalWeeks: totalWeeks,
     );
-    await _services.semesterDao.update(next);
+    await _dao.update(next);
     return next;
   }
 
@@ -61,9 +78,47 @@ class SemesterUseCase {
     final int target =
         needed > Semester.maxTotalWeeks ? Semester.maxTotalWeeks : needed;
     final Semester next = s.copyWith(totalWeeks: target);
-    await _services.semesterDao.update(next);
+    await _dao.update(next);
     return next;
   }
+
+  /// 切换当前学期。**不记 op-log**：`is_active` 是设备本地列、上云被剔除
+  /// （§四），记意图只会产生一条被剔成空白的变更，白跑一轮同步。
+  Future<void> setActiveSemester(String id) => _dao.setActiveSemester(id);
+
+  /// 删除学期：同事务物理删 courses → time_details → timetables → semesters，
+  /// 每步 append delete 意图（§6.1，四类都是同步实体，漏一步另一端留着）。
+  /// 课程**不进回收站**（回收站只管待办任务），确认框文案由 UI 负责写清
+  /// 「无法撤销」并带上 `courseCountForDeletion` 的连带数量。
+  ///
+  /// 只剩一个学期时拒删（`StateError('至少保留一个学期')`）：删光了
+  /// `findActive()` 返回 null，整个课表页空白且无从恢复。
+  /// 删的是当前学期 → 把剩下的 `created_time` 最新一个置为 active
+  /// （走 `setActiveSemester`，不记 op-log）。
+  Future<void> deleteSemester(String id) async {
+    final List<Semester> all = await _dao.findAll();
+    if (all.length <= 1) throw StateError('至少保留一个学期');
+    final Semester? target =
+        all.where((Semester s) => s.id == id).firstOrNull;
+    if (target == null) return;
+    final bool wasActive = target.isActive;
+    await _dao.deleteSemesterCascade(id);
+    if (!wasActive) return;
+    final List<Semester> rest = await _dao.findAll();
+    if (rest.isEmpty) return;
+    Semester newest = rest.first;
+    for (final Semester s in rest) {
+      final DateTime a = s.createdTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final DateTime b =
+          newest.createdTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+      if (a.isAfter(b)) newest = s;
+    }
+    await _dao.setActiveSemester(newest.id);
+  }
+
+  /// 该学期课程条数（含软删），给删除确认框写「会连带删除 N 门课程」用。
+  Future<int> courseCountForDeletion(String semesterId) =>
+      _dao.countCoursesForSemester(semesterId);
 
   void _check(String name, int totalWeeks) {
     if (name.trim().isEmpty) throw ArgumentError('学期名称不能为空');
@@ -74,17 +129,18 @@ class SemesterUseCase {
     }
   }
 
+  // ---- 旧「匿名默认作息」路径（v6 前的形状，features 并行改造期继续可用）----
+
   /// 默认作息表，没有就建一张（当前版本恒为 `semester_id IS NULL` 那一张）。
   Future<TimeTable> ensureDefaultTimetable() async {
-    final TimeTable? existing = await _services.semesterDao.findDefaultTimetable();
-    return existing ??
-        await _services.semesterDao.createTimetable(name: '默认作息');
+    final TimeTable? existing = await _dao.findDefaultTimetable();
+    return existing ?? await _dao.createTimetable(name: '默认作息');
   }
 
   /// 默认作息表的节次，按节次升序。
   Future<List<TimeDetail>> loadDefaultDetails() async {
     final TimeTable table = await ensureDefaultTimetable();
-    return _services.semesterDao.findDetails(table.id);
+    return _dao.findDetails(table.id);
   }
 
   /// 保存作息表。**返回 null 表示成功**，否则是可直接展示的校验错误摘要
@@ -93,7 +149,7 @@ class SemesterUseCase {
     final String? error = validateTimeDetails(details);
     if (error != null) return error;
     final TimeTable table = await ensureDefaultTimetable();
-    await _services.semesterDao.replaceDetails(
+    await _dao.replaceDetails(
       table.id,
       <TimeDetail>[
         for (final TimeDetail d in details)
