@@ -1,13 +1,15 @@
-/// 学习通取数客户端：带 cookie 头直连它的 JSON 接口（无官方 API）。
+/// 学习通取数客户端：带 cookie 头直连它的 JSON / HTML 页（无官方 API）。
 ///
-/// 接口清单与响应结构来源见 `chaoxing_models.dart` 文件头声明。会话靠
-/// cookie，**没有 token 刷新**：过期后接口会 302 到登录页并返回 HTML，
-/// 这里把它当成「未登录」抛出去，由界面提示重新登录。
+/// 接口清单与响应结构来源见 `chaoxing_models.dart`（课程 / 活动）、
+/// `chaoxing_homework.dart`（作业页）与 `chaoxing_exam.dart`（考试两页）各自
+/// 的文件头声明。会话靠 cookie，**没有 token 刷新**：过期后接口会 302 到登录页
+/// 并返回 HTML，这里把它当成「未登录」抛出去，由界面提示重新登录。
 library;
 
 import 'dart:convert';
 import 'dart:io';
 
+import 'chaoxing_exam.dart';
 import 'chaoxing_homework.dart';
 import 'chaoxing_models.dart';
 
@@ -28,6 +30,22 @@ class ChaoxingClient {
   /// 形如 `a=1; b=2` 的 Cookie 头值（由登录流程从 WebView 的 cookie jar 导出）。
   final String cookie;
 
+  /// 作业页（脚本 :757-791 那一形态的来源）。
+  static const String kUrlHomework =
+      'https://mooc1-api.chaoxing.com/work/stu-work';
+
+  /// 考试的卡片形态页。脚本 :463 的常量 `URL_EXAM` 末尾带 `#chaoxing-assignment`
+  /// ——那是页面内锚点，HTTP 请求从不发送它，脚本自己抓的时候也没带
+  /// （:1434 / :3405 / :3467 三处全是无片段地址），这里同形。
+  static const String kUrlExamCards =
+      'https://mooc1-api.chaoxing.com/exam-ans/exam/phone/examcode';
+
+  /// 考试的表格形态页：`API_EXAM_LIST` :911 的**原值**，含末尾那个空的 `fid=`。
+  /// 不补 fid：脚本 :1455 / :3420 就是照这个常量原样 fetch 的，超星接受空值。
+  static const String kUrlExamTable =
+      'https://mooc1.chaoxing.com/exam-ans/exam/test/examcode/examlist'
+      '?edition=1&nohead=0&fid=';
+
   final HttpClient _http = HttpClient();
 
   Future<List<ChaoxingCourse>> fetchCourses() async {
@@ -40,15 +58,20 @@ class ChaoxingClient {
   int courseCount = 0;
 
   /// 分批逐课程拉活动并合并，按 (courseId, activeId) 去重。
-  /// 作业页（stu-work）排在最前：那才是「我现在要做什么」的真源，
-  /// activelist 只有课堂活动（签到/讨论/问卷），没有带截止时间的作业。
+  /// 顺序照脚本 :1509 的 `[...pendingTasks, ...pendingExams, ...activities]`：
+  /// 作业页排最前（那才是「我现在要做什么」的真源），考试两页次之（脚本
+  /// :1433-1473 在待办区把它们接在作业后面），`activelist` 只有课堂活动
+  /// （签到/讨论/问卷），既没有带截止时间的作业也没有考试的状态与分数列。
   Future<List<ChaoxingTask>> fetchAllTasks() async {
     final List<ChaoxingCourse> courses = await fetchCourses();
     courseCount = courses.length;
     final Map<String, String> names = <String, String>{
       for (final ChaoxingCourse c in courses) c.courseId: c.name,
     };
-    final List<ChaoxingTask> out = <ChaoxingTask>[...await fetchHomework(names)];
+    final List<ChaoxingTask> out = <ChaoxingTask>[
+      ...await fetchHomework(names),
+      ...await fetchExams(names),
+    ];
     int okCourses = 0;
     for (int i = 0; i < courses.length; i += kBatch) {
       final List<List<ChaoxingTask>> batch =
@@ -78,20 +101,7 @@ class ChaoxingClient {
   Future<List<ChaoxingTask>> fetchHomework(
       Map<String, String> courseNames) async {
     try {
-      final HttpClientRequest req = await _http
-          .getUrl(Uri.parse('https://mooc1-api.chaoxing.com/work/stu-work'))
-          .timeout(const Duration(seconds: 20));
-      req.headers.set(HttpHeaders.cookieHeader, cookie);
-      req.headers.set(HttpHeaders.userAgentHeader,
-          'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile');
-      final HttpClientResponse res =
-          await req.close().timeout(const Duration(seconds: 20));
-      final String body = await res
-          .transform(utf8.decoder)
-          .join()
-          .timeout(const Duration(seconds: 20));
-      if (!body.trimLeft().startsWith('<')) throw ChaoxingAuthException();
-      return ChaoxingHomework.parsePage(body,
+      return ChaoxingHomework.parsePage(await _getHtml(kUrlHomework),
           courseNames: courseNames, now: DateTime.now());
     } on ChaoxingAuthException {
       rethrow;
@@ -100,21 +110,61 @@ class ChaoxingClient {
     }
   }
 
+  static const String _ua =
+      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile';
+  static const Duration _timeout = Duration(seconds: 20);
+
+  /// 取一页 HTML；会话失效时超星返回的不是这个形状（或整页请求失败），
+  /// 与 [_getJson] 同一判据：不像 HTML 就当未登录。
+  Future<String> _getHtml(String url) async {
+    final HttpClientRequest req =
+        await _http.getUrl(Uri.parse(url)).timeout(_timeout);
+    req.headers.set(HttpHeaders.cookieHeader, cookie);
+    req.headers.set(HttpHeaders.userAgentHeader, _ua);
+    final HttpClientResponse res = await req.close().timeout(_timeout);
+    final String body =
+        await res.transform(utf8.decoder).join().timeout(_timeout);
+    if (!body.trimLeft().startsWith('<')) throw ChaoxingAuthException();
+    return body;
+  }
+
+  /// 考试两页各抓一次（脚本 :1433-1473 / :3405-3432 也是两个都抓、按
+  /// `examId || title` 合并；两页是不同形态，少一页就少一批考试）。
+  ///
+  /// 与 [fetchHomework] 同一容错：单页失败只当「这一页没考试」，会话死了照抛，
+  /// 否则「未登录」会被伪装成「没有考试」。同一场考试两页都列出来时 `key` 相同
+  /// （都是 `courseId|examId`），由 [ChaoxingTask.dedupe] 吃掉。
+  Future<List<ChaoxingTask>> fetchExams(
+      Map<String, String> courseNames) async {
+    final DateTime now = DateTime.now();
+    final List<ChaoxingTask> out = <ChaoxingTask>[];
+    try {
+      out.addAll(ChaoxingExam.parseCards(await _getHtml(kUrlExamCards),
+          courseNames: courseNames, now: now));
+    } on ChaoxingAuthException {
+      rethrow;
+    } catch (_) {/* 这一页没抓到 ≠ 没有考试，下一页照抓 */}
+    try {
+      out.addAll(ChaoxingExam.parseTable(await _getHtml(kUrlExamTable),
+          courseNames: courseNames, now: now));
+    } on ChaoxingAuthException {
+      rethrow;
+    } catch (_) {/* 同上 */}
+    return ChaoxingTask.dedupe(out);
+  }
+
   Future<Map<String, Object?>> _activelist(ChaoxingCourse c) => _getJson(
       'https://mobilelearn.chaoxing.com/v2/apis/active/student/activelist'
       '?fid=0&courseId=${c.courseId}&classId=${c.clazzId}'
       '&showNotStartedActive=0&_=${DateTime.now().millisecondsSinceEpoch}');
 
   Future<Map<String, Object?>> _getJson(String url) async {
-    final HttpClientRequest req =
-        await _http.getUrl(Uri.parse(url)).timeout(const Duration(seconds: 20));
+    final HttpClientRequest req = await _http.getUrl(Uri.parse(url)).timeout(_timeout);
     req.headers.set(HttpHeaders.cookieHeader, cookie);
-    req.headers.set(HttpHeaders.userAgentHeader,
-        'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile');
-    final HttpClientResponse res =
-        await req.close().timeout(const Duration(seconds: 20));
+    req.headers.set(HttpHeaders.userAgentHeader, _ua);
+    final HttpClientResponse res = await req.close().timeout(_timeout);
     final String body =
-        await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 20));
+        await res.transform(utf8.decoder).join().timeout(_timeout);
     // 会话失效时超星返回 HTML 登录页而非 JSON；这里不猜，直接判未登录。
     final Object? decoded = body.trimLeft().startsWith('{')
         ? jsonDecode(body)

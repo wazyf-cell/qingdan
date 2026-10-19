@@ -114,22 +114,32 @@ class _ChaoxingDetailPageState extends State<ChaoxingDetailPage> {
             onLoadStop(uri == null ? null : Uri.tryParse(uri.toString())),
       );
 
-  /// 拼不出 URL（课堂活动 / 考试，或**真作业缺 `clazzId`**）：**如实降级，
-  /// 不假装能看**。两种 null 的成因不一样，话也必须分开——`detailUrlOf`
-  /// （`chaoxing_links.dart` :33-34）对 `serverStatus != null` 的作业在缺
-  /// `clazzId` / `courseId` 时同样返回 null，那种条目其实**有**题目页，只是
-  /// 我们手里少一个参数。把两种情况都写成「这类条目没有题目页」会让用户以为
-  /// 这条作业天生看不了，从而不去超星里点开它。
+  /// 拼不出 URL（课堂活动，或**真作业缺 `clazzId`** / **真考试缺 `examId`**）：
+  /// **如实降级，不假装能看**。两类 null 的成因不一样，话也必须分开——
+  /// `detailUrlOf`（`chaoxing_links.dart`）对作业页与考试页来的条目在缺参数时
+  /// 同样返回 null，那种条目其实**有**题目页，只是我们手里少一个参数。把两种
+  /// 情况都写成「这类条目没有题目页」会让用户以为这条作业/考试天生看不了，
+  /// 从而不去超星里点开它。
   Widget _unsupported(BuildContext context) {
     final AppColors colors = AppColors.of(context);
-    final bool hasRealPage = widget.task.serverStatus != null;
+    final ChaoxingTask t = widget.task;
+    final bool hasRealPage =
+        t.serverStatus != null || t.source == ChaoxingSource.exam;
+    // 缺的哪个参数要点名：作业缺 clazzId、考试缺 examId，成因不同，
+    // 写成同一句话用户就不知道该回超星找什么。
+    final List<String> missing = <String>[
+      if (t.courseId.isEmpty) 'courseId',
+      if (t.clazzId == null || t.clazzId!.isEmpty) 'clazzId',
+      if (t.source == ChaoxingSource.exam &&
+          (t.examId == null || t.examId!.isEmpty)) 'examId',
+    ];
     final String headline = hasRealPage
-        ? '这条作业打不开'
+        ? '这条${t.kind}打不开'
         : '该类型暂不支持查看详情';
     final String reason = hasRealPage
-        ? '它在超星里是有题目页的，但抓到的这一行没带班级 id（clazzId），'
+        ? '它在超星里是有题目页的，但抓到的这一行没带 ${missing.join(' / ')}，'
             '我们拼不出地址。请在「学习通」App 或网页版里进这门课打开。'
-        : '这类「${widget.task.kind}」在超星里没有单独的题目页，'
+        : '这类「${t.kind}」在超星里没有单独的题目页，'
             '请在「学习通」App 或网页版的课程里打开。';
     return Center(
       child: Padding(

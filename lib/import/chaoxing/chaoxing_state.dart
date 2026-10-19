@@ -1,11 +1,32 @@
-/// 学习通条目的状态枚举、截止分桶与类型码表（纯数据，无 IO）。
+/// 学习通条目的状态枚举、来源页枚举、截止分桶与类型码表（纯数据，无 IO）。
 ///
 /// 从 `chaoxing_models.dart` 拆出（M6B §B3：加 `clazzId` 后单文件撞 300 行红线）。
 ///
 /// **来源声明**：`activeType` 语义与核心类型集合取自油猴脚本 `扩展/作业列表.js`
 /// （上游 Cooanyh/chaoxing-list，AGPL-3.0-or-later）——类型映射 :655、
-/// 核心类型集合 :137。只重写「读哪些字段」这层。
+/// 核心类型集合 :137、三个数据来源页 :463 / :467 / :674。
+/// 只重写「读哪些字段」这层。
 library;
+
+/// 条目**来自哪个页面**。页签分界与「详情」URL 都按它走，不靠猜字段。
+///
+/// 为什么不能用 `kind` 判：`activelist` 里也有 `kind == '考试'` 的条目
+/// （标题含「考试」时 `_kindOf` 就这么标，脚本 :664 同规则），但那是课程活动、
+/// 没有 examId，与 `examcode` 两页抓出来的考试不是一回事。
+enum ChaoxingSource {
+  /// `mooc1-api.chaoxing.com/work/stu-work`（脚本 `extractTasks` :757-791）。
+  homework('作业页'),
+
+  /// `mobilelearn…/student/activelist`（脚本 `fetchCourseActivities` :670-722）。
+  activity('活动接口'),
+
+  /// `examcode` / `examcode/examlist` 两个考试页（脚本 :793-832 / :832-908）。
+  exam('考试页');
+
+  const ChaoxingSource(this.label);
+
+  final String label;
+}
 
 /// 条目状态。**「已完成」是本地标记，不是服务端真值**：activelist 只有
 /// `status` 1=进行中 / 2=已结束（脚本 :702-704），拿不到「用户交没交」；

@@ -14,7 +14,9 @@
 ///   用 `data` 里的 courseId 回查课程表补全。
 library;
 
+import 'chaoxing_html.dart';
 import 'chaoxing_models.dart';
+import 'chaoxing_time.dart';
 
 class ChaoxingHomework {
   static final RegExp _kLi =
@@ -36,16 +38,16 @@ class ChaoxingHomework {
       final Match? option = _kOption.firstMatch(block);
       final Match? title = _kTitle.firstMatch(block);
       if (option == null || title == null) continue;
-      final Map<String, String> params =
-          Uri.tryParse(_unescape(li.group(1)!))?.queryParameters ??
-              const <String, String>{};
+      // `data` 里是 `&amp;` 分隔的，先还原实体再拆参数，否则第二个键会变成
+      // 字面量 `amp;msgId`（原来那版靠 Uri.tryParse 顺带做了这件事）。
+      final Map<String, String> params = queryOf(unescapeHtml(li.group(1)!));
       String status = '';
       String course = '';
       String left = '';
       bool overdue = false;
       bool classHasStatus = false;
       for (final RegExpMatch span in _kSpan.allMatches(option.group(1)!)) {
-        final String text = _unescape(span.group(2)!).trim();
+        final String text = htmlText(span.group(2)!);
         if (text.isEmpty) continue;
         final String cls = _kClass.firstMatch(span.group(1)!)?.group(1) ?? '';
         if (status.isEmpty &&
@@ -62,16 +64,18 @@ class ChaoxingHomework {
           overdue = true;
         }
       }
-      final Duration? remaining = _parseLeft(left);
+      final Duration? remaining = parseRemaining(left);
       final bool finished = !classHasStatus ||
           status.contains('已完成') ||
           status.contains('待批阅');
+      final String head = htmlText(title.group(1)!);
       out.add(ChaoxingTask(
-        id: params['taskrefId'] ?? params['activeId'] ?? title.group(1)!,
+        id: params['taskrefId'] ?? params['activeId'] ?? head,
         courseId: params['courseId'] ?? '',
         courseName: courseNames[params['courseId']] ?? course,
-        title: _unescape(title.group(1)!).trim(),
+        title: head,
         kind: '作业',
+        source: ChaoxingSource.homework,
         ongoing: !overdue,
         startAt: null,
         dueAt: remaining == null ? null : now.add(remaining),
@@ -85,25 +89,4 @@ class ChaoxingHomework {
     }
     return ChaoxingTask.dedupe(out);
   }
-
-  /// 「剩余241小时」/「剩余120小时55分钟」/「剩余1天0小时」→ Duration。
-  /// 含「过期」视为已结束（脚本 :3269 同义）。
-  static Duration? _parseLeft(String text) {
-    if (text.isEmpty || text.contains('过期')) return null;
-    final int days = _num(text, r'(\d+)\s*天');
-    final int hours = _num(text, r'(\d+)\s*小时');
-    final int minutes = _num(text, r'(\d+)\s*分');
-    if (days == 0 && hours == 0 && minutes == 0) return null;
-    return Duration(days: days, hours: hours, minutes: minutes);
-  }
-
-  static int _num(String text, String pattern) =>
-      int.tryParse(RegExp(pattern).firstMatch(text)?.group(1) ?? '') ?? 0;
-
-  static String _unescape(String s) => s
-      .replaceAll('&amp;', '&')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'");
 }

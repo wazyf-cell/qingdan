@@ -60,12 +60,43 @@ ChaoxingTask cxHomework(String id,
       courseName: course,
       title: '$title$id',
       kind: '作业',
+      source: ChaoxingSource.homework,
       ongoing: ongoing,
       dueAt: dueAt,
       serverStatus: status,
       serverDone: serverDone,
       clazzId: clazzId);
   return t;
+}
+
+/// 考试条目（两个考试页解析出来的形状都长这样；`examId` 给空串等价于「那一行
+/// 没带可解析的链接」，详情 URL 就该拼不出来）。
+ChaoxingTask cxExam(String id,
+    {String courseId = 'c1',
+    String? clazzId = 'z1',
+    String? examId = '991',
+    String title = '单元测验',
+    String course = '建模课',
+    DateTime? startAt,
+    DateTime? dueAt,
+    bool ongoing = true,
+    bool serverDone = false,
+    String? status = '未提交'}) {
+  final String exam = examId ?? '';
+  return ChaoxingTask(
+      id: exam.isNotEmpty ? exam : title,
+      courseId: courseId,
+      courseName: course,
+      title: title,
+      kind: '考试',
+      source: ChaoxingSource.exam,
+      ongoing: ongoing,
+      startAt: startAt,
+      dueAt: dueAt,
+      serverStatus: status,
+      serverDone: serverDone,
+      clazzId: clazzId,
+      examId: exam.isEmpty ? null : exam);
 }
 
 /// 课堂活动条目（没有 serverStatus）。

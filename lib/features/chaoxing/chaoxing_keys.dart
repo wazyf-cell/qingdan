@@ -7,10 +7,20 @@ library;
 
 import 'package:flutter/widgets.dart';
 
+import 'chaoxing_grouping.dart';
+
 abstract final class ChaoxingKeys {
   // ---- 头部一行 ----
   static const String tabHomework = 'cx-tab-homework';
+  static const String tabExam = 'cx-tab-exam';
   static const String tabActivity = 'cx-tab-activity';
+
+  /// 页签 → key。新增页签只在这里加一行，头部按 [ChaoxingTab.values] 自己铺。
+  static String tabKeyOf(ChaoxingTab t) => switch (t) {
+        ChaoxingTab.homework => tabHomework,
+        ChaoxingTab.exam => tabExam,
+        ChaoxingTab.activities => tabActivity,
+      };
   static const String stale = 'cx-stale';
   static const String refresh = 'cx-refresh';
   static const String filter = 'cx-filter';

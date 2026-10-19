@@ -24,6 +24,9 @@ class ChaoxingLoginGate extends StatelessWidget {
         children: <Widget>[
           Icon(Icons.school_outlined, size: 48, color: colors.textFaint),
           const SizedBox(height: AppDimens.s12),
+          /// 这句承诺现在是真的：作业页 + **考试两页**（`全部考试` 页签，
+          /// `chaoxing_exam.dart`）+ 课堂活动都接在同一次刷新里。考试没接的那阵子
+          /// 这行字是半真半假——界面不许说代码没做的事。
           Text('登录一次超星账号，这里就会列出还没交的作业和考试',
               style: AppTypography.meta.copyWith(color: colors.textSecondary)),
           const SizedBox(height: AppDimens.s16),

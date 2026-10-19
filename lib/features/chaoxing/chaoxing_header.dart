@@ -66,8 +66,7 @@ class ChaoxingHeader extends StatelessWidget {
         height: _rowHeight,
         child: Row(
           children: <Widget>[
-            _tab(context, ChaoxingTab.homework, '全部作业', ChaoxingKeys.tabHomework),
-            _tab(context, ChaoxingTab.activities, '课堂活动', ChaoxingKeys.tabActivity),
+            for (final ChaoxingTab t in ChaoxingTab.values) _tab(context, t),
             const Spacer(),
             if (loggedIn) ...<Widget>[
               Flexible(
@@ -167,12 +166,13 @@ class ChaoxingHeader extends StatelessWidget {
   }
 
   /// 自绘文字页签：下划线 2dp，选中用主题色，未选中用次要文字色。
-  Widget _tab(
-      BuildContext context, ChaoxingTab value, String label, String key) {
+  /// 文案取枚举自带的 [ChaoxingTab.label]（「全部作业 / 全部考试 / 课堂活动」，
+  /// 逐字对齐脚本 :5043-5045 的三个视图标题）。
+  Widget _tab(BuildContext context, ChaoxingTab value) {
     final AppColors colors = AppColors.of(context);
     final bool selected = value == tab;
     return InkWell(
-      key: ChaoxingKeys.vkey(key),
+      key: ChaoxingKeys.vkey(ChaoxingKeys.tabKeyOf(value)),
       onTap: () => onTab(value),
       child: Container(
         height: _rowHeight,
@@ -184,7 +184,7 @@ class ChaoxingHeader extends StatelessWidget {
                 width: 2, color: selected ? colors.accent : Colors.transparent),
           ),
         ),
-        child: Text(label,
+        child: Text(value.label,
             style: AppTypography.meta.copyWith(
                 color: selected ? colors.accent : colors.textSecondary)),
       ),

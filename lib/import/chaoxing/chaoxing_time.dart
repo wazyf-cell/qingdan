@@ -2,12 +2,33 @@
 ///
 /// 剩余时长与截止行格式逐字对齐扩展成品界面；紧急度阈值取自油猴脚本
 /// `扩展/作业列表.js` :3440-3442（含「小时」→ ≤24 小时算急，含「天」→ <1 天算急）。
+///
+/// 相对时间解析 [parseRemaining] 也住这里：作业页的 `.fr`（脚本 :757-791 抓的
+/// 「剩余X小时」）与考试卡片页的 `dd`（:793-832 抓的同一形状）必须用同一份算法，
+/// 各写一份迟早会漂。
 library;
 
 import 'chaoxing_models.dart';
 
 /// 紧急度档位，由消费方决定配色（这里不碰颜色）。
 enum ChaoxingUrgency { none, calm, soon, urgent, overdue }
+
+/// 「剩余241小时」/「剩余120小时55分钟」/「剩余1天0小时」→ [Duration]。
+///
+/// **空 / 含「过期」/ 一个数字都没有 → null**（= 没有可用截止时间）。语义对齐
+/// 脚本 `parseTimeToMinutes` :3268-3281：那里「过期」返回 -1（已过去）、没数字
+/// 返回 `Infinity`（排到最后），两者在我们都归成「推不出绝对时刻」。
+Duration? parseRemaining(String text) {
+  if (text.isEmpty || text.contains('过期')) return null;
+  final int days = _num(text, r'(\d+)\s*天');
+  final int hours = _num(text, r'(\d+)\s*小时');
+  final int minutes = _num(text, r'(\d+)\s*分');
+  if (days == 0 && hours == 0 && minutes == 0) return null;
+  return Duration(days: days, hours: hours, minutes: minutes);
+}
+
+int _num(String text, String pattern) =>
+    int.tryParse(RegExp(pattern).firstMatch(text)?.group(1) ?? '') ?? 0;
 
 /// 剩余时长文案，**与扩展成品界面逐字一致**：≥1 天省略分钟（`剩3天0小时`），
 /// 不足 1 天带分钟（`剩23小时49分`），不足 1 分显示「不足1分」。

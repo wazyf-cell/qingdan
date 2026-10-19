@@ -36,6 +36,22 @@ class ChaoxingTask {
     /// 班级 id：拼「详情」URL 必需（M6B §B3）。**可空**——`activelist` 的
     /// JSON 里活动条目本身不带 classId，作业页 `li[data]` 也有少数行没带。
     this.clazzId,
+
+    /// 条目来自哪个页面；默认「活动接口」——它是唯一不额外带参数的来源。
+    this.source = ChaoxingSource.activity,
+
+    /// 考试的 `examId`（脚本 :823 / :871）。**只有考试解析器会填**：
+    /// 拼考试那条 `examnotes` 地址非它不可（`chaoxing_links.dart`），
+    /// 而 [id] 在缺 examId 时会被标题顶掉，不能拿 [id] 当它用。
+    this.examId,
+
+    /// 考试时长（分钟）/ 考试形式 / 分数：**只有考试解析器会填**
+    /// （表格形态的第 [3]/[7]/[6] 列，脚本 :845-848）。扩展成品的考试列表
+    /// 并不渲染这三列（它只渲染 名称 / 剩余 / 状态，:1295-1300），我们也不渲染，
+    /// 但它们是通知里的字段，留在条目上才能对账与将来导出。
+    this.durationMinutes,
+    this.examForm,
+    this.examScore,
   });
 
   /// 活动 id（`id` / `activeId`）或作业的 `taskrefId`。
@@ -65,8 +81,20 @@ class ChaoxingTask {
   /// 作业页的红点（`i.redPoint`）= 还没打开看过，扩展里叫「待打开」。
   final bool unread;
 
-  /// 班级 id（作业页 `li[data]` 的 `clazzId`）。缺省时「详情」不可用。
+  /// 班级 id（作业页 `li[data]` 的 `clazzId`、考试两页的 `classId`）。
+  /// 缺省时「详情」不可用。
   final String? clazzId;
+
+  /// 来源页（页签分界与详情 URL 都按它走，见 `chaoxing_state.dart`）。
+  final ChaoxingSource source;
+
+  /// 考试的 `examId`；非考试条目恒为 null。见构造函数注释。
+  final String? examId;
+
+  /// 考试专属三列（时长分钟 / 形式 / 分数）；非考试条目恒为 null。
+  final int? durationMinutes;
+  final String? examForm;
+  final String? examScore;
 
   /// 完成标记与忽略标记都按这个键存本地（不进数据库、不参与同步）。
   ///
@@ -139,9 +167,15 @@ class ChaoxingTask {
   static List<ChaoxingTask> mergeRepublished(List<ChaoxingTask> tasks) {
     final Map<String, ChaoxingTask> newest = <String, ChaoxingTask>{};
     for (final ChaoxingTask t in tasks) {
-      // 作业页条目（有 serverStatus）自带截止时间与提交状态，不参与合并——
-      // 它和活动页同名条目不是「重发」关系，合掉会丢真作业。
-      if (!t.ongoing || t.serverStatus != null) continue;
+      // 只合**活动接口**来的条目。作业页与考试页（`serverStatus != null` 或
+      // `source != activity`）各自带服务端状态与绝对时刻，同名也不是「重发」
+      // 关系——合掉会丢真作业 / 丢另一页形态的考试（两个考试页是互补的，
+      // 脚本 :1439-1470 只按 `examId || title` 去重，从不相消）。
+      if (!t.ongoing ||
+          t.serverStatus != null ||
+          t.source != ChaoxingSource.activity) {
+        continue;
+      }
       final String k = '${t.courseId}|${t.kind}|${t.title}';
       final ChaoxingTask? prev = newest[k];
       if (prev == null || _isNewer(t, prev)) newest[k] = t;
@@ -149,7 +183,10 @@ class ChaoxingTask {
     final Set<ChaoxingTask> keep = newest.values.toSet();
     return tasks
         .where((ChaoxingTask t) =>
-            !t.ongoing || t.serverStatus != null || keep.contains(t))
+            !t.ongoing ||
+            t.serverStatus != null ||
+            t.source != ChaoxingSource.activity ||
+            keep.contains(t))
         .toList();
   }
 

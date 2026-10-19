@@ -1,12 +1,16 @@
 /// 学习通面板的视图模型：扩展成品工具栏的四个控件（课程筛选 / 仅看未完成 /
-/// 仅看可提交 / 排序）+ 搜索 + 两个页签（全部作业 / 课堂活动）。
+/// 仅看可提交 / 排序）+ 搜索 + 三个页签（全部作业 / 全部考试 / 课堂活动）。
 ///
 /// **来源声明**（AGENTS.md 禁止事项要求逐个文件标注）：筛选与排序的语义取自
 /// 用户的油猴脚本 `扩展/作业列表.js`（上游 https://github.com/Cooanyh/chaoxing-list，
 /// AGPL-3.0-or-later，作者 lcandy2 / Coren）——排序档位 `sortOptions` :3258-3264、
-/// 智能排序（未完成 + 剩余时间短的在上）:3283、默认排序注释 :3352。
-/// 这里只重写「有哪几个开关、每档叫什么、怎么比」这层视图语义，未拷贝其
-/// Vue 模板与遥测代码。
+/// 智能排序（未完成 + 剩余时间短的在上）:3283、默认排序注释 :3352；
+/// **考试自成一个列表**（`examItems` :2022，与 `homeworkItems` 并列，视图标题
+/// `case 'exam': return '全部考试'` :5044，取数走 `getViewItems` :5056 的独立分支，
+/// 仪表盘上还有一张单独的「全部考试」卡片 :5642-5651）——所以这里是三个页签，
+/// 不是把考试并进作业。
+/// 这里只重写「有哪几个开关、每档叫什么、怎么比、哪页归哪个页签」这层视图语义，
+/// 未拷贝其 Vue 模板与遥测代码。
 ///
 /// 语义对齐扩展：「仅看未完成」= 藏掉已完成与已结束；「仅看可提交」= 只留
 /// 没过期且没交的（扩展里未提交且未过期才会出现在待办区）。排序选项照抄
@@ -18,6 +22,7 @@ import 'package:qingdan/import/chaoxing/chaoxing_time.dart';
 
 enum ChaoxingTab {
   homework('全部作业'),
+  exam('全部考试'),
   activities('课堂活动');
 
   const ChaoxingTab(this.label);
@@ -76,11 +81,18 @@ class ChaoxingRow {
   final ChaoxingTaskState state;
 }
 
-/// 作业页条目带服务端状态原文，活动页条目不带——这就是两个页签的分界。
-List<ChaoxingTask> tasksOfTab(List<ChaoxingTask> tasks, ChaoxingTab tab) => tasks
-    .where((ChaoxingTask t) =>
-        (t.serverStatus != null) == (tab == ChaoxingTab.homework))
-    .toList();
+/// 作业页条目带服务端状态原文，活动页条目不带——这是作业/活动两页签的老分界。
+/// 考试页**也带**状态原文（`ks_state` / 作答状态列），所以它必须先按来源页判走，
+/// 否则会整页混进「全部作业」（脚本也是各页一个列表：`examItems` :2022 独立于
+/// `homeworkItems`，视图标题 `case 'exam': return '全部考试'` :5044）。
+List<ChaoxingTask> tasksOfTab(List<ChaoxingTask> tasks, ChaoxingTab tab) =>
+    tasks.where((ChaoxingTask t) => tabOf(t) == tab).toList();
+
+/// 一条属于哪个页签（`chaoxing_pane.dart` 与筛选弹层共用这一个判据）。
+ChaoxingTab tabOf(ChaoxingTask t) {
+  if (t.source == ChaoxingSource.exam) return ChaoxingTab.exam;
+  return t.serverStatus != null ? ChaoxingTab.homework : ChaoxingTab.activities;
+}
 
 List<ChaoxingRow> buildRows(
   List<ChaoxingTask> tasks,
