@@ -52,6 +52,11 @@ class ChaoxingTask {
     this.durationMinutes,
     this.examForm,
     this.examScore,
+
+    /// 列表页 `li[data]` 里那条**原样地址**（带服务端算好的 `enc_task`）。
+    /// 只有作业解析器会填：它是「进题目页」唯一可用的入口，题目页真正的地址
+    /// 连 `enc` 都只在那一页的脚本里（见 `chaoxing_work_detail.dart` 文件头）。
+    this.detailEntryUrl,
   });
 
   /// 活动 id（`id` / `activeId`）或作业的 `taskrefId`。
@@ -95,6 +100,9 @@ class ChaoxingTask {
   final int? durationMinutes;
   final String? examForm;
   final String? examScore;
+
+  /// 作业的题目入口（确认页地址）；非作业条目恒为 null。见构造函数注释。
+  final String? detailEntryUrl;
 
   /// 完成标记与忽略标记都按这个键存本地（不进数据库、不参与同步）。
   ///

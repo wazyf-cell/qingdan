@@ -40,7 +40,8 @@ class ChaoxingHomework {
       if (option == null || title == null) continue;
       // `data` 里是 `&amp;` 分隔的，先还原实体再拆参数，否则第二个键会变成
       // 字面量 `amp;msgId`（原来那版靠 Uri.tryParse 顺带做了这件事）。
-      final Map<String, String> params = queryOf(unescapeHtml(li.group(1)!));
+      final String data = unescapeHtml(li.group(1)!);
+      final Map<String, String> params = queryOf(data);
       String status = '';
       String course = '';
       String left = '';
@@ -85,6 +86,11 @@ class ChaoxingHomework {
         // 同一串 data 里就带 clazzId（脚本 :757-791 也在读它），早先没取出来，
         // 导致「详情」URL 拼不出来（M6B §B3）。缺省就是缺省，不猜。
         clazzId: params['clazzId'],
+        // 2026-10-19 实测：这一页 `li[data]` 的值**就是**那条入口地址
+        // （`android/mtaskmsgspecial?…&enc_task=…`，页面自己的 `goTask(this)`
+        // 拿它当 url 用）。整条留着，详情页要靠它取正文——参数拆出来只剩
+        // 三个 id，`enc_task` 一丢就再也进不去了。不是 http 开头的按缺省处理。
+        detailEntryUrl: data.startsWith('http') ? data : null,
       ));
     }
     return ChaoxingTask.dedupe(out);

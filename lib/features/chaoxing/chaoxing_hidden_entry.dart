@@ -139,3 +139,30 @@ List<ChaoxingHiddenEntry> syncHiddenMetaWithTasks(
     );
   }).toList();
 }
+
+/// 隐藏一条：同键的旧元数据先丢掉（重复隐藏不该留两条），再按当前值追加。
+List<ChaoxingHiddenEntry> withHiddenAdded(
+  List<ChaoxingHiddenEntry> entries,
+  ChaoxingTask t,
+  DateTime now,
+) =>
+    <ChaoxingHiddenEntry>[
+      ...entries.where((ChaoxingHiddenEntry e) => e.key != t.key),
+      ChaoxingHiddenEntry.of(t, now),
+    ];
+
+/// 恢复一条 / 清掉全部已失效项（`dead` = 本次刷新里已经不再出现）。
+List<ChaoxingHiddenEntry> withoutHidden(
+  List<ChaoxingHiddenEntry> entries,
+  String key,
+) =>
+    entries.where((ChaoxingHiddenEntry e) => e.key != key).toList();
+
+List<ChaoxingHiddenEntry> withoutDead(List<ChaoxingHiddenEntry> entries) =>
+    entries.where((ChaoxingHiddenEntry e) => !e.dead).toList();
+
+/// 「清理已失效」要同时删元数据与隐藏键，所以键的集合单独给。
+List<String> deadHiddenKeys(List<ChaoxingHiddenEntry> entries) => entries
+    .where((ChaoxingHiddenEntry e) => e.dead)
+    .map((ChaoxingHiddenEntry e) => e.key)
+    .toList();

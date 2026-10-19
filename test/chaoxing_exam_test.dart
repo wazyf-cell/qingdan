@@ -42,15 +42,45 @@ void main() {
       expect(b.clazzId, '160000003');
     });
 
-    test('img src 含 ks_02 → 判过期（这一行的文字还写着「剩余3小时」）', () {
+    test('「待批阅」这条关掉（交过了），但依据是状态文字，不是 ks_02 那张图', () {
       final ChaoxingTask b = examById(examCards(), '88002');
       expect(b.ongoing, isFalse,
-          reason: '判过期的唯一依据是 ks_02 那张已截止图（:813），改坏了这条要红');
+          reason: ':828 的完成判定；图那条判据已作废，见下面那条真账号回归');
       expect(b.dueAt, kExamNow.add(const Duration(hours: 3)),
           reason: '页面给的剩余照抄，但条目已经关掉');
       expect(b.serverStatus, '待批阅');
       expect(b.serverDone, isTrue, reason: '扩展把待批阅也当已完成（:828 / :5674）');
       expect(b.stateAt(kExamNow, done: false), ChaoxingTaskState.done);
+    });
+
+    /// 2026-10-19 用真账号跑 `fetchExams` 抓回来的形状：这一页 40 条考试的
+    /// `div.ks_pic > img` **全是** `ks_02.png`（含两条还没考的），而且整页没有
+    /// 任何时间文字（「剩余」「截止」「已结束」各出现 0 次）。脚本 :812-813 把
+    /// `ks_02` 当「已截止」标记，照抄的结果是 40 条一律 `ongoing=false`——
+    /// 没考的考试在界面上是灰的、「仅看未完成」筛掉、提醒也不排。
+    /// 这条测试钉的就是「别再拿那张图判过期」。
+    test('真账号形状：整页都是 ks_02 图、没有时间文字时，未交的那条仍是进行中', () {
+      String card(String id, String title, String status) =>
+          '''<li data="/exam-ans/exam/phone/task-exam?taskrefId=$id&amp;courseId=240000009&amp;classId=160000009">
+            <div class="ks_pic"><img src="//mooc1-api.chaoxing.com/exam-ans/views/identifycode/images/ks_02.png"></div>
+            <dl><dt>$title</dt></dl><span class="ks_state">$status</span></li>''';
+      final List<ChaoxingTask> l = ChaoxingExam.parseCards(
+          '<ul class="ks_list">${card('90001', '还没考的测验', '未交')}'
+          '${card('90002', '考完的测验', '已完成')}${card('90003', '等分的测验', '待批阅')}'
+          '</ul>',
+          courseNames: const <String, String>{},
+          now: kExamNow);
+      expect(l.length, 3);
+      final ChaoxingTask todo = examById(l, '90001');
+      expect(todo.ongoing, isTrue, reason: '未交 + 页面没给时间 = 不能判它结束了');
+      expect(todo.serverDone, isFalse);
+      expect(todo.dueAt, isNull, reason: '这一页没有时间列，不编一个截止时刻');
+      expect(todo.stateAt(kExamNow, done: false), ChaoxingTaskState.todo);
+      expect(examById(l, '90002').stateAt(kExamNow, done: false),
+          ChaoxingTaskState.done);
+      expect(examById(l, '90003').serverDone, isTrue);
+      expect(todo.courseName, ChaoxingExam.kUnknownCourse,
+          reason: '课程回查表里没有时用占位名，不编课程名');
     });
 
     test('ks_01 图但 dd 写「已结束」→ 也判过期，且推不出截止时刻', () {

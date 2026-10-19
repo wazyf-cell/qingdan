@@ -9,9 +9,11 @@
 ///    不是冗余，所以两条解析全部移植。
 ///  - 卡片形态 = `extractExams` :793-832：`#chaoxing-assignment-wrapper
 ///    ul.ks_list > li`（退路 `ul.ks_list > li`）、`dl > dt`=标题、`dl > dd`=
-///    相对剩余时间、`span.ks_state`=状态、`div.ks_pic > img` 的 `src` 含
-///    `ks_02`=已过期、`li[data]` 里 `taskrefId`→examId / `courseId` / `classId`
-///    （:816-827）、完成判定 :828（状态含「已完成」或「待批阅」）。
+///    相对剩余时间、`span.ks_state`=状态、`li[data]` 里 `taskrefId`→examId /
+///    `courseId` / `classId`（:816-827）、完成判定 :828（状态含「已完成」或
+///    「待批阅」）。**脚本 :812-813 那条「img src 含 `ks_02` = 已过期」没有移植**：
+///    2026-10-19 真账号实测，这一页 40 条考试的图全是 `ks_02.png`（含两条还没考的），
+///    它在当前版面上是默认图标，照抄会把没考的考试一律关掉。理由写在 [parseCards] 里。
 ///  - 表格形态 = `extractExamsFromTable` :832-908：`table.dataTable tr.dataTr`、
 ///    不足 9 个 `td` 整行跳过（:840）、列序 :842-849（[1]名称 [2]时间区间
 ///    [3]时长 [4]考试状态 [5]作答状态 [6]分数（空则 `---`）[7]考试形式
@@ -44,9 +46,6 @@ class ChaoxingExam {
   static final RegExp _kDd = RegExp(r'<dd\b[^>]*>([\s\S]*?)</dd>');
   static final RegExp _kState = RegExp(
       r'<span\b[^>]*class="[^"]*\bks_state\b[^"]*"[^>]*>([\s\S]*?)</span>');
-  static final RegExp _kPic = RegExp(
-      r'<div\b[^>]*class="[^"]*\bks_pic\b[^"]*"[^>]*>([\s\S]*?)</div>');
-  static final RegExp _kImgSrc = RegExp(r'<img\b[^>]*\bsrc="([^"]*)"');
 
   // ---- 表格形态（examlist 页）----
   static final RegExp _kTr = RegExp(
@@ -76,15 +75,16 @@ class ChaoxingExam {
       if (title.isEmpty) continue;
       final String timeLeft = htmlText(_kDd.firstMatch(dl)?.group(1) ?? '');
       final String status = htmlText(_kState.firstMatch(body)?.group(1) ?? '');
-      // :812-813 只看 `div.ks_pic` 里那张图的 src：含 `ks_02` = 换成了「已截止」图。
-      bool expired = (_kImgSrc
-                  .firstMatch(_kPic.firstMatch(body)?.group(1) ?? '')
-                  ?.group(1) ??
-              '')
-          .contains('ks_02');
-      // 文字形态的同一件事：脚本 :885 给过期行写的就是「已结束」，:3272 把含
-      // 「过期」当已过去。两种写法都收在同一个标记上。
-      if (timeLeft.contains('过期') || timeLeft.contains('已结束')) expired = true;
+      // :828 同判：状态含「已完成」或「待批阅」就是交过了。
+      final bool submitted = status.contains('已完成') || status.contains('待批阅');
+      // **不再用 `div.ks_pic > img` 的 `ks_02` 判过期**（脚本 :812-813 那条）。
+      // 2026-10-19 真账号实测：这一页 40 条考试的图**全部**是 `ks_02.png`，
+      // 包括两条还没考的——那张图在这版页面里是默认图标，不是「已截止」标记。
+      // 照抄它会把没考的考试一律判成已结束：列表里看着是灰的、「仅看未完成」
+      // 筛掉、提醒快照也不排。这一页一个字的时间都没有（实测「剩余」「截止」
+      // 「已结束」出现 0 次），所以唯一可信的信号只剩状态文字 + `dd` 的相对时间。
+      bool expired = timeLeft.contains('过期') || timeLeft.contains('已结束');
+      if (submitted) expired = true;
       final Map<String, String> p = queryOf(attrOf(li.group(1)!, 'data'));
       final Duration? left = parseRemaining(timeLeft);
       out.add(_task(
@@ -96,8 +96,7 @@ class ChaoxingExam {
         dueAt: left == null ? null : now.add(left),
         status: status,
         expired: expired,
-        // :828 同判：状态含「已完成」或「待批阅」就是交过了。
-        finished: status.contains('已完成') || status.contains('待批阅'),
+        finished: submitted,
       ));
     }
     return ChaoxingTask.dedupe(out);

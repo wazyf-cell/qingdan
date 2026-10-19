@@ -1,9 +1,9 @@
-/// 「详情」= 应用内 WebView 打开超星真实的作业页（M6B §B3）。
+/// 「详情」= 推进本应用自己的一个全屏页（M6B §B3，2026-10-19 改版）。
 ///
-/// 为什么不做原生题目解析：参考脚本 `扩展/作业列表.js`（6101 行，上游
-/// Cooanyh/chaoxing-list，AGPL-3.0）全文没有任何取题目详情的接口，它的
-/// 「查看」就是 `window.open(getHomeworkLink(item))`（:5619）。URL 拼法见
-/// `lib/import/chaoxing/chaoxing_links.dart`（照抄脚本 :3527-3534）。
+/// 这一屏**默认是原生正文**：作业的题干、题型、附件名由
+/// `chaoxing_detail_view.dart` 抽出来自己渲染（链路见 `chaoxing_work_detail.dart`），
+/// 抽不到才退回超星真实网页。早先这里是「一进来就一个 WebView」，等于把
+/// 详情按钮做成了「打开外部页面」，用户要的正是别这样。
 ///
 /// 登录态复用：WebView 的 cookie jar 是全局的，登录页种下的 cookie 这里直接
 /// 就能用，**代码里不读 cookie 值、也不拼 Cookie 头**（避免进日志）。
@@ -19,13 +19,11 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
+import 'chaoxing_detail_view.dart';
 import 'chaoxing_login.dart';
 import 'chaoxing_model.dart';
 
-/// WebView 构造器：测试环境没有 `flutter_inappwebview` 的平台实现（一 build
-/// 就抛 MissingPluginException），所以留一个注入点，测试换成占位 Widget。
-typedef ChaoxingWebViewBuilder = Widget Function(
-    BuildContext context, String url, ValueChanged<Uri?> onLoadStop);
+export 'chaoxing_detail_view.dart' show ChaoxingWebViewBuilder;
 
 /// 打开详情页；`webView` 只给测试用。
 void showChaoxingDetail(BuildContext context, ChaoxingTask task,
@@ -54,16 +52,6 @@ class _ChaoxingDetailPageState extends State<ChaoxingDetailPage> {
 
   String? get _url => detailUrlOf(widget.task);
 
-  void _onLoadStop(Uri? uri) {
-    final String text = uri.toString().toLowerCase();
-    // 只认这两个特征：超星把未登录的请求重定向到 passport2.chaoxing.com 或
-    // 带 /login 的路径；课程中间页本身不含这两串，不会误判。
-    final bool lost =
-        text.contains('passport') || text.contains('/login');
-    if (lost == _sessionLost) return;
-    setState(() => _sessionLost = lost);
-  }
-
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
@@ -90,14 +78,27 @@ class _ChaoxingDetailPageState extends State<ChaoxingDetailPage> {
           ),
         ),
       ),
-      body: url == null
+      body: url == null && widget.task.detailEntryUrl == null
+          // 既没有网页地址、也没有入口地址（课堂活动 / 缺参数的条目）：
+          // 只能如实降级，见 [_unsupported]。
           ? _unsupported(context)
+          // 有入口地址时交给主体去试抽取——**抽取不需要 clazzId**，所以
+          // 「拼不出网页地址」的条目也可能抽得出正文，不能在这里就判它看不了。
           : Column(
               children: <Widget>[
                 if (_sessionLost) _lostBanner(context),
                 Expanded(
-                  child: (widget.webView ?? _inAppWebView)(
-                      context, url, _onLoadStop),
+                  child: ChaoxingDetailView(
+                    // 重新登录后整块重建：换 key 才会重跑一次抽取（登录前那次
+                    // 必然失败，不重建就永远停在「登录态已失效」那一屏）。
+                    key: ValueKey<int>(_reloadTick),
+                    task: widget.task,
+                    webView: widget.webView ?? _inAppWebView,
+                    onSessionLost: (bool lost) {
+                      if (lost == _sessionLost) return;
+                      setState(() => _sessionLost = lost);
+                    },
+                  ),
                 ),
               ],
             ),

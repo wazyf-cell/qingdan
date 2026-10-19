@@ -13,8 +13,10 @@ import 'package:flutter/foundation.dart';
 
 import 'package:qingdan/sync/secure_store.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_client.dart';
+import 'package:qingdan/import/chaoxing/chaoxing_work_detail.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 
+import 'chaoxing_counts.dart';
 import 'chaoxing_grouping.dart';
 import 'chaoxing_hidden_entry.dart';
 import 'chaoxing_prefs.dart';
@@ -82,14 +84,9 @@ class ChaoxingModel extends ChangeNotifier {
   bool get stale =>
       fetchedAt != null && now.difference(fetchedAt!) > kStaleAfter;
 
-  /// 「数据 · N 分钟前」文案；未抓取过时说「未刷新」。
-  String get fetchedAgoText {
-    final DateTime? at = fetchedAt;
-    if (at == null) return '未刷新';
-    final int m = now.difference(at).inMinutes;
-    final String base = m < 1 ? '刚刚' : '$m 分钟前';
-    return stale ? '$base · 建议刷新' : base;
-  }
+  /// 「数据 · N 分钟前」文案；未抓取过时说「未刷新」（本体在 `chaoxing_counts.dart`）。
+  String get fetchedAgoText =>
+      fetchedAgo(fetchedAt: fetchedAt, now: now, stale: stale);
 
   /// 待办总条数（底部页签角标，M5 定案第 10 条）。没有截止时间的待办也数进来。
   int get todoCount => _countTodos();
@@ -97,24 +94,13 @@ class ChaoxingModel extends ChangeNotifier {
   /// 24 小时内到期的待办条数（「今天」页顶部提示条，M5 定案第 7 条）。
   int get dueSoonCount => _countTodos(within: const Duration(hours: 24));
 
-  /// 只数「状态仍为待办且未被隐藏」的条目；**没拉取过返回 0**——这个数据刻意
-  /// 不落库、不后台刷，所以提示条与角标都停在上次拉取（定案风险第 4 条已接受）。
-  int _countTodos({Duration? within}) {
-    if (fetchedAt == null) return 0;
-    int n = 0;
-    for (final ChaoxingTask t in tasks) {
-      if (settings.hidden.contains(t.key)) continue;
-      if (t.stateAt(now, done: false) != ChaoxingTaskState.todo) continue;
-      if (within != null) {
-        final DateTime? due = t.dueAt;
-        if (due == null) continue;
-        final Duration left = due.difference(now);
-        if (left.isNegative || left > within) continue;
-      }
-      n++;
-    }
-    return n;
-  }
+  int _countTodos({Duration? within}) => countTodos(
+        tasks: tasks,
+        hidden: settings.hidden,
+        now: now,
+        fetched: fetchedAt != null,
+        within: within,
+      );
 
   /// 启动时读一次凭据库与本地偏好：有 cookie 就认为已登录（真伪由第一次拉取校验）。
   Future<void> restore() async {
@@ -209,6 +195,25 @@ class ChaoxingModel extends ChangeNotifier {
     }
   }
 
+  /// 点开详情才取正文：**每次现取，不缓存**。正文只在人想看的时候有用，缓存
+  /// 会让「老师改了题目」看不见，而这条链路只有两个请求。
+  /// 返回 null = 这一条抽不出正文（非作业、已提交、已过时效），界面退回真实网页。
+  Future<ChaoxingWorkDetail?> loadWorkDetail(ChaoxingTask task) async {
+    final String? entry = task.detailEntryUrl;
+    if (entry == null) return null;
+    final String? cookie = await _secure.read(kCookieKey);
+    if (cookie == null) {
+      loggedIn = false;
+      return null;
+    }
+    final ChaoxingClient client = _clientFactory(cookie);
+    try {
+      return await client.fetchWorkDetail(entry);
+    } finally {
+      client.close();
+    }
+  }
+
   /// C4 §2 写入点。异常吞这里而不是 [refresh] 的 catch：写盘失败不该把成功抓取说成失败。
   Future<void> _writeReminderSnapshot() async {
     try {
@@ -253,18 +258,14 @@ class ChaoxingModel extends ChangeNotifier {
   Future<void> hide(ChaoxingTask t) async {
     await _mutate(
         settings.copyWith(hidden: Set<String>.of(settings.hidden)..add(t.key)));
-    final List<ChaoxingHiddenEntry> next = List<ChaoxingHiddenEntry>.of(
-            hiddenEntries.where((ChaoxingHiddenEntry e) => e.key != t.key))
-          ..add(ChaoxingHiddenEntry.of(t, now));
-    await _saveHiddenMeta(next);
+    await _saveHiddenMeta(withHiddenAdded(hiddenEntries, t, now));
   }
 
   /// 恢复单条（隐藏列表页的「恢复」）。
   Future<void> unhide(String key) async {
     await _mutate(settings.copyWith(
         hidden: Set<String>.of(settings.hidden)..remove(key)));
-    await _saveHiddenMeta(List<ChaoxingHiddenEntry>.of(hiddenEntries)
-      ..removeWhere((ChaoxingHiddenEntry e) => e.key == key));
+    await _saveHiddenMeta(withoutHidden(hiddenEntries, key));
   }
 
   Future<void> unhideAll() async {
@@ -275,15 +276,11 @@ class ChaoxingModel extends ChangeNotifier {
   /// 清掉「本次刷新里已经不再出现」的隐藏项（隐藏列表页的「清理已失效」）。
   /// 隐藏键也一并删掉：条目本身都没了，留着键只会挡住将来同 id 的新待办。
   Future<void> purgeDead() async {
-    final List<String> deadKeys = hiddenEntries
-        .where((ChaoxingHiddenEntry e) => e.dead)
-        .map((ChaoxingHiddenEntry e) => e.key)
-        .toList();
-    if (deadKeys.isEmpty) return;
+    final List<String> keys = deadHiddenKeys(hiddenEntries);
+    if (keys.isEmpty) return;
     await _mutate(settings.copyWith(
-        hidden: Set<String>.of(settings.hidden)..removeAll(deadKeys)));
-    await _saveHiddenMeta(List<ChaoxingHiddenEntry>.of(hiddenEntries)
-      ..removeWhere((ChaoxingHiddenEntry e) => e.dead));
+        hidden: Set<String>.of(settings.hidden)..removeAll(keys)));
+    await _saveHiddenMeta(withoutDead(hiddenEntries));
   }
 
   Future<void> _saveHiddenMeta(List<ChaoxingHiddenEntry> next) async {

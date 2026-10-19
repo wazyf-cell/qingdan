@@ -13,6 +13,7 @@ import 'package:qingdan/features/chaoxing/chaoxing_pane.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_prefs.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_client.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
+import 'package:qingdan/import/chaoxing/chaoxing_work_detail.dart';
 import 'package:qingdan/sync/secure_store.dart';
 import 'package:qingdan/theme/app_theme.dart';
 
@@ -29,12 +30,24 @@ class FakeChaoxingClient extends ChaoxingClient {
   int fetches = 0;
   bool failAuth = false;
 
+  /// 详情页取正文的假返回：null = 「这一页抽不出题」（已提交 / 已过时效）。
+  ChaoxingWorkDetail? workDetail;
+  int workFetches = 0;
+  bool failWorkAuth = false;
+
   @override
   Future<List<ChaoxingTask>> fetchAllTasks() async {
     fetches++;
     if (failAuth) throw ChaoxingAuthException();
     courseCount = 1;
     return tasks;
+  }
+
+  @override
+  Future<ChaoxingWorkDetail?> fetchWorkDetail(String entryUrl) async {
+    workFetches++;
+    if (failWorkAuth) throw ChaoxingAuthException();
+    return workDetail;
   }
 
   @override
@@ -53,7 +66,8 @@ ChaoxingTask cxHomework(String id,
     DateTime? dueAt,
     bool ongoing = true,
     bool serverDone = false,
-    String? status = '未提交'}) {
+    String? status = '未提交',
+    String? entryUrl}) {
   final ChaoxingTask t = ChaoxingTask(
       id: id,
       courseId: courseId,
@@ -65,6 +79,7 @@ ChaoxingTask cxHomework(String id,
       dueAt: dueAt,
       serverStatus: status,
       serverDone: serverDone,
+      detailEntryUrl: entryUrl,
       clazzId: clazzId);
   return t;
 }

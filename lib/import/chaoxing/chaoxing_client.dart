@@ -12,6 +12,7 @@ import 'dart:io';
 import 'chaoxing_exam.dart';
 import 'chaoxing_homework.dart';
 import 'chaoxing_models.dart';
+import 'chaoxing_work_detail.dart';
 
 /// 会话失效（cookie 缺失/过期）——界面据此显示「重新登录」而不是空列表。
 class ChaoxingAuthException implements Exception {
@@ -114,8 +115,12 @@ class ChaoxingClient {
       'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile';
   static const Duration _timeout = Duration(seconds: 20);
 
-  /// 取一页 HTML；会话失效时超星返回的不是这个形状（或整页请求失败），
-  /// 与 [_getJson] 同一判据：不像 HTML 就当未登录。
+  /// 取一页 HTML；会话失效时超星返回的不是这个形状，与 [_getJson] 同一思路判
+  /// 未登录。但**光看首字符不够**：cookie 过期后这一串请求会被 302 到
+  /// `passport2.chaoxing.com` 的登录页，而登录页本身就是合法 HTML（以 `<` 开头），
+  /// 于是「未登录」被读成「这一页没有作业/考试」——列表静默变空，界面还一片祥和。
+  /// 所以先认重定向落点（[_isLoginTarget]，与详情页 WebView 那条判据同源），
+  /// 再看首字符兜住「没跳转但回来的不是页面」那种形态。
   Future<String> _getHtml(String url) async {
     final HttpClientRequest req =
         await _http.getUrl(Uri.parse(url)).timeout(_timeout);
@@ -124,9 +129,20 @@ class ChaoxingClient {
     final HttpClientResponse res = await req.close().timeout(_timeout);
     final String body =
         await res.transform(utf8.decoder).join().timeout(_timeout);
-    if (!body.trimLeft().startsWith('<')) throw ChaoxingAuthException();
+    if (bouncedToLogin(res.redirects.map((RedirectInfo r) => r.location)) ||
+        !body.trimLeft().startsWith('<')) {
+      throw ChaoxingAuthException();
+    }
     return body;
   }
+
+  /// 这一串重定向落点里有没有「登录页」。判据与 `chaoxing_detail_page.dart` 的
+  /// `_onLoadStop` 一致（认 `passport` / `login`），两处必须同一套，否则 WebView
+  /// 那条路说「登录态失效」而 HTTP 这条路说「没有待办」。
+  static bool bouncedToLogin(Iterable<Uri> locations) => locations.any((Uri u) {
+        final String s = '${u.host}${u.path}'.toLowerCase();
+        return s.contains('passport') || s.contains('/login');
+      });
 
   /// 考试两页各抓一次（脚本 :1433-1473 / :3405-3432 也是两个都抓、按
   /// `examId || title` 合并；两页是不同形态，少一页就少一批考试）。
@@ -138,14 +154,18 @@ class ChaoxingClient {
       Map<String, String> courseNames) async {
     final DateTime now = DateTime.now();
     final List<ChaoxingTask> out = <ChaoxingTask>[];
+    // **表格页排在卡片页前面**：同一场考试两页都列出来时 [ChaoxingTask.dedupe]
+    // 留第一条，而只有表格页给绝对时间区间（真账号实测：卡片页 40 条里
+    // 「剩余」「截止」「已结束」一个字都没有，时间列全空）。反过来放就会把
+    // 带时间的那条丢掉、留下没时间的——2026-10-19 实测被这样吃掉两场考试。
     try {
-      out.addAll(ChaoxingExam.parseCards(await _getHtml(kUrlExamCards),
+      out.addAll(ChaoxingExam.parseTable(await _getHtml(kUrlExamTable),
           courseNames: courseNames, now: now));
     } on ChaoxingAuthException {
       rethrow;
     } catch (_) {/* 这一页没抓到 ≠ 没有考试，下一页照抓 */}
     try {
-      out.addAll(ChaoxingExam.parseTable(await _getHtml(kUrlExamTable),
+      out.addAll(ChaoxingExam.parseCards(await _getHtml(kUrlExamCards),
           courseNames: courseNames, now: now));
     } on ChaoxingAuthException {
       rethrow;
@@ -153,8 +173,20 @@ class ChaoxingClient {
     return ChaoxingTask.dedupe(out);
   }
 
-  Future<Map<String, Object?>> _activelist(ChaoxingCourse c) => _getJson(
-      'https://mobilelearn.chaoxing.com/v2/apis/active/student/activelist'
+  /// 取一条作业的正文：确认页 → 题目页两跳。
+  ///
+  /// 返回 null 表示**这一条抽不出正文**（已提交 / 已过时效 / 页面不是题目页），
+  /// 界面要退回真实网页；会话失效照抛 [ChaoxingAuthException]，不能把「没登录」
+  /// 说成「这道题是空的」。
+  Future<ChaoxingWorkDetail?> fetchWorkDetail(String entryUrl) async {
+    final String confirm = await _getHtml(entryUrl);
+    final String? workUrl =
+        ChaoxingWorkPage.parseWorkUrl(confirm, entryUrl: entryUrl);
+    if (workUrl == null) return null;
+    return ChaoxingWorkPage.parse(await _getHtml(workUrl));
+  }
+
+  Future<Map<String, Object?>> _activelist(ChaoxingCourse c) => _getJson(      'https://mobilelearn.chaoxing.com/v2/apis/active/student/activelist'
       '?fid=0&courseId=${c.courseId}&classId=${c.clazzId}'
       '&showNotStartedActive=0&_=${DateTime.now().millisecondsSinceEpoch}');
 
