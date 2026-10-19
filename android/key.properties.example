@@ -1,0 +1,21 @@
+# 正式签名配置模板。**把这份文件复制成 key.properties 并填自己的值，
+# 不要提交 key.properties，也不要提交 .jks**——
+# android/.gitignore 已经把这两类都排除了（key.properties / *.jks / *.keystore）。
+#
+# 口令只留在你自己这台机器和你的备份里：不要贴进聊天窗口、不要写进任何文档、
+# 不要进 CI 的日志。CI 上用 GitHub Actions Secrets 注入。
+#
+# 丢了 .jks 或忘了口令的后果：以后每一个更新包都必须让用户**卸载重装**，
+# 本地数据库随之清空。所以生成完立刻做下面两件事。
+#
+#   1) 备份 .jks 到两个独立的地方（例如：本机 + 坚果云加密压缩包）。
+#   2) 记下它的 SHA-256 指纹，将来核对"这个包是不是我用同一把钥匙签的"：
+#        keytool -list -v -keystore qingdan-release.jks -alias qingdan
+#      只把指纹（十六进制串）记进开发文档，口令和文件本身都不记。
+
+storeFile=qingdan-release.jks
+# ↑ 相对 android/app/ 解析。把 .jks 放 android/app/ 下就写文件名；
+#   放别处就给相对该目录的路径，例如 ../secrets/qingdan-release.jks。
+storePassword=你自己定的密钥库口令
+keyAlias=qingdan
+keyPassword=你自己定的密钥口令
