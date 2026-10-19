@@ -139,7 +139,13 @@ Future<void> hideChaoxingTask(
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
     content: const Text('已隐藏 · 可在 ⋮ → 隐藏列表 里恢复',
         style: AppTypography.meta),
+    // `persist` 的缺省值是 `action != null`（Flutter 3.47.5 snack_bar.dart:303），
+    // 于是**带 action 的 SnackBar 会无视 duration 常驻**：ScaffoldMessenger 照样
+    // 挂 4 秒定时器，到点却只执行 `if (snackBar.persist) return;`
+    // （scaffold.dart:619-626）——真机上这条就是这么赖着不走的。恢复入口在
+    // ⋮ → 隐藏列表 里也有一份，不必把提示钉在屏上，故显式要求自动收起。
     duration: const Duration(seconds: 4),
+    persist: false,
     action: SnackBarAction(label: '全部恢复', onPressed: model.unhideAll),
   ));
 }

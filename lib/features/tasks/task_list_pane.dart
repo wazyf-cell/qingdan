@@ -129,7 +129,10 @@ class TaskListPane extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('已删除「$title」'),
+          // `persist: false` 的理由见 `list_shortcuts.dart` 里那份同名方法
+          // （带 action 的 SnackBar 缺省常驻，会无视 duration）。
           duration: const Duration(seconds: 5),
+          persist: false,
           action: SnackBarAction(
             label: '撤销',
             onPressed: () => model.undoDelete(task.id),

@@ -108,7 +108,10 @@ class ListShortcuts extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('已删除「$title」'),
+          // 带 action 的 SnackBar 缺省 `persist: true`（Flutter 3.47.5
+          // snack_bar.dart:303），会无视 duration 常驻；撤销入口在回收站里也有一份。
           duration: const Duration(seconds: 5),
+          persist: false,
           action: SnackBarAction(
             label: '撤销',
             onPressed: () => model.undoDelete(task.id),
