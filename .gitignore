@@ -70,7 +70,7 @@ app.*.map.json
 /_s7/
 
 # --- 第三方扩展目录：含 Chrome 扩展签名私钥 1.2.2_0.pem、AGPL 上游代码、
-#     以及 本学期.wakeup_schedule / 日历.ics（本人真实课表，个人数据）---
+#     以及本人真实课表的导出件（.wakeup_schedule / .ics，个人数据）---
 /扩展/
 
 # --- 签名材料：仓库是 public，私钥/口令一旦进来就撤不回 ---
