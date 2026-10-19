@@ -82,7 +82,7 @@ void main() {
     expect(prefs.getInt(SettingsModel.kTrashPurgeDaysKey), 7);
   });
 
-  testWidgets('通用页：语言与检查更新是明说「没做」的占位，不是死行',
+  testWidgets('通用页：语言仍是明说「没做」的占位，更新通道已是真控件两行',
       (WidgetTester tester) async {
     await pumpNarrow(tester);
     await openRow(tester, 'settings-general');
@@ -97,12 +97,13 @@ void main() {
     expect(find.textContaining('即将推出'), findsNothing,
         reason: '没有排期的事不能写在界面上');
 
-    expect(find.textContaining('更新源尚未配置'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey<String>('settings-update')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('等仓库发布第一个 Release 后启用'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey<String>('update-ok')));
-    await tester.pumpAndSettle();
+    // v1.0.2：检查更新从占位换成真控件，两行都在。点下去之后的行为（结论弹层、
+    // 跳浏览器、失败回执）连同假 fetcher 一起放在 test/settings_update_rows_test.dart，
+    // 这里不碰网络——测试环境里的 HttpClient 是被换掉的假实现。
+    expect(find.textContaining('更新源尚未配置'), findsNothing);
+    expect(find.text('检测更新'), findsOneWidget);
+    expect(find.text('GitHub 仓库'), findsOneWidget);
+    expect(find.textContaining('从 GitHub Releases 查新版本'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey<String>('general-permissions')));
     await tester.pumpAndSettle();

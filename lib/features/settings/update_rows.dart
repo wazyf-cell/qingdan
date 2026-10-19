@@ -1,0 +1,171 @@
+import 'package:flutter/material.dart';
+
+import 'package:qingdan/platform/system_intents.dart';
+import 'package:qingdan/theme/app_colors.dart';
+import 'package:qingdan/theme/app_dimens.dart';
+import 'package:qingdan/theme/app_typography.dart';
+import 'package:qingdan/update/update_checker.dart';
+
+import 'about_section.dart' show kAppVersion;
+
+/// 更新通道的两行控件（v1.0.2：把 M6-E 的说明占位换成真功能）。
+///
+/// 拆成两行是用户的原话：「就做成 2 个，一个检测更新和一个 github 按钮」。
+/// 前者只查一次、把结论写在行上；后者只是跳浏览器，两件事的失败方式不一样，
+/// 合并成一行就会互相顶包（跳不动被当成查不到新版）。
+class UpdateRows extends StatefulWidget {
+  const UpdateRows({super.key, this.checker});
+
+  /// 测试注入用的假检查器；为 null 时用默认的（真打 GitHub API）。
+  final UpdateChecker? checker;
+
+  @override
+  State<UpdateRows> createState() => _UpdateRowsState();
+}
+
+class _UpdateRowsState extends State<UpdateRows> {
+  bool _running = false;
+  UpdateResult? _last;
+
+  /// 「打不开」的本地回执。**不用 SnackBar**：设置二级页是 push 出来的路由，
+  /// 弹层关掉之后 SnackBar 会画在已经没人看的那一层（这条在课表弹层栽过两次）。
+  String? _said;
+
+  Future<void> _check() async {
+    if (_running) return;
+    setState(() {
+      _running = true;
+      _said = null;
+    });
+    final UpdateResult r =
+        await (widget.checker ?? UpdateChecker()).check(kAppVersion);
+    if (!mounted) return;
+    setState(() {
+      _running = false;
+      _last = r;
+    });
+    await _showResult(r);
+  }
+
+  Future<void> _showResult(UpdateResult r) => showDialog<void>(
+        context: context,
+        builder: (BuildContext ctx) => AlertDialog(
+          title: const Text('检查更新'),
+          content: SizedBox(
+            width: 320,
+            child: Text(_detailText(r),
+                style: AppTypography.body,
+                key: const ValueKey<String>('update-result-text')),
+          ),
+          actions: <Widget>[
+            TextButton(
+              key: const ValueKey<String>('update-result-close'),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('关闭'),
+            ),
+            if (r.status == UpdateStatus.available)
+              FilledButton(
+                key: const ValueKey<String>('update-result-open'),
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  _open(r.latest!.url, '发布页');
+                },
+                child: const Text('打开发布页'),
+              ),
+          ],
+        ),
+      );
+
+  Future<void> _openRepo() => _open(kRepoUrl, '仓库主页');
+
+  Future<void> _open(String url, String what) async {
+    final bool ok = await SystemIntents.openUrl(url);
+    if (ok || !mounted) return;
+    setState(() => _said =
+        '「$what」打不开：这台设备上没有能打开网页的应用。地址是 $url');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors colors = AppColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        ListTile(
+          key: const ValueKey<String>('settings-update'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          enabled: !_running,
+          title: Text('检测更新',
+              style: AppTypography.body.copyWith(color: colors.textPrimary)),
+          subtitle: Text(_subtitle(),
+              key: const ValueKey<String>('settings-update-subtitle'),
+              style: AppTypography.meta),
+          trailing: _running
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.chevron_right, size: 20),
+          onTap: _check,
+        ),
+        ListTile(
+          key: const ValueKey<String>('settings-update-github'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('GitHub 仓库',
+              style: AppTypography.body.copyWith(color: colors.textPrimary)),
+          subtitle: Text('$kRepoSlug · 发布页与源码',
+              style: AppTypography.meta),
+          trailing: const Icon(Icons.open_in_new, size: 18),
+          onTap: _openRepo,
+        ),
+        if (_said != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AppDimens.s4),
+            child: Text(_said!,
+                key: const ValueKey<String>('update-open-failed'),
+                style: AppTypography.meta.copyWith(color: colors.overdue)),
+          ),
+      ],
+    );
+  }
+
+  String _subtitle() {
+    if (_running) return '正在检查 GitHub Releases…';
+    if (_last != null) return _last!.summary;
+    return '当前 v$kAppVersion · 从 GitHub Releases 查新版本';
+  }
+}
+
+String _detailText(UpdateResult r) {
+  final StringBuffer b = StringBuffer(r.summary);
+  switch (r.status) {
+    case UpdateStatus.upToDate:
+      b.write('\n\n版本源：$kRepoUrl/releases/latest');
+      if (r.latest != null && r.latest!.publishedAt != null) {
+        b.write('\n最新发布：${_ymd(r.latest!.publishedAt!)}');
+      }
+    case UpdateStatus.available:
+      final ReleaseInfo l = r.latest!;
+      b.write('\n\n当前 v$kAppVersion → 最新 v${l.version}'
+          '（发布于 ${_ymd(l.publishedAt)}）');
+      if (l.assetNames.isNotEmpty) {
+        b.write('\n\n发布页里的文件：\n${l.assetNames.join('\n')}');
+      }
+      b.write('\n\n本应用不会自己下载安装：换签名安装必须先卸载，'
+          '而卸载会清空本机数据库。请到发布页自己选一个包装上。');
+    case UpdateStatus.failed:
+      b.write('\n\n没有拿到 GitHub 的发布页。检查更新只是读一个公开网页，'
+          '失败不影响任务、课表与同步。');
+  }
+  return b.toString();
+}
+
+String _ymd(DateTime? t) {
+  if (t == null) return '未知';
+  final DateTime local = t.toLocal();
+  final String mm = local.month.toString().padLeft(2, '0');
+  final String dd = local.day.toString().padLeft(2, '0');
+  return '${local.year}-$mm-$dd';
+}

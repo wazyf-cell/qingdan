@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// C3 系统权限深链：把用户送去 Android 系统里应用自己改不动的那几个页面
-/// （通知设置 / 电池优化白名单 / 应用详情页）。
+/// C3 系统权限深链 + 外链跳转：把用户送去 Android 系统里应用自己改不动的地方
+/// （通知设置 / 电池优化白名单 / 应用详情页 / 系统浏览器里的一个网页）。
 ///
-/// 为什么是 MethodChannel 而不是 URL 插件：这些设置页不是 URL，只能靠原生
-/// Intent 打开；而本批禁止新增 pubspec 依赖，通道属于平台代码，不受该限制。
+/// 为什么是 MethodChannel 而不是 url_launcher：设置页根本不是 URL，只能靠原生
+/// Intent 打开；既然为了它们已经开了这条通道，打开网页就顺手复用同一条，
+/// 不必为「跳浏览器」这一件事再加一个 pubspec 依赖。
 ///
-/// 契约：**四个方法都只返回 bool，永不抛异常**。设置页在 Windows 上同样会调
+/// 契约：**所有方法都只返回 bool，永不抛异常**。设置页在 Windows 上同样会调
 /// 它们，平台不支持、原生通道未注册、Intent 找不到接收方，统统折算成 false，
 /// 由调用方提示「打不开，请手动到 系统设置 → 应用 → 清单 里找」。
 class SystemIntents {
@@ -34,10 +35,20 @@ class SystemIntents {
   /// 严格版通知页：Android 8 以下直接返回 false、不回落，留给调用方自己决定兜底。
   static Future<bool> openAppNotificationSettings() => _invoke('openAppNotificationSettings');
 
-  static Future<bool> _invoke(String method) async {
+  /// 用系统浏览器打开一个网页链接（更新通道「GitHub 仓库」按钮走这里）。
+  ///
+  /// 只放行 http/https：链接是从 GitHub API 响应里读出来的，属于半外部输入，
+  /// `file://` / `intent://` / `javascript:` 交出去就是拿用户的设备开盲盒。
+  static Future<bool> openUrl(String url) {
+    final String? scheme = Uri.tryParse(url)?.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') return Future<bool>.value(false);
+    return _invoke('openUrl', <String, String>{'url': url});
+  }
+
+  static Future<bool> _invoke(String method, [Map<String, String>? args]) async {
     if (!_isAndroid) return false; // Windows 端也会调到这里，必须先短路再碰通道
     try {
-      return await _ch.invokeMethod<bool>(method) ?? false;
+      return await _ch.invokeMethod<bool>(method, args) ?? false;
     } on PlatformException {
       return false;
     } on MissingPluginException {

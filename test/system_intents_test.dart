@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qingdan/platform/system_intents.dart';
 
-/// C3 验收：四个方法名与 Kotlin 侧的 `when` 分支一一对应、任何异常都吞成 false、
-/// 非 Android（Windows 设置页同样会调这些方法）既不碰通道也不抛。
+/// C3 + 更新通道验收：方法名与 Kotlin 侧的 `when` 分支一一对应、任何异常都吞成
+/// false、非 Android（Windows 设置页同样会调这些方法）既不碰通道也不抛。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -90,6 +90,37 @@ void main() {
       expect(calls, hasLength(1));
       expect(calls.single.arguments, isNull);
     });
+
+    // openUrl 是这批里唯一带参数的方法：链接来自 GitHub API 响应，属于半外部输入。
+    test('openUrl 把地址原样带过去，并回传原生侧的成败', () async {
+      mockChannel((_) => true);
+
+      expect(
+          await SystemIntents.openUrl('https://github.com/wazyf-cell/qingdan'),
+          isTrue);
+      expect(calls.single.method, 'openUrl');
+      expect(calls.single.arguments,
+          <String, String>{'url': 'https://github.com/wazyf-cell/qingdan'});
+
+      mockChannel((_) => false); // 设备上没有能打开网页的应用
+      expect(await SystemIntents.openUrl('https://example.com'), isFalse);
+    });
+
+    test('openUrl 只放行 http/https，其余协议一次都不碰通道', () async {
+      mockChannel((_) => true);
+
+      for (final String bad in <String>[
+        'file:///data/data/com.qingdan.qingdan/files/qingdan.db',
+        'content://sms/inbox',
+        'intent#Intent;scheme=tel;action=android.intent.action.DIAL;end',
+        'javascript:alert(1)',
+        '',
+      ]) {
+        expect(await SystemIntents.openUrl(bad), isFalse,
+            reason: '「$bad」不该被交给系统去打开');
+      }
+      expect(calls, isEmpty, reason: '挡协议要在碰通道之前，不是之后');
+    });
   });
 
   group('非 Android（显式指定平台，不靠测试主机是什么）', () {
@@ -102,6 +133,7 @@ void main() {
       expect(await SystemIntents.openBatteryOptimizationSettings(), isFalse);
       expect(await SystemIntents.openAppDetails(), isFalse);
       expect(await SystemIntents.openAppNotificationSettings(), isFalse);
+      expect(await SystemIntents.openUrl('https://github.com'), isFalse);
       expect(calls, isEmpty);
     });
 

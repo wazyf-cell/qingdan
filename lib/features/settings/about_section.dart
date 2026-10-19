@@ -12,7 +12,7 @@ import 'settings_section_page.dart';
 /// 不引 `package_info_plus`（本轮定死「不新增依赖」），代价是它是个手抄常量，
 /// 所以 `test/app_version_test.dart` 直接读 pubspec 比对：改了版本号忘了改这里，
 /// 那条测试就红——留一个永远显示 0.1.0 的死字符串比不显示更糟。
-const String kAppVersion = '1.0.1';
+const String kAppVersion = '1.0.2';
 
 /// 设置 · 关于节（M5 定案第 13 条 + M6-C C1 / C6 / E1）。
 class AboutSection extends StatelessWidget {
@@ -43,8 +43,8 @@ class AboutSection extends StatelessWidget {
                 style: AppTypography.meta.copyWith(color: colors.textSecondary)),
           ],
         ),
-        // E1：更新通道没配就明说，别留一个看起来会自己更新的版本号。
-        Text('更新通道：未配置',
+        // v1.0.2：更新通道从「未配置」变成真通道，入口在 设置 → 通用。
+        Text('更新通道：GitHub Releases（设置 → 通用 → 检测更新）',
             style: AppTypography.meta.copyWith(color: colors.textFaint)),
         const SizedBox(height: AppDimens.s12),
         Text(

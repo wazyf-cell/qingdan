@@ -4,12 +4,12 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
-import 'about_section.dart' show kAppVersion;
 import 'notify_section.dart';
 import 'permissions_sheet.dart';
 import 'settings_section_page.dart';
+import 'update_rows.dart';
 
-/// 设置 · 通用节（M6-C C1 重排 + C3 权限入口 + E1/E2 两个占位）。
+/// 设置 · 通用节（M6-C C1 重排 + C3 权限入口 + E2 语言占位）。
 ///
 /// 原来这里的两项（默认页签、角标）其实是「界面表现」，已挪到外观节；
 /// 通用节现在管的是**跟系统打交道**的事：通知权限、后台与省电、语言、更新。
@@ -69,39 +69,9 @@ class GeneralSection extends StatelessWidget {
           subtitle: const Text('简体中文（本应用只做简体中文）',
               style: AppTypography.meta),
         ),
-        // E1：占位**不发任何网络请求**（联网只会得到一个失败提示，反而像功能坏了）。
-        ListTile(
-          key: const ValueKey<String>('settings-update'),
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text('检查更新',
-              style: AppTypography.body.copyWith(color: colors.textPrimary)),
-          subtitle: Text('当前 v$kAppVersion · 更新源尚未配置',
-              style: AppTypography.meta),
-          trailing: const Icon(Icons.chevron_right, size: 20),
-          onTap: () => _showUpdateNotice(context),
-        ),
+        // E1 占位已在 v1.0.2 换成真控件：一行查 GitHub Releases，一行跳仓库。
+        const UpdateRows(),
       ],
     );
   }
-
-  Future<void> _showUpdateNotice(BuildContext context) => showDialog<void>(
-        context: context,
-        builder: (BuildContext ctx) => AlertDialog(
-          title: const Text('检查更新'),
-          content: Text(
-              '当前版本 v$kAppVersion。更新源尚未配置：'
-              '本项目的更新将从 GitHub Releases 拉取，等仓库发布第一个 Release 后启用。',
-              style: AppTypography.body),
-          actions: <Widget>[
-            TextButton(
-              key: const ValueKey<String>('update-ok'),
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('知道了'),
-            ),
-          ],
-        ),
-      );
 }
-
-/// 「即将推出」小标签：占位行不能只靠置灰让人猜它是坏了还是没做。

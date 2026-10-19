@@ -7,11 +7,11 @@ import 'package:qingdan/features/settings/about_section.dart' show kAppVersion;
 import 'package:qingdan/features/settings/general_section.dart';
 import 'package:qingdan/theme/app_theme.dart';
 
-/// E 批两个占位的「不许偷偷做」钉桩（M6-E §E1 / §E2 的测试节）。
+/// 两条「不许顺手做过头」的钉桩（M6-E §E2 语言占位 + v1.0.2 更新通道边界）。
 ///
 /// 一级页与二级页的可见行为已由 `test/settings_page_test.dart` 覆盖，这里只钉
 /// 两条**只有读源码 / 读 widget 配置才看得见**的约束：
-/// 1. 占位阶段**一个网络请求都不发**（联网只会给出失败提示，反而像功能坏了）；
+/// 1. 更新通道只许「查一次 + 把人送到发布页」，不许自己下载安装包；
 /// 2. 语言占位不许顺手做成半套 i18n（切了语言只有一半界面跟着变）。
 ///
 /// `GeneralSection` 自己不 watch 任何模型（只有它推开的二级节才需要 provider），
@@ -33,19 +33,33 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  test('检查更新占位：general_section 不碰任何网络栈', () {
-    final String src =
-        File('lib/features/settings/general_section.dart').readAsStringSync();
+  test('更新通道的边界：只查、只跳浏览器，绝不自己下载安装包', () {
+    // 为什么钉这一条：Android 覆盖安装要求签名一致，而 release 包与 debug 包
+    // 签名不同 → 装上就得先卸载，卸载会清空 files/qingdan.db（任务、课表全在里面）。
+    // 所以「点了就自己升级」在这个项目里是做不到的事，界面也不许偷偷往那走。
+    final String src = <String>[
+      'lib/update/update_checker.dart',
+      'lib/features/settings/update_rows.dart',
+    ].map((String p) => File(p).readAsStringSync()).join('\n');
+
     for (final String forbidden in <String>[
-      'dart:io',
-      'HttpClient',
-      'package:http',
-      'Socket',
+      'openWrite',
+      'writeAsBytes',
+      'writeAsString',
       'Process.start',
+      'INSTALL_PACKAGES',
+      'requestInstallPackages',
+      'path_provider',
+      'ApplicationDocumentsDirectory',
     ]) {
       expect(src, isNot(contains(forbidden)),
-          reason: '占位阶段点了就该只弹说明框，出现 $forbidden 等于偷偷开始联网');
+          reason: '出现 $forbidden 意味着开始往「自己下载并安装」那边走，那是做不到的事');
     }
+    // 反向闸：只钉「不许做什么」的测试很容易变成永真式——把联网代码整块删掉它照样绿。
+    expect(src, contains('api.github.com'),
+        reason: '更新源必须是 GitHub Releases，否则这条功能就是假的');
+    expect(src, contains('releases/latest'),
+        reason: 'latest 才不含草稿与预发布；换成 /releases 会把彩排包推给用户');
   });
 
   testWidgets('语言占位：MaterialApp 仍未接 flutter_localizations（不许半做 i18n）',

@@ -28,6 +28,13 @@ object SystemIntents {
                 "openAppNotificationSettings" -> notificationIntent(activity)?.let { start(activity, it) } ?: false
                 "openBatteryOptimizationSettings" -> start(activity, batteryIntent())
                 "openAppDetails" -> start(activity, detailsIntent(activity))
+                // 更新通道的「GitHub 仓库」与「去发布页」：交给系统默认浏览器。
+                // 协议在这里再判一次——Dart 侧已经挡过一道，但这条通道谁都能调。
+                "openUrl" -> call.argument<String>("url")
+                    ?.let { Uri.parse(it) }
+                    ?.takeIf { it.scheme == "https" || it.scheme == "http" }
+                    ?.let { start(activity, Intent(Intent.ACTION_VIEW, it)) }
+                    ?: false
                 else -> null
             }
             if (opened == null) reply.notImplemented() else reply.success(opened)
