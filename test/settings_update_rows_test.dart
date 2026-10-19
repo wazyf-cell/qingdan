@@ -97,19 +97,23 @@ void main() {
 
   testWidgets('点检测更新 → 弹层说结论；没新版时不给「打开发布页」按钮',
       (WidgetTester tester) async {
+    // 用「GitHub 上还更旧」这一档：这正是 1.0.2 刚出包、还没推 tag 时的真实状态。
     await pumpRows(
-        tester, returning(<String, dynamic>{'tag_name': 'v$kAppVersion'}));
+        tester, returning(<String, dynamic>{'tag_name': 'v1.0.1'}));
 
     await tester.tap(find.byKey(const ValueKey<String>('settings-update')));
     await tester.pumpAndSettle();
 
     expect(find.text('检查更新'), findsWidgets);
-    expect(
-        tester
-            .widget<Text>(
-                find.byKey(const ValueKey<String>('update-result-text')))
-            .data,
-        contains('已是最新版'));
+    final String text = tester
+        .widget<Text>(
+            find.byKey(const ValueKey<String>('update-result-text')))
+        .data!;
+    expect(text, contains('已是最新版'));
+    // 光写「最新发布：日期」会被读成「最新的就是我今天这个」，那个日期其实是旧版的。
+    expect(text, contains('GitHub 上最新是 v1.0.1'));
+    expect(text, isNot(contains('最新发布：')),
+        reason: '不带版本号的发布日期在这一档里是误导');
     expect(find.byKey(const ValueKey<String>('update-result-open')), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey<String>('update-result-close')));

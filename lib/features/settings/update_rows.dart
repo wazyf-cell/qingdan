@@ -142,10 +142,12 @@ String _detailText(UpdateResult r) {
   final StringBuffer b = StringBuffer(r.summary);
   switch (r.status) {
     case UpdateStatus.upToDate:
-      b.write('\n\n版本源：$kRepoUrl/releases/latest');
-      if (r.latest != null && r.latest!.publishedAt != null) {
-        b.write('\n最新发布：${_ymd(r.latest!.publishedAt!)}');
-      }
+      // 「GitHub 上最新是 vX」必须带版本号。本机包比 GitHub 那条 release 更新是
+      // 正常状态（发了版还没推 tag / 用户装的是预发布的包），只写「最新发布：日期」
+      // 会被读成「最新的就是我今天这个」，而那个日期其实是旧版的发布日。
+      b.write('\n\nGitHub 上最新是 v${r.latest!.version}'
+          '（发布于 ${_ymd(r.latest!.publishedAt)}）');
+      b.write('\n版本源：$kRepoUrl/releases/latest');
     case UpdateStatus.available:
       final ReleaseInfo l = r.latest!;
       b.write('\n\n当前 v$kAppVersion → 最新 v${l.version}'
