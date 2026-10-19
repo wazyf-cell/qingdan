@@ -1,0 +1,127 @@
+name: android-release
+
+# 打 tag（如 v1.0.1）或在 Actions 页手动点「Run workflow」→ 构建 release APK
+# → 建一个 GitHub Release 并把 APK 与校验和作为附件传上去。
+#
+# ★ 用之前必须知道的一件事：这条路要求把签名密钥上传到 GitHub 的 Secrets 里。
+#   那把 .jks 现在只在你这台机器 + 坚果云备份两处；配好 Secrets 之后它会多一份
+#   副本在 GitHub 服务器上。能签出「你手机认作合法升级」的包，就是那把钥匙的作用，
+#   所以这不是普通的一次性令牌。不想这么做就别用本文件：本机 `flutter build apk
+#   --release --split-per-abi` 已经验过能出包，把产物拖到 Release 页面即可，
+#   钥匙一步都不出本机。
+#
+# 需要在仓库 Settings → Secrets and variables → Actions 里建 2 个：
+#   KEYSTORE_BASE64   ← base64 -w0 android/app/qingdan-release.jks 的输出
+#   KEYSTORE_PASSWORD ← android/key.properties 里 storePassword 的值
+# 可选：KEY_ALIAS（默认 qingdan）。
+#
+# 第三方动作（subosito/flutter-action、softprops/action-gh-release）按 @vN 引用。
+# 要更严就改成 pin 到 commit SHA（@v2 这类可变标签理论上会在上游被替换）。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: "3.47.5"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 版本号只有一个真相：pubspec。tag 必须与它一致，否则拒绝发布。
+      # 这一条专门堵「Release 写 v1.0.2、里面那个 apk 其实是 1.0.1」——
+      # 更新通道最容易长出来的那种出轨。
+      - name: 校验 tag 与 pubspec 版本一致
+        run: |
+          set -euo pipefail
+          PUB=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/^version:[[:space:]]*//' | cut -d+ -f1)
+          TAG=${GITHUB_REF_NAME#v}
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "手动触发，跳过 tag 比对（pubspec 版本 = $PUB）"
+          elif [ "$PUB" != "$TAG" ]; then
+            echo "::error::tag v$TAG 与 pubspec 版本 $PUB 不一致，拒绝发布"
+            exit 1
+          fi
+          echo "VERSION=$PUB" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 还原签名密钥与 key.properties
+        run: |
+          set -euo pipefail
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "::error::缺少 Secret KEYSTORE_BASE64，构建会退回 debug 签名——拒绝发布"
+            exit 1
+          fi
+          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/qingdan-release.jks
+          umask 077
+          {
+            echo "storeFile=qingdan-release.jks"
+            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "keyAlias=${{ secrets.KEY_ALIAS || 'qingdan' }}"
+            echo "keyPassword=${{ secrets.KEYSTORE_PASSWORD }}"
+          } > android/key.properties
+
+      - run: flutter pub get
+
+      # 静态检查与测试都过才允许出包。
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test --concurrency=1
+
+      - name: 构建 release APK
+        run: flutter build apk --release --split-per-abi
+
+      # 核对产物确实是正式签名而不是 debug（build.gradle.kts 在缺密钥时会退回
+      # debug 并吼一声；这里把那道吼变成硬失败）。
+      - name: 核对签名不是 debug
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | head -1)
+          for apk in build/app/outputs/flutter-apk/*-release.apk; do
+            DN=$("$APKSIGNER" verify --print-certs "$apk" 2>/dev/null \
+                 | grep -m1 "certificate DN" || true)
+            echo "$apk → ${DN:-（读不到）}"
+            if [ -z "$DN" ]; then
+              echo "::error::$apk 读不到签名者证书"; exit 1
+            fi
+            if printf '%s' "$DN" | grep -qi "Android Debug"; then
+              echo "::error::$apk 是 debug 签名，不能发布"; exit 1
+            fi
+          done
+
+      - name: 生成 SHA-256 校验和
+        run: |
+          cd build/app/outputs/flutter-apk
+          sha256sum *-release.apk > sha256sums.txt
+          cat sha256sums.txt
+
+      - name: 发布 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: qingdan ${{ env.VERSION }}
+          body_path: build/app/outputs/flutter-apk/sha256sums.txt
+          files: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/sha256sums.txt
+          make_latest: "true"
