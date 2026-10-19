@@ -1,0 +1,106 @@
+NOTICE — 上游来源与移植声明
+================================================================================
+
+本文件登记 qingdan 仓库里**不是从零写**的部分。仓库自身的许可证见 `LICENSE`
+（GNU AGPL-3.0-or-later）。项目规矩（AGENTS.md 禁止事项）：每一个移植/参考的
+源码文件都必须在**文件头**写明原路径、原类名与参考行号；本文件只是索引与汇总，
+逐条证据以各文件头为准。
+
+
+一、AGPL-3.0-or-later 的上游：超星「学习通」油猴脚本
+--------------------------------------------------------------------------------
+
+- 上游项目：Cooanyh/chaoxing-list — https://github.com/Cooanyh/chaoxing-list
+  作者：lcandy2 / Coren
+  许可证：AGPL-3.0-or-later
+  移植时的底本：`扩展/作业列表.js`（作者本机留存的油猴脚本副本，**未随本仓库分发**；
+  clone 后这个路径不存在，下表行号请按上述上游仓库的对应版本核对）
+
+- 本仓库使用了什么：只重写**「读哪些字段、请求哪个 URL」这层接口契约**。
+  **未拷贝**其 Vue 界面代码、样式与遥测/上报代码。
+
+- 受影响文件（均在 `lib/import/chaoxing/`，逐文件行号见各自文件头）：
+
+  | 文件 | 取自上游的位置（`扩展/作业列表.js` 行号） |
+  | --- | --- |
+  | `chaoxing_models.dart` | 课程接口 :467、类型映射 :655、活动接口 :674、活动字段解析 :701-722、核心类型集合 :137、课程解析 :2264 |
+  | `chaoxing_homework.dart` | `extractTasks` :757-791、完成判定 :169-173、剩余时间解析 :3268-3281 |
+  | `chaoxing_exam.dart` | `URL_EXAM` :463、`API_EXAM_LIST` :911、`extractExams` :793-832、合并去重 :1433-1473 / :3405-3432 |
+  | `chaoxing_links.dart` | `API_VISIT_COURSE` :910、`getHomeworkLink` :3527-3534、`API_OPEN_EXAM` :912、`getExamLink` :3536-3542 |
+  | `chaoxing_html.dart` | 借其「用 DOM 取属性/文本/查询参数」的做法，用正则自行实现（本项目未引 html 解析包） |
+  | `chaoxing_client.dart` | 接口清单与响应层级由上面几个文件头的声明汇总 |
+
+- **例外声明**：`chaoxing_work_detail.dart`（作业详情抽取）**不是**从该脚本移植的
+  ——脚本全文没有取题目详情的接口（它的「查看」是 `window.open(...)`，:5619）。
+  该文件的地址与 DOM 形状来自 2026-10-19 用真实会话逐跳抓取的页面样本。
+
+- 许可证变更说明：本仓库原以 MIT 发布，与「仓库内含 AGPL 派生代码」这一事实相矛盾；
+  2026-10-19 整体改为 AGPL-3.0-or-later（纯许可条款变更，代码功能零损失）。
+
+
+二、逆向工程参考项目（只借算法与结构，未拷贝实现）
+--------------------------------------------------------------------------------
+
+这两个项目是逆向工程产物，**纯自用**；本仓库不分发其任何二进制、原生库或资源
+（不拷 `.so`、不拷第三方 SDK）。下表的 `F:\Code\APK-MCP\...` 与 `扩展\...` 是
+**作者本机的路径，不会出现在 clone 里**——照抄它们只为审计追溯（各文件头同样写了）。
+
+1. WakeUp 课程表（`F:\Code\APK-MCP\3-Wakeup`，反编译产物）
+
+   | 本仓库文件 | 参考位置 |
+   | --- | --- |
+   | `lib/import/course/wakeup_schedule_file.dart` | 文件形态反推自真样本 `扩展/本学期.wakeup_schedule`（5 段拼接 JSON）；字段语义对齐 `Gradle\app\src\main\java\com\suda\net\schedule_import\bean\CourseBaseBean.java:16-21` |
+   | `lib/import/jiaowu/jiaowu_capture.dart` | 思路取自 `schedule_import\WebViewLoginFragment.java:621`（`getPageHtml` 递归抓 iframe/frame 的 innerHTML）与 `:1139`（渲染后 DOM 回传解析层） |
+   | `lib/import/jiaowu/jiaowu_qz.dart` | 解析骨架对齐 `schedule_parser\parser\base\OooOOO0.java:309` 的强智（`qz`）系规则；表格结构另经 2026-10-18 真机抓取样本对账 |
+
+2. TickTick / 滴答清单（`F:\Code\APK-MCP\9-Ticktick\Gradle`，反编译产物）
+
+   | 本仓库文件 | 参考位置 |
+   | --- | --- |
+   | `lib/sync/merge_engine.dart` | `com\ticktick\task\sync\utils\TaskMergeUtils.java`：`getStringVersion`（L278-286，字段级 LWW 四分支）、`mergeTask`（L817-897，逐字段合并骨架）、`mergePomodoroSummaries`（L449-514，累加型 `delta + revised − original`）、`mergeTags`（并集规则）。Java → Dart 的空安全与集合语义已重写；`getRevisedTextByDiff` 的文本行级三方 diff **未移植** |
+
+3. 教务系统（强智教务）课表页：`lib/import/jiaowu/jiaowu_qz.dart` 的 DOM 结构取自
+   对本校教务页面的真实抓取样本（该站点多需校内网访问）。本仓库不含任何登录凭据。
+
+
+三、第三方依赖（运行时与开发期）
+--------------------------------------------------------------------------------
+
+按 `pubspec.yaml` 的声明使用；具体许可证以各包自带的 `LICENSE` 为准（**此处刻意
+不标注许可证类型**，避免把上游改动的许可证写错）。查每台机器上的实际版本与许可证文件：
+
+```bash
+dart pub deps                       # 列出解析到的依赖与版本
+dart pub cache list                 # 给出包在本机的目录
+#   <PUB_CACHE>/hosted/pub.dev/<包名>-<版本>/LICENSE 就是该包随包分发的许可证原文
+```
+
+用途简述：
+
+- `flutter` / `dart` SDK —— 框架与语言（Flutter stable 3.47.5 / Dart 3.13.4）。
+- `flutter_inappwebview` —— 内嵌 WebView：学习通登录取 cookie、教务系统登录后抓当前页 HTML。（用的是 6.2.0-beta.3，原因见 `pubspec.yaml` 注释：稳定版自带的 Android 子包使用了被 AGP 拒绝的 `proguard-android.txt`。）
+- `sqflite_common_ffi` / `path_provider` —— 本地 SQLite 数据库与数据目录。
+- `flutter_secure_storage` —— 系统凭据库（Windows 凭据管理器 / Android Keystore），存 WebDAV 口令与学习通 cookie。
+- `shared_preferences` —— 轻量配置（同步设置、外观偏好等）。
+- `provider` —— 状态管理。
+- `flutter_local_notifications` + `timezone` —— 本地通知与提醒排程。
+- `csv` / `excel` / `enough_convert` —— 课表 CSV 与 xlsx 读取，GBK 解码。
+- `icalendar_parser` —— .ics 日历解析。
+- `file_selector` —— 系统文件选择（Android 走 SAF）。
+- `crypto` —— 课程 UID 的 sha1。
+- `intl` —— 日期时间格式化。
+- `window_manager` —— 桌面窗口控制（当前分支只做 Android 端，保留依赖未清理）。
+- `cupertino_icons`、`flutter_lints` —— 图标字体与 lint 基线。
+
+Android 侧由 Gradle 解析的插件（AAR）：各自随对应 pub 包分发，许可证见对应包。
+
+
+四、未随本仓库发布的部分
+--------------------------------------------------------------------------------
+
+- `需求总结/`、`相关来源或素材/`、`开发文档/` —— 需求输入、外部素材与过程文档
+  （含逐条移植登记与真机验收记录）。这三处**含真实课程名、教师名、作业标题等
+  个人信息**，已被 `.gitignore` 排除出发布范围，clone 后不存在。
+- 上述三个目录不是本仓库的可再分发作品，其内第三方材料的许可证以上游为准。
+- 正式签名钥匙（`android/key.properties`、`*.jks`）与任何账号凭据**永不入库**；
+  仓库只发布 `android/key.properties.example` 模板。

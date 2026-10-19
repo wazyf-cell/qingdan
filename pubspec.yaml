@@ -1,8 +1,14 @@
 name: qingdan
-description: "A new Flutter project."
+description: "qingdan —— 自用任务清单（Android）：本地 SQLite + 可选 WebDAV 同步，课表与学习通待办并入同一张清单。无自建服务端。"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+# 许可证：AGPL-3.0-or-later（全文见仓库根目录 LICENSE）。
+# 之所以不是 MIT：lib/import/chaoxing/*.dart 的接口契约移植自 AGPL-3.0-or-later 的
+# 油猴脚本（上游 Cooanyh/chaoxing-list），派生作品必须延续同种 copyleft。
+# 移植来源与第三方依赖清单见 NOTICE。
+license: AGPL-3.0-or-later
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -20,6 +26,10 @@ version: 1.0.1+2
 
 environment:
   sdk: ^3.13.4
+  # 工具链钉在实测过的 Flutter 版本上：compileSdk / minSdk / targetSdk / NDK 都是
+  # 从 Flutter 工具链默认值解析的（见 android/app/build.gradle.kts），换版本会连带
+  # 改这四项并可能要求升 AGP。细节见 README「环境要求」。
+  flutter: ">=3.47.5 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions

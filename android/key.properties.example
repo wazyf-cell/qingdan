@@ -19,3 +19,41 @@ storeFile=qingdan-release.jks
 storePassword=你自己定的密钥库口令
 keyAlias=qingdan
 keyPassword=你自己定的密钥口令
+
+## 一、生成自己的钥匙（一次性的）
+
+JDK 17 自带的 keytool 就够；有效期给足（比如 27 年），别名和两个口令都自己定：
+
+    keytool -genkeypair -v \
+      -keystore qingdan-release.jks \
+      -alias qingdan \
+      -keyalg RSA -keysize 2048 \
+      -validity 10000 \
+      -storepass "你的密钥库口令" \
+      -keypass "你的密钥口令" \
+      -dname "CN=qingdan, OU=personal, O=none, L=none, C=CN"
+
+生成完把 .jks 放到 android/app/ 下（或改上面的 storeFile 指向别处），然后把四个值填进
+复制出来的 key.properties。要点：
+
+- **两个口令可以不同，也可以相同**；填的时候别填反（storePassword 解钥匙库，
+  keyPassword 解里面的那把钥匙）。
+- dname 里的 CN/OU/O 只是证书里的字符串，不会显示给用户，随便写但别写真实姓名单位。
+- 生成后立刻按文件开头说的做两件事：异地备份 .jks、把 SHA-256 指纹记进你自己的文档。
+- 验证一下钥匙能读出来（会提示输入口令）：
+      keytool -list -v -keystore qingdan-release.jks -alias qingdan
+
+## 二、debug 包与 release 包不能互相覆盖安装（重要）
+
+没有 key.properties 时 release 构建会退回 **debug 签名**（配置期会吼一条 WARNING）。
+Android 认的是**签名**，不是包名版本号，所以：
+
+- debug 签名的包 ↔ release 签名的包 **装不到同一个设备上**，`adb install -r` 直接报
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，界面上覆盖安装同样失败。
+- **唯一的解决办法是先卸载再装**。而卸载会连带删掉应用私有目录里的
+  `files/qingdan.db` —— 任务、清单、学期、作息、课表、导入历史**全部一起没了**，
+  学号/口令之外的所有数据都在那一个文件里。
+- 所以：真机验证请从头到尾固定用一种签名；非要切换，先把数据同步出去（或把
+  `qingdan.db` 拷出来）再卸载。
+- 对外发的包必须是 release + 正式钥匙。debug keystore 的口令是公开默认值，
+  拿它签出来的包，任何人复现这把钥匙就能推「合法升级」。
