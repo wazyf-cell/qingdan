@@ -1,7 +1,6 @@
 import "package:flutter/material.dart";
 import "package:provider/provider.dart";
 
-import "package:qingdan/features/settings/settings_dialog.dart";
 import "package:qingdan/sync/sync_report.dart";
 import "package:qingdan/sync/sync_status.dart";
 import "package:qingdan/theme/app_colors.dart";
@@ -118,7 +117,10 @@ class _SlotVisual {
   final Color color;
 }
 
-/// 详情卡（§5.3）：360×320 居中卡，内容 + [立即同步] [打开设置]。
+/// 详情卡（§5.3）：360×320 居中卡，内容 + [关闭] [立即同步]。
+///
+/// 「打开设置」这个按钮 2026-10-19 去掉了：设置入口在导航里本来就有（手机是底部
+/// 「设置」页签，桌面是侧栏底部），在一张状态详情卡里再开一个入口既挤又重复。
 class _SyncDetailCard extends StatelessWidget {
   const _SyncDetailCard({required this.model});
 
@@ -161,23 +163,18 @@ class _SyncDetailCard extends StatelessWidget {
             if (model.deviceId != null)
               _row(colors, "设备", _shortId(model.deviceId!)),
             const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            // 用 Wrap 不用 Row：卡片宽 360 再被 `Dialog` 按屏宽夹一道（360dp 级窄屏
+            // 上实际可用宽度不足 320），Row 装不下就是 Overflow 红条——按钮跑到卡片
+            // 外面。Wrap 装不下会换行，最多少一个按钮在一行里。
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: AppDimens.s4,
+              runSpacing: AppDimens.s4,
               children: <Widget>[
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text("关闭"),
                 ),
-                const SizedBox(width: AppDimens.s4),
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    showSettingsDialog(context);
-                  },
-                  icon: const Icon(Icons.settings_outlined, size: 16),
-                  label: const Text("打开设置"),
-                ),
-                const SizedBox(width: AppDimens.s4),
                 FilledButton.icon(
                   onPressed: status.kind == SyncStatusKind.running
                       ? null

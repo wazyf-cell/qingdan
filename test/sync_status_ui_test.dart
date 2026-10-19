@@ -130,7 +130,39 @@ void main() {
     expect(find.textContaining("本窗口请求"), findsOneWidget);
     expect(find.textContaining("abcd1234"), findsWidgets);
     expect(find.text("立即同步"), findsOneWidget);
-    expect(find.text("打开设置"), findsOneWidget);
+    // 「打开设置」2026-10-19 去掉了：设置入口本来就在导航里（手机底部「设置」页签、
+    // 桌面侧栏底部），状态卡里再开一个既挤又重复。
+    expect(find.text("打开设置"), findsNothing);
+    m.dispose();
+  });
+
+  /// 窄屏回归（用户报的：「立即同步」那个按钮超出了弹层窗口）。
+  ///
+  /// 卡片写死 360 宽，而 `Dialog` 还会按屏宽再夹一道 —— 411dp 屏上可用宽度不够
+  /// 三个按钮并排，`Row` 装不下就是 Overflow 红条 + 按钮画到卡片外面。
+  /// 这条测试钉两件事：**没有溢出异常**，以及**按钮右缘不越出卡片右缘**。
+  /// （原来那批用例跑在 800×600 的默认测试面上，永远撞不到这个宽度。）
+  testWidgets("窄屏 411dp：详情卡按钮不越出卡片、不溢出",
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(411, 915);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await configure();
+    final (SyncCoordinator _, SyncStatusModel m) = await pair(CountingRunner());
+    await pumpWidgetWith(tester, m, const SyncSlot());
+    await tester.tap(find.byType(SyncSlot));
+    await tester.pumpAndSettle();
+
+    // 量的是**里面那张固定尺寸的卡片**，不是 Dialog —— Dialog 的布局盒是整屏。
+    final Rect card = tester.getRect(find
+        .descendant(of: find.byType(Dialog), matching: find.byType(Container))
+        .first);
+    final Rect button = tester.getRect(find.text("立即同步"));
+    expect(button.right, lessThanOrEqualTo(card.right + 0.5),
+        reason: '按钮越出卡片右缘：${button.right} > ${card.right}');
+    expect(button.bottom, lessThanOrEqualTo(card.bottom + 0.5),
+        reason: '按钮越出卡片下缘');
+    expect(tester.takeException(), isNull, reason: '出现 RenderFlex 溢出');
     m.dispose();
   });
 
