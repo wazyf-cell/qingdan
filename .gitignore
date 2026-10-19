@@ -73,6 +73,17 @@ app.*.map.json
 #     以及 本学期.wakeup_schedule / 日历.ics（本人真实课表，个人数据）---
 /扩展/
 
+# --- 签名材料：仓库是 public，私钥/口令一旦进来就撤不回 ---
+# android/.gitignore 已经挡住 android/ 底下的这些；**根级再兜一层**，因为
+# 只要有人把 .jks 挪到仓库根、或在根目录新建一个 upload-keystore.jks，
+# android/ 那份规则就管不着了（2026-10-19 正式签名密钥落地时补的）。
+*.jks
+*.keystore
+*.p12
+*.pfx
+key.properties
+# （`key.properties.example` 是模板、要跟踪；上面这条只匹配同名文件，不匹配它）
+
 # --- 桌面端：本仓库只发布 Android 端（2026-10-18 用户明确要求）---
 /windows/
 
