@@ -93,7 +93,8 @@ flutter build apk --release --split-per-abi
   后面是 versionCode）。
 - 发布靠打 tag：确认 `pubspec.yaml` 的版本后
   `git tag v1.0.1 && git push --tags`，CI 会**硬比对 tag 与 pubspec 版本**，不一致直接拒绝发布。
-- 手动 Run workflow 是「彩排」：跑完测试与构建、留下 artifact，但不创建 Release。
+- 手动 Run workflow 是「彩排」：跑完 analyze、测试、构建与签名核对，但**不创建 Release、
+  也不上传任何产物**（公开仓库的 Actions 产物不登录就能下载，没经你过目的包不该挂上去）。
 
 ## 怎么跑测试
 
