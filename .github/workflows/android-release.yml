@@ -1,7 +1,9 @@
 name: android-release
 
-# 打 tag（如 v1.0.1）或在 Actions 页手动点「Run workflow」→ 构建 release APK
-# → 建一个 GitHub Release 并把 APK 与校验和作为附件传上去。
+# 打 tag（如 v1.0.1）→ 构建 release APK → 建一个 GitHub Release 并把 APK 与
+# 校验和作为附件传上去。**手动 Run workflow 只彩排**：同样跑 analyze / test /
+# 构建 / 签名核对，但**不建 Release、不传附件**（`github.ref_name` 在手动触发时是
+# 分支名，拿它当 tag 会在仓库上凭空长出一个叫 `main` 的 tag 和一条 latest Release）。
 #
 # ★ 用之前必须知道的一件事：这条路要求把签名密钥上传到 GitHub 的 Secrets 里。
 #   那把 .jks 现在只在你这台机器 + 坚果云备份两处；配好 Secrets 之后它会多一份
@@ -63,19 +65,26 @@ jobs:
           cache: true
 
       - name: 还原签名密钥与 key.properties
+        # 秘密走 `env:` 而不是把 `${{ secrets.X }}` 直接插进 shell 命令行：
+        # 插值发生在 shell 之前，口令里只要有一个引号或反引号就会把那一行拆开
+        # （轻则构建红，重则变成命令注入）。走 env 时 shell 只看到变量名。
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           set -euo pipefail
-          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
             echo "::error::缺少 Secret KEYSTORE_BASE64，构建会退回 debug 签名——拒绝发布"
             exit 1
           fi
-          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/qingdan-release.jks
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/qingdan-release.jks
           umask 077
           {
             echo "storeFile=qingdan-release.jks"
-            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
-            echo "keyAlias=${{ secrets.KEY_ALIAS || 'qingdan' }}"
-            echo "keyPassword=${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=${KEY_ALIAS:-qingdan}"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
           } > android/key.properties
 
       - run: flutter pub get
@@ -114,7 +123,18 @@ jobs:
           sha256sum *-release.apk > sha256sums.txt
           cat sha256sums.txt
 
+      # **只有打 tag 那次才真的发布**。手动 Run workflow 是「彩排」：跑完
+      # analyze + test + 构建 + 签名核对，但不建 Release。原因：`workflow_dispatch`
+      # 的 `github.ref_name` 是**分支名**，直接拿去当 `tag_name` 会在仓库上凭空建
+      # 一个名叫 `main` 的 tag 和一条 `make_latest` 的 Release——彩排不该留下产物。
+      - name: 彩排（手动触发）：只报产物校验和，不发布
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "构建与签名核对已通过；本次是彩排，未创建 Release。"
+          echo "要正式发布：确认 pubspec.yaml 的 version 后 git tag v<版本> && git push --tags"
+
       - name: 发布 GitHub Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
