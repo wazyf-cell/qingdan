@@ -21,7 +21,7 @@ void main() {
             hiddenAtMs: kCxNow.subtract(const Duration(days: 1)).millisecondsSinceEpoch),
         ChaoxingHiddenEntry(
             key: 'c1|2',
-            courseName: '课程乙',
+            courseName: '课程丙',
             title: '第二次作业',
             dueMs: kCxNow.subtract(const Duration(hours: 2)).millisecondsSinceEpoch,
             hiddenAtMs: kCxNow.subtract(const Duration(days: 2)).millisecondsSinceEpoch,

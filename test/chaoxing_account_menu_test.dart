@@ -11,6 +11,7 @@ import 'chaoxing_harness.dart';
 /// M6B §B4：⋮ 三项（重新登录 / 隐藏列表 / 退出登录，破坏性放最后）+ 两个确认框。
 /// 旧代码只有两项且退出**不清 WebView cookie jar**，所以「jar 被清」那条必须红。
 void main() {
+  /// 隐藏项元数据种子：课程名 / 标题都是合成值（形状取自真实页面，仓库是 public）。
   const String metaJson =
       '{"c1|h1":{"courseName":"课程甲","title":"第一次作业","dueMs":1760000000000,'
       '"hiddenAtMs":1760000000001,"dead":false}}';

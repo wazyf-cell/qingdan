@@ -21,6 +21,10 @@ import 'package:qingdan/theme/app_theme.dart';
 /// 测试数据里不得出现 cookie / `_uid` 值）。
 const String kFakeCookie = 'placeholder-not-a-credential';
 
+/// 下面三个构造器的默认课程名 / 标题都是合成名（`课程甲` / `课程乙` / `课程丙`）：
+/// 形状取自真机登录态的学习通条目，**但真实开课班名不写进这个 public 仓库**。
+/// 依赖默认值的用例只钉「面板把课程名渲染出来」这件事，不钉具体字面。
+
 /// 计次的假客户端：`ChaoxingModel` 的 `clientFactory` 注入点用它替代真实
 /// `dart:io HttpClient`，这样「刷新收敛到两处」能被数着请求次数验证。
 class FakeChaoxingClient extends ChaoxingClient {
@@ -91,7 +95,7 @@ ChaoxingTask cxExam(String id,
     String? clazzId = 'z1',
     String? examId = '991',
     String title = '单元测验',
-    String course = '建模课',
+    String course = '课程乙',
     DateTime? startAt,
     DateTime? dueAt,
     bool ongoing = true,

@@ -27,7 +27,7 @@ void main() {
       expect(a.stateAt(kExamNow, done: false), ChaoxingTaskState.todo);
       expect(a.key, '240000001|88001');
       // 这一页没有课程名列：回查课程表补全，不吃页面。
-      expect(a.courseName, '课程丁');
+      expect(a.courseName, '课程甲');
     });
 
     test('dd 的相对时间 = 抓取时刻 + 剩余，推成绝对 dueAt；没有开始时间', () {
@@ -227,7 +227,7 @@ void main() {
         ...ChaoxingExam.parseCards(
             '<ul class="ks_list"><li data="https://x?taskrefId=992&amp;'
             'courseId=240000002&amp;classId=160000003"><div class="ks_pic">'
-            '<img src="ks_01.png"></div><dl><dt>数据结构</dt><dd>剩余6天</dd></dl>'
+            '<img src="ks_01.png"></div><dl><dt>期中测验</dt><dd>剩余6天</dd></dl>'
             '<span class="ks_state">未提交</span></li></ul>',
             courseNames: const <String, String>{},
             now: kExamNow),

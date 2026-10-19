@@ -103,11 +103,12 @@ void main() {
       '';
 
   testWidgets('导入过（本学期批次）：那一行写「导入 · 文件名」，点开能看到批次',
+      // 文件名是合成值（原夹具用的是用户自己那份导出文件名；仓库是 public）。
       (tester) async {
     await addBatch(tester,
         ImportBatch(
             id: 'b1',
-            fileName: '本学期.csv',
+            fileName: '示例学期.csv',
             importedAt: DateTime.utc(2025, 9, 7, 6, 32),
             countImported: 5,
             countUpdated: 1,
@@ -116,7 +117,7 @@ void main() {
     await pumpAt(tester, width: 1280);
 
     expect(freshnessText(tester), contains('导入'));
-    expect(freshnessText(tester), contains('本学期.csv'));
+    expect(freshnessText(tester), contains('示例学期.csv'));
 
     await tester.tap(find.byKey(const ValueKey<String>('course-freshness-tap')));
     await tester.pumpAndSettle();

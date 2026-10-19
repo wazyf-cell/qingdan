@@ -1,4 +1,6 @@
 // 提醒协调器单测·快照部分（M6-C2 §6 接线 + C4 §2 快照写入时机）。
+// 夹具里的课程名 / 作业名是合成值「课程甲 · 作业N」（形状取自真实学习通条目，
+// 仓库是 public，真实开课班名不写进来）。
 // 自 reminder_coordinator_test.dart 拆出：本文件管「快照筛选（C4 §2）」与
 // 「ChaoxingModel 的快照钩子（C4 §2 写入时机）」；重排触发线（防抖 / 总开关 /
 // 静默失败）在孪生文件 reminder_coordinator_reschedule_test.dart。

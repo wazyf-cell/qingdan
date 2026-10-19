@@ -20,6 +20,7 @@ import 'chaoxing_harness.dart';
 /// `chaoxing_actions.dart` 路径，不是本节自己重写的一份）。
 /// 双端各 pump 一次（总纲铁律 8）：411 与 1280 都跑一遍，防窄屏溢出。
 void main() {
+  /// 隐藏项元数据种子：课程名 / 标题都是合成值（形状取自真实页面，仓库是 public）。
   const String metaJson =
       '{"c1|h1":{"courseName":"课程甲","title":"第一次作业","dueMs":1760000000000,'
       '"hiddenAtMs":1760000000001,"dead":false}}';

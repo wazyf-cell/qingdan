@@ -57,6 +57,8 @@ Task makeReminderTask(String id,
         {DateTime? due, bool completed = false, bool deleted = false}) =>
     Task(id: id, title: '任务$id', dueDate: due, completed: completed, deleted: deleted);
 
+/// 课程名用合成值「课程甲」（形状取自真实学习通条目；仓库是 public，
+/// 真实开课班名不写进来）。
 ChaoxingTask makeReminderChaoxingTask(
         String id, {DateTime? dueAt, bool ongoing = true, bool done = false, String? status}) =>
     ChaoxingTask(

@@ -165,6 +165,7 @@ void main() {
   });
 
   testWidgets('课程块弹层：限高 60% 屏高，长内容滚动而不是撑爆', (tester) async {
+    // 长名字是合成值（钉的是「超长课名/地点不撑爆」这个形状，字符数与原夹具一致）。
     tester.view.physicalSize = const Size(411, 640);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -172,13 +173,13 @@ void main() {
     final Course long = Course(
       id: 'c1',
       uid: 'u1',
-      name: '软件质量保证与测试' * 6,
+      name: '课程甲乙丙丁戊己庚' * 6,
       weekday: 1,
       startSection: 1,
       endSection: 2,
       weeks: allWeeks,
       teacher: '某老师' * 8,
-      location: '航北楼实验中心' * 8,
+      location: '测试楼实验中心' * 8,
     );
     final SectionLayout layout = layoutSections(<TimeDetail>[
       TimeDetail(

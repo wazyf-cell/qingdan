@@ -3,12 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_links.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 
+/// 形状取自真机抓回的 `work/stu-work` 条目（与 `chaoxing_homework_test.dart`
+/// 同源），**但三个 id 与开课班名全部换成合成值**（仓库是 public，
+/// 真实的 courseId / clazzId / taskrefId 属于个人数据）。
+/// 钉的是「URL 拼了哪些参数、缺参数时给不给」，与具体 id 无关。
 ChaoxingTask homework(
         {String courseId = '240000001', String? clazzId = '160000001'}) =>
     ChaoxingTask(
         id: '88000001',
         courseId: courseId,
-        courseName: '课程丙',
+        courseName: '课程甲2026-2027',
         title: '作业1-4',
         kind: '作业',
         ongoing: true,
@@ -18,7 +22,7 @@ ChaoxingTask homework(
 ChaoxingTask activity({String? clazzId = '160000001'}) => ChaoxingTask(
     id: 'a1',
     courseId: '240000001',
-    courseName: '课程丙',
+    courseName: '课程甲2026-2027',
     title: '签到',
     kind: '签到',
     ongoing: true,
@@ -62,7 +66,7 @@ void main() {
           ]
         },
         courseId: 'c9',
-        courseName: '概率论',
+        courseName: '课程乙',
         clazzId: 'z9',
       );
       expect(tasks.single.clazzId, 'z9');

@@ -3,6 +3,10 @@ import 'package:qingdan/features/chaoxing/chaoxing_grouping.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_time.dart';
 
+/// 学习通分组/筛选/排序的用例。课程名与作业标题都是**合成名**（形状取自
+/// 2026-10-17 真机抓回的列表，但真实开课班名与作业标题不进这个 public 仓库）。
+/// 换值只动字面，排序类断言的期望已按新字面重算（字典序仍是「一条首字不同 +
+/// 两条同前缀比第二字」这个形状）。
 final DateTime kNow = DateTime(2026, 10, 17, 12);
 
 ChaoxingTask _h(String id, String course, String title,
@@ -36,11 +40,11 @@ ChaoxingTask _a(String id, String course, String kind,
 List<ChaoxingTask> homework() => <ChaoxingTask>[
       _h('h1', '课程甲', '第四次作业',
           dueAt: kNow.add(const Duration(hours: 3))),
-      _h('h2', '课程丙', '实验3 项目成本估算+AI',
+      _h('h2', '课程乙', '实验二',
           status: '已完成',
           serverDone: true,
           dueAt: kNow.subtract(const Duration(hours: 1))),
-      _h('h3', '课程乙', '第一次作业',
+      _h('h3', '课程丙', '第一次作业',
           ongoing: false, dueAt: kNow.subtract(const Duration(hours: 2))),
     ];
 
@@ -130,8 +134,8 @@ void main() {
     test('搜索命中标题或课程，不分大小写', () {
       const ChaoxingViewSettings s = ChaoxingViewSettings();
       expect(_ids(buildRows(homework(), s, kNow, query: '白盒')), isEmpty);
-      expect(_ids(buildRows(homework(), s, kNow, query: '成本')), <String>['h2']);
-      expect(_ids(buildRows(homework(), s, kNow, query: '运筹')), <String>['h1']);
+      expect(_ids(buildRows(homework(), s, kNow, query: '实验')), <String>['h2']);
+      expect(_ids(buildRows(homework(), s, kNow, query: '甲')), <String>['h1']);
     });
 
     test('课程筛选只留该课程', () {
@@ -141,7 +145,7 @@ void main() {
           <String>['h1']);
       expect(
           courseOptions(homework()),
-          <String>['课程乙', '课程丙', '课程甲']);
+          <String>['课程丙', '课程乙', '课程甲']);
     });
   });
 

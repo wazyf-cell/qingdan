@@ -2,10 +2,10 @@
 // 只有真机才能验证真实页面确实长这样）。
 //
 // 形状逐条照油猴脚本 `扩展/作业列表.js` 的选择器搭：卡片形态 `extractExams`
-// :793-832、表格形态 `extractExamsFromTable` :832-908；字段值照用户 2026-10-19
-// 贴的那条真实考试通知填：
-//   课程名称：建模课 / 考试名称：第一次单元测验
-//   开始时间：2026-10-11 08:00 / 结束时间：2026-10-11 22:00 / 考试形式：自主考试
+// :793-832、表格形态 `extractExamsFromTable` :832-908；字段值照 2026-10-19
+// 那条真实考试通知的**形状**填（课程名 / 「第 N 次单元测验」/ 起止时刻 / 考试形式
+// 四样各有其位），但课程名、考试名、三个 id 全部换成合成值——仓库是 public，
+// 带年级与专业的开课名属于个人数据。
 // 「现在」固定在 kExamNow = 2026-10-19 12:00——那场测验那时**已经考完 8 天**，
 // 判过期 / 不进待办列表 / 不进提醒快照都是正确行为（见两个 _test 文件）。
 //
@@ -17,13 +17,14 @@ import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 final DateTime kExamNow = DateTime(2026, 10, 19, 12);
 
 const Map<String, String> kExamCourses = <String, String>{
-  '240000001': '课程丁',
-  '240000002': '建模课',
+  '240000001': '课程甲',
+  '240000002': '课程乙',
 };
 
-/// 卡片形态四条：① 未交、还剩 23 小时 35 分 ② ks_02 图判过期（文字还写着
-/// 「剩余3小时」，判过期的依据只能是那张图）③ ks_01 图但文字「已结束」
-/// ④ 没有 ks_state，且 `data` 里没带 taskrefId。
+/// 卡片形态四条：① 未交、还剩 23 小时 35 分 ② 状态「待批阅」= 交过了 → 关掉
+/// （它那张图也是 `ks_02`，但**图片不参与判定**——2026-10-19 真账号实测 40 条全是
+/// 同一张 `ks_02.png`，拿它判过期会把没考的考试一并关掉，故作废该判据）
+/// ③ 文字写「已结束」→ 关掉，且推不出截止时刻 ④ 没有 ks_state，且 `data` 里没带 taskrefId。
 const String kExamCards = '''
 <div id="chaoxing-assignment-wrapper">
 <ul class="ks_list">
@@ -73,13 +74,13 @@ const String kExamTable = '''
   <td><a href="#" onclick="go('https://mooc1.chaoxing.com/exam-ans/exam/test/examcode/examnotes?moocId=240000001&amp;clazzid=160000002&amp;examId=991&amp;refer=http%3A%2F%2Fmooc1.chaoxing.com%2Fexam-ans%2Fexam%2Ftest%2Fexamcode%2Fexamnotes%3FcourseId%3D240000001%26classId%3D160000002%26examId%3D991');return false;">查看</a></td>
 </tr>
 <tr class="dataTr">
-  <td>2</td><td>数据结构</td>
+  <td>2</td><td>期中测验</td>
   <td>2026-10-25 14:00 ~ 2026-10-25 16:00</td>
   <td>90分钟</td><td>未开始</td><td>未提交</td><td></td><td>自主考试</td>
   <td><a href="#" onclick="go('/exam-ans/exam/test/examcode/examnotes?moocId=777777&amp;clazzid=666666&amp;refer=http%3A%2F%2Fx%3FcourseId%3D240000002%26classId%3D160000003%26examId%3D992');return false;">前往考试</a></td>
 </tr>
 <tr class="dataTr">
-  <td>3</td><td>状态没刷新的软工概论测验</td>
+  <td>3</td><td>状态没刷新的测验</td>
   <td>2026-10-18 08:00 至 2026-10-18 22:00</td>
   <td>60分钟</td><td>进行中</td><td>未提交</td><td>---分</td><td>自主考试</td>
   <td><a href="#" onclick="go('https://x/y?examId=993&amp;clazzid=160000004&amp;moocId=240000003');return false;">查看</a></td>

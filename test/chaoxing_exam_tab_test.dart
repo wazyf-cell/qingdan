@@ -33,7 +33,7 @@ ChaoxingTask endedExam() => cxExam('991',
 ChaoxingTask openExam() => cxExam('992',
     courseId: '240000002',
     examId: '992',
-    title: '数据结构',
+    title: '期中测验',
     startAt: kNow.subtract(const Duration(hours: 1)),
     dueAt: kNow.add(const Duration(hours: 6)),
     status: '未提交');

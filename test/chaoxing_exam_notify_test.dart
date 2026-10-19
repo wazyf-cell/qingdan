@@ -1,6 +1,7 @@
 // 考试接进「提醒快照 / 状态机 / 页签 / 筛选」这四条链路（2026-10-19）。
 //
-// 判据用真实通知的那场考试：`第一次单元测验`，
+// 判据用那场已结束的考试：`第一次单元测验`（**考试名取自真实通知的形状，
+// 但去掉年级与专业；仓库是 public，开课班名属于个人数据**），
 // 开始 2026-10-11 08:00、结束 **2026-10-11 22:00**，而「现在」固定在
 // kExamNow = 2026-10-19 12:00——**它那时已经考完 8 天了**。正确行为是：状态=已结束、
 // 不进提醒快照、不计入角标、开「仅看未完成」后从列表消失。这几条就是
@@ -21,7 +22,7 @@ import 'chaoxing_harness.dart';
 
 final DateTime kNow = kExamNow;
 
-/// 用户贴的那场：结束时刻已过 8 天。
+/// 已结束的那场：结束时刻已过 8 天。
 ChaoxingTask ended() => cxExam('991',
     courseId: '240000001',
     examId: '991',
@@ -36,7 +37,7 @@ ChaoxingTask upcoming() => cxExam('992',
     courseId: '240000002',
     clazzId: '160000003',
     examId: '992',
-    title: '数据结构',
+    title: '期中测验',
     startAt: DateTime(2026, 10, 25, 14, 0),
     dueAt: DateTime(2026, 10, 25, 16, 0),
     status: '未提交');
@@ -46,7 +47,7 @@ ChaoxingTask open() => cxExam('993',
     courseId: '240000003',
     clazzId: '160000004',
     examId: '993',
-    title: '概论单元测',
+    title: '第二次单元测验',
     startAt: kNow.subtract(const Duration(hours: 2)),
     dueAt: kNow.add(const Duration(hours: 8)),
     status: '未提交');
@@ -62,7 +63,7 @@ void main() {
     test('dueAt = 结束时间：没考完的考试正常进快照', () {
       final List<ChaoxingSnapshotItem> kept = snap(<ChaoxingTask>[open()]);
       expect(kept.single.key, '240000003|993');
-      expect(kept.single.title, '概论单元测');
+      expect(kept.single.title, '第二次单元测验');
       expect(kept.single.dueAt, kNow.add(const Duration(hours: 8)),
           reason: '提醒必须按结束时刻排：那时还没交就再也交不了了');
     });
@@ -124,16 +125,16 @@ void main() {
   group('考试不污染别的页签与合并', () {
     test('两个考试页给出的同名考试不会被 mergeRepublished 相消', () {
       final ChaoxingTask a = cxExam('991',
-          courseId: '240000002', examId: '991', title: '数据结构');
+          courseId: '240000002', examId: '991', title: '期中测验');
       final ChaoxingTask b = cxExam('992',
-          courseId: '240000002', examId: '992', title: '数据结构');
+          courseId: '240000002', examId: '992', title: '期中测验');
       expect(ChaoxingTask.mergeRepublished(<ChaoxingTask>[a, b]).length, 2,
           reason: '同课同名的两场都是真考试（重发相消只管课堂活动）');
       expect(
           ChaoxingTask.dedupe(<ChaoxingTask>[
             a,
             cxExam('991',
-                courseId: '240000002', examId: '991', title: '数据结构')
+                courseId: '240000002', examId: '991', title: '期中测验')
           ]).length,
           1,
           reason: '只有 key 完全相同（同一场的两份副本）才去掉');
@@ -141,7 +142,7 @@ void main() {
 
     test('同名同 id 的作业与考试也各留一条', () {
       expect(ChaoxingTask.mergeRepublished(<ChaoxingTask>[
-        cxHomework('992', courseId: '240000002', title: '数据结构'),
+        cxHomework('992', courseId: '240000002', title: '期中测验'),
         upcoming(),
       ]).length, 2);
     });

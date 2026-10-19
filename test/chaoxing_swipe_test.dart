@@ -140,7 +140,7 @@ void main() {
         (WidgetTester tester) async {
       final ChaoxingHarness h = ChaoxingHarness();
       final List<ChaoxingTask> tasks = <ChaoxingTask>[
-        cxHomework('1', clazzId: 'z1', course: '课程乙'),
+        cxHomework('1', clazzId: 'z1', course: '课程丙'),
       ];
       await h.start(tasks: tasks);
       int launches = 0;
@@ -159,7 +159,7 @@ void main() {
       await h.tapIo(tester, h.detailOf(tasks[0]));
 
       expect(find.byType(ChaoxingDetailPage), findsOneWidget);
-      expect(find.text('课程乙'), findsOneWidget);
+      expect(find.text('课程丙'), findsOneWidget);
       expect(launches, 1);
       // URL 来自 clazzId（缺它就只会走降级页）。
       expect(find.textContaining('clazzid=z1'), findsOneWidget);

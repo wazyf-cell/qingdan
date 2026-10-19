@@ -1,4 +1,5 @@
 // 提醒协调器单测·重排触发部分（M6-C2 §6 接线）。自 reminder_coordinator_test.dart 拆出：
+// 夹具里的课程名是合成值「课程甲」（形状取自真实学习通条目，仓库是 public）。
 // 本文件管「防抖与触发源 / 总开关 / 失败要静默」三条线；快照筛选与 ChaoxingModel
 // 写入钩子在孪生文件 reminder_coordinator_snapshot_test.dart。
 //
