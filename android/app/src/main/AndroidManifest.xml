@@ -18,7 +18,7 @@
         android:allowBackup="false"
         android:usesCleartextTraffic="true">
         <!-- usesCleartextTraffic：教务系统普遍是 http（南昌航空强智入口
-             `qzjwxt.nchu.edu.cn:800/jsxsd/`、校内 `172.16.247.230:800/` 都是明文），
+             `qzjwxt.nchu.edu.cn:800/jsxsd/`、校内网段 `172.16.x.x:800/` 都是明文），
              Android 自 API 28 起默认拒绝，WebView 直接报
              `ERR_CLEARTEXT_NOT_PERMITTED`（2026-10-18 真机抓到）。不能按域名放行，
              因为要抓哪个教务地址是用户当场在地址栏里输入的，事先无从枚举。
