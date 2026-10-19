@@ -1,7 +1,7 @@
 /// WakeUp 课程表的导出文件（`.wakeup_schedule`）→ 导入向导的原始表。
 ///
 /// **来源声明**（AGENTS.md 禁止事项）：文件形态反推自用户提供的真样本
-/// `扩展/本学期.wakeup_schedule`（2026-10-18，5 段拼接的 JSON）；字段语义对齐
+/// `扩展/<学期>.wakeup_schedule`（2026-10-18，5 段拼接的 JSON）；字段语义对齐
 /// WakeUp 反编译产物 `F:\Code\APK-MCP\3-Wakeup\Gradle\app\src\main\java\
 /// com\suda\net\schedule_import\bean\` 的 `CourseBaseBean.java:16-21`
 /// （courseName / id / tableId）与 `CourseDetailBean.java:17-30`
@@ -10,7 +10,7 @@
 ///
 /// 为什么值得支持它：WakeUp 是成熟应用，它已经把教务页解析对了——同一份课表，
 /// 我们的 HTML 抓取要处理「跨节次行重复」，而它直接给 `startNode + step`
-/// （例：工艺训练B 12 周 1-8 节 = 一条明细，我们抓取时散成了 4 条）。
+/// （例：某门 12 周 1-8 节连排的课 = 一条明细，抓取时会被散成 4 条）。
 library;
 
 import 'dart:convert';

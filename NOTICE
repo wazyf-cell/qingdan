@@ -49,7 +49,7 @@ NOTICE — 上游来源与移植声明
 
    | 本仓库文件 | 参考位置 |
    | --- | --- |
-   | `lib/import/course/wakeup_schedule_file.dart` | 文件形态反推自真样本 `扩展/本学期.wakeup_schedule`（5 段拼接 JSON）；字段语义对齐 `Gradle\app\src\main\java\com\suda\net\schedule_import\bean\CourseBaseBean.java:16-21` |
+   | `lib/import/course/wakeup_schedule_file.dart` | 文件形态反推自真样本 `扩展/<学期>.wakeup_schedule`（5 段拼接 JSON）；字段语义对齐 `Gradle\app\src\main\java\com\suda\net\schedule_import\bean\CourseBaseBean.java:16-21` |
    | `lib/import/jiaowu/jiaowu_capture.dart` | 思路取自 `schedule_import\WebViewLoginFragment.java:621`（`getPageHtml` 递归抓 iframe/frame 的 innerHTML）与 `:1139`（渲染后 DOM 回传解析层） |
    | `lib/import/jiaowu/jiaowu_qz.dart` | 解析骨架对齐 `schedule_parser\parser\base\OooOOO0.java:309` 的强智（`qz`）系规则；表格结构另经 2026-10-18 真机抓取样本对账 |
 

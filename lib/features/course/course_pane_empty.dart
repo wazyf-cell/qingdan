@@ -106,7 +106,7 @@ class UnscheduledStrip extends StatelessWidget {
                 ListTile(
                   dense: true,
                   title: Text(c.name, style: AppTypography.body),
-                  // 一屏十几条时必须带星期，否则「计算机网络」出现三次分不清。
+                  // 一屏十几条时必须带星期，否则同一门课出现三次分不清。
                   subtitle: Text(
                     '${_weekdayCn[c.weekday - 1]} · 第 ${c.startSection}-${c.endSection} 节'
                     '${c.location == null ? '' : ' · ${c.location}'}',

@@ -1,7 +1,7 @@
 /// 强智教务系统（`/jsxsd/xskb/xskb_list.do`）课表页 HTML → 导入向导的原始表。
 ///
 /// **来源声明**（AGENTS.md 禁止事项）：表格结构取自 2026-10-18 真机抓取样本
-/// `jiaowu_1792254054670.html`（某大学，42 个课表单元）。解析骨架对齐
+/// `jiaowu_1792254054670.html`（本校教务系统，42 个课表单元）。解析骨架对齐
 /// WakeUp 的强智系解析器（`F:\Code\APK-MCP\3-Wakeup\...\schedule_parser\`
 /// `parser/base/OooOOO0.java:309` 的 `qz` 系：行首 `<th>` 定节次、列序定星期、
 /// `<font title=…>` 定字段），**未拷贝其代码**。
