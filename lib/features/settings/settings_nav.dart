@@ -80,7 +80,7 @@ List<SettingsEntry> settingsEntries() => <SettingsEntry>[
         id: SettingsSectionId.general,
         icon: Icons.tune,
         title: '通用',
-        subtitle: '语言、后台与省电权限、检查更新',
+        subtitle: '语言、后台与省电权限、检测更新与 GitHub 仓库',
         content: (bool showTitle) => GeneralSection(showTitle: showTitle),
       ),
       SettingsEntry(
