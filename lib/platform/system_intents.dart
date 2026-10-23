@@ -68,6 +68,51 @@ class SystemIntents {
     }
   }
 
+  /// 本机首选 ABI（`Build.SUPPORTED_ABIS[0]`，例如 `arm64-v8a`）。拿不到返回 null。
+  static Future<String?> deviceAbi() async {
+    if (!_isAndroid) return null;
+    try {
+      return await _ch.invokeMethod<String>('deviceAbi');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// 本应用**已安装版本**的签名证书 SHA-256（小写十六进制）；取不到返回 null。
+  ///
+  /// 用它和下载到的 APK 比对：不一致就说明这台设备上是另一个签名的旧包，
+  /// 系统安装器只会回一句英文的 `UPDATE_INCOMPATIBLE`，不如我们提前说清楚。
+  static Future<String?> packageSignature() =>
+      _stringMethod('packageSignature');
+
+  /// 一个 APK 文件的签名证书 SHA-256；文件不存在或解析失败返回 null。
+  static Future<String?> apkSignature(String path) =>
+      _stringMethod('apkSignature', <String, String>{'path': path});
+
+  /// 本应用有没有「安装未知应用」的授权。Android 8 以下恒为 true。
+  static Future<bool> canInstallPackages() => _invoke('canInstallPackages');
+
+  /// 打开本应用的「安装未知应用」系统页。允许后系统不会回调，让用户回来再点一次。
+  static Future<bool> openInstallPermission() => _invoke('openInstallPermission');
+
+  /// 调起系统安装器（APK 走 FileProvider）。用户还要在系统界面点一次「安装」。
+  static Future<bool> installApk(String path) =>
+      _invoke('installApk', <String, String>{'path': path});
+
+  static Future<String?> _stringMethod(String method,
+      [Map<String, String>? args]) async {
+    if (!_isAndroid) return null;
+    try {
+      return await _ch.invokeMethod<String>(method, args);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   static Future<bool> _invoke(String method, [Map<String, String>? args]) async {
     if (!_isAndroid) return false; // Windows 端也会调到这里，必须先短路再碰通道
     try {

@@ -2,13 +2,17 @@ package com.qingdan.qingdan
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.security.MessageDigest
 
 /**
  * C3 系统权限深链的 Android 侧。
@@ -40,6 +44,42 @@ object SystemIntents {
                         "lastUpdateTime" to info.lastUpdateTime,
                     ),
                 )
+                return@setMethodCallHandler
+            }
+            // 应用内更新（1.0.4）：ABI 用来挑对的那份 APK；签名用来在进系统安装器
+            // 之前就发现「这台设备是另一个签名的旧包」，而不是让用户吃一句英文报错。
+            if (call.method == "deviceAbi") {
+                reply.success(Build.SUPPORTED_ABIS.firstOrNull())
+                return@setMethodCallHandler
+            }
+            if (call.method == "packageSignature") {
+                reply.success(selfSignature(activity.packageManager, activity.packageName))
+                return@setMethodCallHandler
+            }
+            if (call.method == "apkSignature") {
+                reply.success(call.argument<String>("path")?.let { apkSignature(activity, it) })
+                return@setMethodCallHandler
+            }
+            if (call.method == "canInstallPackages") {
+                val pm = activity.packageManager
+                reply.success(
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        pm.canRequestPackageInstalls()
+                    } else {
+                        true // 8.0 以下没有这个开关，装包时由系统直接问
+                    },
+                )
+                return@setMethodCallHandler
+            }
+            if (call.method == "openInstallPermission") {
+                // 允许后系统不会回调我们；Dart 侧让用户回来后再点一次。
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                    .setData(Uri.fromParts("package", activity.packageName, null))
+                reply.success(start(activity, intent))
+                return@setMethodCallHandler
+            }
+            if (call.method == "installApk") {
+                reply.success(installApk(activity, call.argument<String>("path")))
                 return@setMethodCallHandler
             }
             val opened: Boolean? = when (call.method) {
@@ -90,4 +130,95 @@ object SystemIntents {
         } catch (_: ActivityNotFoundException) {
             false // 定制 ROM 可能删掉某个系统设置页；Dart 侧统一按 false 处理
         }
+
+    /** 本机已装包当前签名的 SHA-256（小写十六进制）；取不到返回 null。 */
+    private fun selfSignature(pm: PackageManager, packageName: String): String? =
+        try {
+            // 必须带 GET_SIGNING_CERTIFICATES：flags 传 0 时 `signingInfo` 是 null，
+            // 这次真机验收就是这样把「签名一致」误判成不一致的。
+            val flags =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    PackageManager.GET_SIGNING_CERTIFICATES
+                } else {
+                    @Suppress("DEPRECATION")
+                    PackageManager.GET_SIGNATURES
+                }
+            val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(packageName, flags)
+            }
+            certDigest(info)
+        } catch (_: PackageManager.NameNotFoundException) {
+            null
+        }
+
+    /**
+     * 一个 APK 文件里**当前**签名证书的 SHA-256。
+     *
+     * 用 `getPackageArchiveInfo` 只读文件、不安装；Dart 侧拿它和已装版本比对，
+     * 不一致就根本不进系统安装器——那一步只会甩一句英文的 UPDATE_INCOMPATIBLE。
+     */
+    private fun apkSignature(activity: FlutterActivity, path: String): String? {
+        val file = File(path)
+        if (!file.exists()) return null
+        val pm = activity.packageManager
+        val flags =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
+            } else {
+                @Suppress("DEPRECATION")
+                PackageManager.GET_SIGNATURES
+            }
+        val info: PackageInfo? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getPackageArchiveInfo(path, PackageManager.PackageInfoFlags.of(flags.toLong()))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageArchiveInfo(path, flags)
+        }
+        return info?.let(::certDigest)
+    }
+
+    /** 取「当前签名者」的第一张证书；签名轮换时 `apkContentsSigners` 才是正在用的那把。 */
+    private fun certDigest(info: PackageInfo): String? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val signing = info.signingInfo ?: return null
+            // 即使是「新旧两把证书都签了」的轮换包，apkContentsSigners 也是当前这一把。
+            val first = signing.apkContentsSigners.firstOrNull() ?: return null
+            return sha256Hex(first.toByteArray())
+        }
+        @Suppress("DEPRECATION")
+        val first = info.signatures?.firstOrNull() ?: return null
+        return sha256Hex(first.toByteArray())
+    }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+
+    /** 把缓存里的 APK 交给系统安装器。用户还要在系统界面点一次「安装」。 */
+    private fun installApk(activity: FlutterActivity, path: String?): Boolean {
+        if (path.isNullOrEmpty()) return false
+        val file = File(path)
+        if (!file.exists()) return false
+        return try {
+            val uri: Uri = FileProvider.getUriForFile(
+                activity,
+                "${activity.packageName}.fileprovider",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        } catch (_: IllegalArgumentException) {
+            // FileProvider 配置与目录对不上时 getUriForFile 会抛这个
+            false
+        }
+    }
 }

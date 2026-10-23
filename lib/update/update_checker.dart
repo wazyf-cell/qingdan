@@ -17,13 +17,23 @@ import 'dart:io';
 const String kRepoSlug = 'wazyf-cell/qingdan';
 const String kRepoUrl = 'https://github.com/$kRepoSlug';
 
+/// 发布页上的一个文件。1.0.4 起要真的去下载它，所以光有名字不够：
+/// 需要有下载地址与字节数（进度条要用总大小）。
+class ReleaseAsset {
+  const ReleaseAsset({required this.name, required this.url, this.size = 0});
+
+  final String name;
+  final String url;
+  final int size;
+}
+
 class ReleaseInfo {
   const ReleaseInfo({
     required this.version,
     required this.url,
     this.tagName = '',
     this.publishedAt,
-    this.assetNames = const <String>[],
+    this.assets = const <ReleaseAsset>[],
     this.notes,
   });
 
@@ -32,7 +42,11 @@ class ReleaseInfo {
   final String url;
   final String tagName;
   final DateTime? publishedAt;
-  final List<String> assetNames;
+  final List<ReleaseAsset> assets;
+
+  /// 发布页里的文件名。界面上只列名字，下载时再按 ABI 挑一个。
+  List<String> get assetNames =>
+      assets.map((ReleaseAsset a) => a.name).toList(growable: false);
 
   /// 发布说明原文（GitHub Release 的 `body`）。只有空白时按 null 处理：
   /// 「没写说明」与「写了一堆空格」在界面上是同一件事，调用方只想判一次空。
@@ -54,13 +68,27 @@ class ReleaseInfo {
           ? (json['html_url'] as String).trim()
           : '$kRepoUrl/releases',
       publishedAt: DateTime.tryParse((json['published_at'] as String?) ?? ''),
-      assetNames: assets is List
+      assets: assets is List
           ? assets
               .whereType<Map<String, dynamic>>()
-              .map((Map<String, dynamic> a) => (a['name'] as String?) ?? '')
-              .where((String n) => n.isNotEmpty)
-              .toList()
-          : const <String>[],
+              .map(_assetFromJson)
+              .whereType<ReleaseAsset>()
+              .toList(growable: false)
+          : const <ReleaseAsset>[],
+    );
+  }
+
+  /// 没有名字的条目丢掉；**没有下载地址的留着**——列表里照样念得出文件名，
+  /// 只是「下载并安装」不会挑它（`pickApkAsset` 只认有地址的）。
+  static ReleaseAsset? _assetFromJson(Map<String, dynamic> a) {
+    final String name = (a['name'] as String?) ?? '';
+    final String url = (a['browser_download_url'] as String?) ?? '';
+    if (name.isEmpty) return null;
+    final Object? size = a['size'];
+    return ReleaseAsset(
+      name: name,
+      url: url,
+      size: size is int ? size : 0,
     );
   }
 }

@@ -121,6 +121,42 @@ void main() {
       }
       expect(calls, isEmpty, reason: '挡协议要在碰通道之前，不是之后');
     });
+
+    // 1.0.4：应用内下载安装。方法名与返回值形状都是 Dart↔Kotlin 的契约。
+    test('更新安装的五个方法名与参数', () async {
+      mockChannel((MethodCall c) => switch (c.method) {
+            'deviceAbi' => 'arm64-v8a',
+            'packageSignature' || 'apkSignature' => 'abc123',
+            _ => true,
+          });
+
+      expect(await SystemIntents.deviceAbi(), 'arm64-v8a');
+      expect(await SystemIntents.packageSignature(), 'abc123');
+      expect(await SystemIntents.apkSignature('/tmp/a.apk'), 'abc123');
+      expect(await SystemIntents.canInstallPackages(), isTrue);
+      expect(await SystemIntents.openInstallPermission(), isTrue);
+      expect(await SystemIntents.installApk('/tmp/a.apk'), isTrue);
+
+      expect(calls.map((MethodCall c) => c.method).toList(), <String>[
+        'deviceAbi',
+        'packageSignature',
+        'apkSignature',
+        'canInstallPackages',
+        'openInstallPermission',
+        'installApk',
+      ]);
+      // 带路径的两个方法必须原样把路径带过去（原生侧靠它找文件）。
+      expect((calls[2].arguments as Map<Object?, Object?>)['path'], '/tmp/a.apk');
+      expect((calls[5].arguments as Map<Object?, Object?>)['path'], '/tmp/a.apk');
+    });
+
+    test('签名读不到时返回 null，而不是空串（调用方靠 null 判「比不了」）', () async {
+      mockChannel((_) => null);
+
+      expect(await SystemIntents.packageSignature(), isNull);
+      expect(await SystemIntents.apkSignature('/tmp/a.apk'), isNull);
+      expect(await SystemIntents.deviceAbi(), isNull);
+    });
   });
 
   group('非 Android（显式指定平台，不靠测试主机是什么）', () {
@@ -142,6 +178,17 @@ void main() {
       mockChannel((_) => true);
 
       await expectLater(SystemIntents.openAppDetails(), completion(isFalse));
+      expect(calls, isEmpty);
+    });
+
+    test('更新安装的方法在非 Android 上返回 null/false，且不碰通道', () async {
+      mockChannel((_) => true);
+
+      expect(await SystemIntents.deviceAbi(), isNull);
+      expect(await SystemIntents.packageSignature(), isNull);
+      expect(await SystemIntents.apkSignature('/tmp/a.apk'), isNull);
+      expect(await SystemIntents.canInstallPackages(), isFalse);
+      expect(await SystemIntents.installApk('/tmp/a.apk'), isFalse);
       expect(calls, isEmpty);
     });
   });

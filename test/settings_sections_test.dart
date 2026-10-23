@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:qingdan/features/settings/about_section.dart';
+import 'package:qingdan/update/install_policy.dart';
 import 'package:qingdan/features/settings/settings_model.dart';
 import 'package:qingdan/features/shell/shell_tab.dart';
 
@@ -121,6 +122,10 @@ void main() {
     expect(find.byKey(const ValueKey<String>('app-version')), findsOneWidget);
     expect(find.text('v$kAppVersion'), findsOneWidget);
     expect(find.textContaining('也不会自建任何服务器'), findsOneWidget);
+    // 能不能覆盖安装的说法只此一份：关于页、检测更新弹层、发布页正文共用。
+    final Text policy = tester.widget<Text>(find.byKey(
+        const ValueKey<String>('about-install-policy')));
+    expect(policy.data, kInstallPolicyText);
 
     await tester.tap(find.byKey(const ValueKey<String>('settings-help')));
     await tester.pumpAndSettle();

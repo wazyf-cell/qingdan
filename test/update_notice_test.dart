@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:qingdan/features/settings/about_section.dart' show kAppVersion;
 import 'package:qingdan/theme/app_theme.dart';
+import 'package:qingdan/update/install_policy.dart';
 import 'package:qingdan/update/release_notes.dart';
 import 'package:qingdan/update/update_checker.dart' show kRepoUrl;
 import 'package:qingdan/update/update_notice.dart';
@@ -157,6 +158,18 @@ void main() {
     await tester.tap(find.text('fire'));
     await tester.pumpAndSettle();
     expect(dialog(), findsNothing);
+  });
+
+  testWidgets('通告里也有「下载并安装」，并写着统一的签名说明',
+      (WidgetTester tester) async {
+    final SharedPreferences p =
+        await seeded(<String, Object>{kLastSeenVersionKey: '1.0.1'});
+    await fire(tester, store: UpdateNoticeStore(prefs: p));
+
+    expect(find.byKey(const ValueKey<String>('update-install')), findsOneWidget);
+    final Text policy = tester
+        .widget<Text>(find.byKey(const ValueKey<String>('update-notice-policy')));
+    expect(policy.data, kInstallPolicyText);
   });
 
   testWidgets('点框外也能关（不必非点按钮），关掉同样算看过',

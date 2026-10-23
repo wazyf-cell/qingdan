@@ -4,7 +4,9 @@ import 'package:qingdan/platform/system_intents.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
+import 'package:qingdan/update/install_policy.dart';
 import 'package:qingdan/update/update_checker.dart';
+import 'package:qingdan/update/update_install_button.dart';
 
 import 'about_section.dart' show kAppVersion;
 
@@ -53,11 +55,30 @@ class _UpdateRowsState extends State<UpdateRows> {
           title: const Text('检查更新'),
           content: SizedBox(
             width: 320,
-            // 带上发布说明之后正文可能很长；能滚才不会被裁掉、也不会把按钮顶出屏幕。
-            child: SingleChildScrollView(
-              child: Text(_detailText(r),
-                  style: AppTypography.body,
-                  key: const ValueKey<String>('update-result-text')),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                // 只有正文滚：发布说明可能很长，但「下载并安装」必须始终看得见，
+                // 否则用户要先把整篇 Release 正文滚到底才知道能装。
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Text(_detailText(r),
+                        style: AppTypography.body,
+                        key: const ValueKey<String>('update-result-text')),
+                  ),
+                ),
+                if (r.status == UpdateStatus.available) ...<Widget>[
+                  const SizedBox(height: AppDimens.s12),
+                  // 有新版才给装：已是最新版时这一块只会让人以为还有东西可装。
+                  UpdateInstallButton(
+                    key: const ValueKey<String>('update-result-install'),
+                    currentVersion: kAppVersion,
+                    release: r.latest,
+                    checker: widget.checker,
+                  ),
+                ],
+              ],
             ),
           ),
           actions: <Widget>[
@@ -67,7 +88,7 @@ class _UpdateRowsState extends State<UpdateRows> {
               child: const Text('关闭'),
             ),
             if (r.status == UpdateStatus.available)
-              FilledButton(
+              TextButton(
                 key: const ValueKey<String>('update-result-open'),
                 onPressed: () {
                   Navigator.of(ctx).pop();
@@ -164,8 +185,9 @@ String _detailText(UpdateResult r) {
       if (l.assetNames.isNotEmpty) {
         b.write('\n\n发布页里的文件：\n${l.assetNames.join('\n')}');
       }
-      b.write('\n\n本应用不会自己下载安装：换签名安装必须先卸载，'
-          '而卸载会清空本机数据库。请到发布页自己选一个包装上。');
+      b.write('\n\n$kInstallPolicyText');
+      b.write('\n\n点「下载并安装」会在这里下载这一版的 APK，校验签名后调起系统安装器；'
+          '系统仍会让你点一次「安装」——普通应用无权跳过那一步。');
     case UpdateStatus.failed:
       b.write('\n\n没有拿到 GitHub 的发布页。检查更新只是读一个公开网页，'
           '失败不影响任务、课表与同步。');

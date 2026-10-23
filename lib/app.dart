@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,6 +10,7 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_theme.dart';
 import 'package:qingdan/theme/app_typography.dart';
 import 'package:qingdan/theme/theme_mode_model.dart';
+import 'package:qingdan/update/apk_download.dart';
 import 'package:qingdan/update/update_notice.dart';
 
 /// M1 界面第一入口的根组件：装配主题与主窗口壳。
@@ -65,6 +68,9 @@ class _UpdateNoticeHostState extends State<_UpdateNoticeHost> {
   @override
   void initState() {
     super.initState();
+    // 上次装完/放弃后留下的 APK（缓存目录，25MB 一份）不该一直躺着。
+    // 只删一小时前的：刚交给系统安装器的那份还要等用户点「安装」。
+    unawaited(cleanupOldDownloads());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) maybeShowUpdateNotice(context);
     });

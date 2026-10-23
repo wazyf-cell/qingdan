@@ -11,6 +11,9 @@
          （`AndroidScheduleMode.inexactAllowWhileIdle`），精确闹钟在 Android 12+
          要用户单独授权且政策收紧，而分钟级的提醒晚几十秒完全可以接受。 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- 应用内更新（1.0.4）：下载发布页的 APK 后调起系统安装器。
+         这不是「静默安装」——系统仍会弹一次确认；只有 root / 设备所有者才跳得过。 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
         android:label="qingdan"
         android:name="${applicationName}"
@@ -78,6 +81,18 @@
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
             android:exported="false" />
+        <!-- 把缓存目录里的 APK 以 content:// 交给系统安装器：Android 7+ 直接
+             传 file:// 会抛 FileUriExposedException。authority 必须与
+             SystemIntents.kt 里拼的 "<包名>.fileprovider" 一致。 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
+import 'package:qingdan/update/install_policy.dart';
 
 import 'help_section.dart';
 import 'settings_section_page.dart';
@@ -12,7 +13,7 @@ import 'settings_section_page.dart';
 /// 不引 `package_info_plus`（本轮定死「不新增依赖」），代价是它是个手抄常量，
 /// 所以 `test/app_version_test.dart` 直接读 pubspec 比对：改了版本号忘了改这里，
 /// 那条测试就红——留一个永远显示 0.1.0 的死字符串比不显示更糟。
-const String kAppVersion = '1.0.3';
+const String kAppVersion = '1.0.4';
 
 /// 设置 · 关于节（M5 定案第 13 条 + M6-C C1 / C6 / E1）。
 class AboutSection extends StatelessWidget {
@@ -46,6 +47,13 @@ class AboutSection extends StatelessWidget {
         // v1.0.2：更新通道从「未配置」变成真通道，入口在 设置 → 通用。
         Text('更新通道：GitHub Releases（设置 → 通用 → 检测更新）',
             style: AppTypography.meta.copyWith(color: colors.textFaint)),
+        const SizedBox(height: AppDimens.s8),
+        // 能不能覆盖安装只取决于签名。这段与检测更新弹层、发布页正文共用同一份文字，
+        // 之前三处各写各的，结果发布页说「直接覆盖」，真机上正好反过来。
+        Text(kInstallPolicyText,
+            key: const ValueKey<String>('about-install-policy'),
+            style: AppTypography.meta
+                .copyWith(color: colors.textFaint, height: 1.5)),
         const SizedBox(height: AppDimens.s12),
         Text(
             '任务、清单与课表都存在这台设备的本地数据库里；开了同步，才把改动写进'

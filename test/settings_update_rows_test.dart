@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qingdan/features/settings/about_section.dart' show kAppVersion;
 import 'package:qingdan/features/settings/update_rows.dart';
 import 'package:qingdan/theme/app_theme.dart';
+import 'package:qingdan/update/install_policy.dart';
 import 'package:qingdan/update/update_checker.dart';
 
 /// 更新通道两行的可见行为（v1.0.2 把 M6-E 的说明占位换成真控件）。
@@ -143,8 +144,12 @@ void main() {
           .data!;
       expect(text, contains('9.9.9'));
       expect(text, contains('app-arm64-v8a-release.apk'));
-      // 这条是整个功能的边界：不自己下载安装，因为换签名要卸载、卸载清库。
-      expect(text, contains('不会自己下载'));
+      // 1.0.4：有新版时弹层里就有「下载并安装」，能不能覆盖只取决于签名——
+      // 这段话与关于页、升级通告共用同一份常量。
+      expect(text, contains(kInstallPolicyText));
+      expect(
+          find.byKey(const ValueKey<String>('update-result-install')),
+          findsOneWidget);
       expect(
           find.byKey(const ValueKey<String>('update-result-open')), findsOneWidget);
 
@@ -261,7 +266,7 @@ void main() {
     expect(text, isNot(contains('这一版改了什么')));
     // 有新版时原有的两条信息一条都不能少。
     expect(text, contains('当前 v$kAppVersion → 最新 v9.9.9'));
-    expect(text, contains('不会自己下载'));
+    expect(text, contains(kInstallPolicyText));
   });
 
   testWidgets('发布说明是 Markdown → 压成纯文本，不把井号和星号端给用户',

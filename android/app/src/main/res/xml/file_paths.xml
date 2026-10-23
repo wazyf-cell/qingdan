@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 只暴露缓存目录下的 update/ 子目录：更新包下载在这里，别的一概不给。 -->
+<paths>
+    <cache-path name="update" path="update/" />
+</paths>
