@@ -122,11 +122,13 @@ void main() {
   }
 
   Future<void> pump(WidgetTester tester,
-      {required SyncStatusModel syncModel, required SyncCoordinator c}) async {
+      {required SyncStatusModel syncModel,
+      required SyncCoordinator c,
+      bool preload = true}) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await io(tester, () => model.load());
+    if (preload) await io(tester, () => model.load());
     await tester.pumpWidget(MultiProvider(
       providers: <SingleChildWidget>[
         ChangeNotifierProvider<CoursePaneModel>.value(value: model),
@@ -170,6 +172,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('同步来的课'), findsOneWidget,
         reason: '对端同步来的课必须出现在周视图上（S6-4 验收项）');
+  });
+
+  testWidgets('同步在页签不在前台时完成，重新进入页签也要重载', (tester) async {
+    final (SyncCoordinator c, SyncStatusModel syncModel) =
+        await wiredCoordinator(tester);
+    await pump(tester, syncModel: syncModel, c: c);
+    expect(find.text('还没有学期，先建一个学期和作息表'), findsOneWidget);
+
+    // 用户切走：面板连同监听器一起销毁（窄屏一次只挂一个页签）。
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    // 同步在页签不在前台时跑完并写进库——此刻没有任何面板在听状态流。
+    await io(tester, () async {
+      await c.syncNow();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    });
+
+    // 重新进入课表页签：只按 `loaded` 判断会停在同步前的空课表。
+    await pump(tester, syncModel: syncModel, c: c, preload: false);
+    await io(tester, () => Future<void>.delayed(const Duration(milliseconds: 150)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('还没有学期，先建一个学期和作息表'), findsNothing,
+        reason: '同步成功比上次加载新，重新进入页签必须补一次 load');
+    expect(find.text('对端学期'), findsOneWidget);
   });
 }
 

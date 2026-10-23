@@ -46,13 +46,21 @@ class _CoursePaneState extends State<CoursePane> with CoursePaneActions {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final CoursePaneModel model = context.read<CoursePaneModel>();
-      if (!model.loaded) model.load();
       // 未装配同步层（纯 UI 测试 / 未配置同步）时照常工作，与状态槽同一口径。
       final SyncStatusModel? sync = context.read<SyncStatusModel?>();
-      if (sync == null) return;
-      _sync = sync;
-      _lastSyncSeen = sync.status.lastSuccessAt;
-      sync.addListener(_onSyncChanged);
+      if (sync != null) {
+        _sync = sync;
+        _lastSyncSeen = sync.status.lastSuccessAt;
+        sync.addListener(_onSyncChanged);
+      }
+      // 本面板随页签销毁：同步在别的页签上成功时，[_onSyncChanged] 根本不存在。
+      // 只按 `loaded` 判断就会把同步前的空课表一直挂在眼前（2026-10-24 真机：
+      // 云端 21 个对象 00:44 已拉进库，课表页仍显示「还没有学期」，重启才恢复）。
+      final DateTime? syncedAt = sync?.status.lastSuccessAt;
+      final bool stale = model.loaded &&
+          syncedAt != null &&
+          (model.loadedAt == null || syncedAt.isAfter(model.loadedAt!));
+      if (!model.loaded || stale) model.load();
     });
   }
 

@@ -46,6 +46,10 @@ class CoursePaneModel extends ChangeNotifier {
   String? error;
   bool loaded = false;
 
+  /// 最近一次成功 [load] 的模型时间（注入时钟）。重新进入页签时用它跟
+  /// 「上次同步成功」比：同步发生在页签不在前台时，没人听得到状态流。
+  DateTime? loadedAt;
+
   /// 节次 → 像素布局（与今日摘要共用同一纯函数，§6.3.2）。
   SectionLayout get layout => layoutSections(details);
 
@@ -170,6 +174,7 @@ class CoursePaneModel extends ChangeNotifier {
       error = '$e';
     }
     loaded = true;
+    loadedAt = _clock();
     notifyListeners();
   }
 
