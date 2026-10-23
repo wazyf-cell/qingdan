@@ -15,7 +15,7 @@
          这不是「静默安装」——系统仍会弹一次确认；只有 root / 设备所有者才跳得过。 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
-        android:label="qingdan"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -44,6 +44,18 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- 长按图标的 4 个快捷方式。缺这条 meta-data 时系统不会报错，
+                 只是长按菜单里什么额外项都没有 —— 属于「静默失效」那一类。 -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+            <!-- Flutter 3.x 在 Android 上默认开深度链接：Activity 收到的 data URI
+                 会被当成命名路由 push（qingdan://shortcut/course → "/course"），
+                 而本应用没有 routes 表 → 断言失败、快捷方式点了没反应
+                 （2026-10-23 模拟器抓到）。路由只走 AppNav.kt + NavRouter 这一条。 -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -81,6 +93,42 @@
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
             android:exported="false" />
+        <!-- 桌面小组件（v1.0.6）。exported 必须为 true：APPWIDGET_UPDATE 由系统
+             桌面进程发出，false 收不到（表现出来就是卡片永远停在 initialLayout）。
+             三个 Receiver 的分类信息在 res/xml/*_widget_info.xml。 -->
+        <receiver
+            android:name=".widgets.TodayWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_today_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_widget_info"/>
+        </receiver>
+        <receiver
+            android:name=".widgets.CourseWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_course_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/course_widget_info"/>
+        </receiver>
+        <receiver
+            android:name=".widgets.ChaoxingWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_chaoxing_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/chaoxing_widget_info"/>
+        </receiver>
         <!-- 把缓存目录里的 APK 以 content:// 交给系统安装器：Android 7+ 直接
              传 file:// 会抛 FileUriExposedException。authority 必须与
              SystemIntents.kt 里拼的 "<包名>.fileprovider" 一致。 -->

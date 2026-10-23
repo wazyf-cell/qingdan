@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 长按图标弹出的 4 个快捷方式（v1.0.6）。
+     路由用 data URI 而不是 extra：shortcuts.xml 的 intent 只能声明 action/data，
+     写不了 extras；`qingdan://shortcut/<route>` 由 AppNav.handle() 解析。
+     四个 intent 都是显式指向本应用 MainActivity，不经过系统选择器。 -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_task"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_task"
+        android:shortcutShortLabel="@string/shortcut_new_task_short"
+        android:shortcutLongLabel="@string/shortcut_new_task_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.qingdan.qingdan"
+            android:targetClass="com.qingdan.qingdan.MainActivity"
+            android:data="qingdan://shortcut/new_task"/>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="today"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_today"
+        android:shortcutShortLabel="@string/shortcut_today_short"
+        android:shortcutLongLabel="@string/shortcut_today_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.qingdan.qingdan"
+            android:targetClass="com.qingdan.qingdan.MainActivity"
+            android:data="qingdan://shortcut/today"/>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="course"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_course"
+        android:shortcutShortLabel="@string/shortcut_course_short"
+        android:shortcutLongLabel="@string/shortcut_course_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.qingdan.qingdan"
+            android:targetClass="com.qingdan.qingdan.MainActivity"
+            android:data="qingdan://shortcut/course"/>
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="chaoxing"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_chaoxing"
+        android:shortcutShortLabel="@string/shortcut_chaoxing_short"
+        android:shortcutLongLabel="@string/shortcut_chaoxing_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.qingdan.qingdan"
+            android:targetClass="com.qingdan.qingdan.MainActivity"
+            android:data="qingdan://shortcut/chaoxing"/>
+    </shortcut>
+</shortcuts>

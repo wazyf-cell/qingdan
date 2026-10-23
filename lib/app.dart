@@ -13,6 +13,10 @@ import 'package:qingdan/theme/theme_mode_model.dart';
 import 'package:qingdan/update/apk_download.dart';
 import 'package:qingdan/update/update_notice.dart';
 
+/// 根 Navigator 的钥匙：快捷方式/小组件路由要先弹掉「设置 → 通用」这类推上来的
+/// 页面，否则页签切换发生在被盖住的那一层，用户看到的是「点了没反应」。
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 /// M1 界面第一入口的根组件：装配主题与主窗口壳。
 ///
 /// 供 `main.dart` 与 widget 冒烟测试复用；[dbInitError] 非空时
@@ -36,6 +40,7 @@ class QingdanApp extends StatelessWidget {
         builder: (BuildContext context, ThemeModeModel theme, _) {
           return MaterialApp(
             title: 'qingdan',
+            navigatorKey: appNavigatorKey,
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: theme.mode,

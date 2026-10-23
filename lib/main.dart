@@ -19,14 +19,18 @@ import 'package:qingdan/data/device_id.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_model.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/settings/settings_model.dart';
+import 'package:qingdan/features/shell/nav_router.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 import 'package:qingdan/import/course/import_service.dart';
 import 'package:qingdan/features/shell/sidebar/sync_status_model.dart';
 import 'package:qingdan/features/tasks/task_pane_model.dart';
+import 'package:qingdan/features/widgets/widget_snapshot_service.dart';
 import 'package:qingdan/notify/chaoxing_snapshot.dart';
 import 'package:qingdan/notify/notification_service.dart';
 import 'package:qingdan/notify/notify_settings.dart';
 import 'package:qingdan/notify/reminder_coordinator.dart';
+import 'package:qingdan/platform/nav_intents.dart';
+import 'package:qingdan/windows_close_hook.dart';
 import 'package:qingdan/sync/secure_store.dart';
 import 'package:qingdan/sync/sync_config_store.dart';
 import 'package:qingdan/sync/sync_coordinator.dart';
@@ -59,6 +63,8 @@ Future<void> main() async {
   // 路由器要点通知时才用得到侧栏与任务面板模型，而那两者在建库成功后才有；
   // 回调捕获的是这个局部变量，运行时（点通知）早已装配完毕。
   NotificationRouter? notificationRouter;
+  // 长按快捷方式的路由器：与通知路由器一样，回调捕获局部变量，运行时早已装配。
+  NavRouter? navRouter;
   try {
     await notificationService.initialize(
         onResponse: (response) => notificationRouter?.handle(response.payload));
@@ -107,6 +113,7 @@ Future<void> main() async {
   ChaoxingModel? chaoxingModel;
   TrashPurgeScheduler? trashPurgeScheduler;
   ReminderCoordinator? reminderCoordinator;
+  WidgetSnapshotService? widgetSnapshots;
   try {
     final db = await openAppDatabase();
 
@@ -175,6 +182,15 @@ Future<void> main() async {
     await chaoxing.restore();
     chaoxingModel = chaoxing;
 
+    // 桌面小组件（v1.0.6）：把三份快照写进 SharedPreferences 供原生 RemoteViews 读。
+    // 数据源任一变化就重写（600ms 防抖）；放在装配根而不是壳里，三栏/窄屏共用。
+    widgetSnapshots = WidgetSnapshotService(
+      taskUseCase: taskUseCase,
+      semesterUseCase: semesterUseCase,
+      courseUseCase: courseUseCase,
+      chaoxing: chaoxing,
+    )..attach(<Listenable>[paneModel, sidebarModel, courseModel, chaoxing]);
+
     // 提醒装配（M6-C2 §6）：C4 §2 的写入时机 = refresh 成功后；筛选函数在
     // `reminder_coordinator.dart`，落盘走 `ChaoxingSnapshotStore`（prefs，不进库）。
     chaoxing.onReminderSnapshot = (tasks, hidden, now) async {
@@ -193,10 +209,15 @@ Future<void> main() async {
       sources: <Listenable>[paneModel, sidebarModel, chaoxing],
     );
     notificationRouter = NotificationRouter(sidebar: sidebarModel, pane: paneModel);
+    navRouter = NavRouter(
+      sidebar: sidebarModel,
+      pane: paneModel,
+      navigatorKey: appNavigatorKey,
+    );
 
     // Windows 关窗钩子（M3 §2.1）：先同步一次（10s 超时兜底）再真正退出。
     if (Platform.isWindows) {
-      _installWindowsCloseHook(coordinator, trashPurgeScheduler);
+      installWindowsCloseHook(coordinator, trashPurgeScheduler);
     }
   } catch (e, st) {
     dbInitError = '$e\n$st';
@@ -205,8 +226,12 @@ Future<void> main() async {
   // 触发点「从后台回到前台」→ 重排提醒（项目第一个 WidgetsBindingObserver）。
   // 协调器缺席（建库失败）时也要挂：它只发一次空回调，不排任何提醒。
   final ReminderCoordinator? reminder = reminderCoordinator;
-  final AppLifecycleObserver lifecycle = AppLifecycleObserver(
-      onResume: () => reminder?.notifyChanged());
+  // 回到前台顺带重写小组件快照：跨过零点后「今天」换了，这正是它变旧的时刻。
+  final WidgetSnapshotService? widgetRefresh = widgetSnapshots;
+  final AppLifecycleObserver lifecycle = AppLifecycleObserver(onResume: () {
+    reminder?.notifyChanged();
+    widgetRefresh?.refresh();
+  });
   lifecycle.attach();
   reminder?.start(); // 内含「应用启动」那次首排（500ms 防抖）
 
@@ -258,41 +283,17 @@ Future<void> main() async {
       child: QingdanApp(dbInitError: dbInitError, themeModel: themeModel),
     ),
   );
-}
 
-/// Windows 关窗 = 退出：拦截关闭 → 触发一次同步（封顶 10s）→ destroy。
-///
-/// 监听器实例存进顶层变量（而非临时对象）——window_manager 的 addListener
-/// 若收到会被 GC 的临时对象，回调会静默失效（该库的已知坑）。
-_WindowCloseSyncHook? _windowCloseHook;
+  // 启动就把三份快照写一遍：否则新装的用户加完卡片要先改一条任务才看得到内容。
+  widgetSnapshots?.refresh();
 
-void _installWindowsCloseHook(
-    SyncCoordinator coordinator, TrashPurgeScheduler trashPurge) {
-  windowManager.setPreventClose(true);
-  _windowCloseHook = _WindowCloseSyncHook(coordinator, trashPurge);
-  windowManager.addListener(_windowCloseHook!);
-}
-
-/// 关窗同步钩子（见 [_installWindowsCloseHook]）。
-class _WindowCloseSyncHook with WindowListener {
-  _WindowCloseSyncHook(this._coordinator, this._trashPurge);
-
-  final SyncCoordinator _coordinator;
-  final TrashPurgeScheduler _trashPurge;
-  bool _closing = false;
-
-  @override
-  Future<void> onWindowClose() async {
-    if (_closing) return;
-    _closing = true;
-    // 先停清空调度：退出窗口期不应再有物理删除发生（op-log 意图留在库里，
-    // 下次启动的同步照常上传）。
-    _trashPurge.stop();
-    try {
-      await _coordinator.syncNow().timeout(const Duration(seconds: 10));
-    } catch (_) {
-      // 超时或失败都不阻塞退出：数据留在本地 op-log，下次启动兜底再传。
-    }
-    await windowManager.destroy();
+  // 快捷方式路由：热启动走 handler，冷启动那条等首帧后主动问原生要（原生暂存着）。
+  final NavRouter? nav = navRouter;
+  NavIntents.setHandler((String route) => nav?.handle(route));
+  if (nav != null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final String? route = await NavIntents.initialRoute();
+      nav.handle(route);
+    });
   }
 }

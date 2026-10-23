@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 小组件配色：与 lib/theme/app_colors.dart 的浅色一套对齐（4263EB / 1F2328 / 6B7280）。
+     values-night 里有同名的深色一套；改色两边一起改。 -->
+<resources>
+    <color name="widget_bg">#FFFFFF</color>
+    <color name="widget_text">#1F2328</color>
+    <color name="widget_text_secondary">#6B7280</color>
+    <color name="widget_accent">#4263EB</color>
+    <color name="widget_divider">#E5E7EB</color>
+</resources>

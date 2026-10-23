@@ -4,6 +4,7 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
+import 'add_widget_sheet.dart';
 import 'notify_section.dart';
 import 'permissions_sheet.dart';
 import 'settings_section_page.dart';
@@ -52,6 +53,19 @@ class GeneralSection extends StatelessWidget {
               style: AppTypography.meta),
           trailing: const Icon(Icons.chevron_right, size: 20),
           onTap: () => showPermissionsSheet(context),
+        ),
+        // v1.0.6：桌面小组件入口。副标题如实写「系统会确认」——requestPinAppWidget
+        // 做不到静默添加，写成「一键添加」就是在替系统许诺。
+        ListTile(
+          key: const ValueKey<String>('settings-add-widget'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('添加小组件',
+              style: AppTypography.body.copyWith(color: colors.textPrimary)),
+          subtitle: const Text('清单 / 课表 / 学习通放到桌面（系统会确认）',
+              style: AppTypography.meta),
+          trailing: const Icon(Icons.chevron_right, size: 20),
+          onTap: () => showAddWidgetSheet(context),
         ),
         // E2：语言整行禁用。做半套 i18n 比不做更糟——切了语言只有一半界面跟着变。
         //
