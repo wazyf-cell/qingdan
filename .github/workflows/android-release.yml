@@ -1,9 +1,10 @@
 name: android-release
 
 # 打 tag（如 v1.0.1）→ 构建 release APK → 建一个 GitHub Release 并把 APK 与
-# 校验和作为附件传上去。**手动 Run workflow 只彩排**：同样跑 analyze / test /
-# 构建 / 签名核对，但**不建 Release、不传附件**（`github.ref_name` 在手动触发时是
-# 分支名，拿它当 tag 会在仓库上凭空长出一个叫 `main` 的 tag 和一条 latest Release）。
+# 校验和作为附件传上去（**当前这条 tag 触发已停用，见下方 ★ 2026-10-24 说明**）。
+# 手动 Run workflow 只彩排：同样跑 analyze / test / 构建 / 签名核对，
+# 但**不建 Release、不传附件**（`github.ref_name` 在手动触发时是分支名，
+# 拿它当 tag 会在仓库上凭空长出一个叫 `main` 的 tag 和一条 latest Release）。
 #
 # ★ 用之前必须知道的一件事：这条路要求把签名密钥上传到 GitHub 的 Secrets 里。
 #   那把 .jks 现在只在你这台机器 + 坚果云备份两处；配好 Secrets 之后它会多一份
@@ -19,12 +20,15 @@ name: android-release
 #
 # 第三方动作（subosito/flutter-action、softprops/action-gh-release）按 @vN 引用。
 # 要更严就改成 pin 到 commit SHA（@v2 这类可变标签理论上会在上游被替换）。
+#
+# ★ 2026-10-24：**暂时只留手动触发**。仓库里没有配 KEYSTORE_BASE64 /
+#   KEYSTORE_PASSWORD 两个 Secret（Actions → Secrets 里是空的），tag 触发会在
+#   「还原签名密钥」那一步硬失败；而 v1.0.1–v1.0.6 实际上一直是**本机出包、
+#   手工上传**（正式钥匙一步都没离开这台机器）。配好 Secret 之后，
+#   把下面 `push: tags: - "v*"` 三行加回来即可恢复自动发布。
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: write
