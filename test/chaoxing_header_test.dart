@@ -49,7 +49,7 @@ void main() {
     expect(find.text('截止最早优先'), findsNothing);
   });
 
-  testWidgets('「N 分钟前」在刷新按钮左边（用户明确要求的相对位置）',
+  testWidgets('更新时间在刷新按钮左边，且永不出现半个省略号',
       (WidgetTester tester) async {
     final ChaoxingHarness h = ChaoxingHarness();
     await h.start(tasks: tasks());
@@ -58,13 +58,21 @@ void main() {
     final Rect stale = tester.getRect(h.key(ChaoxingKeys.stale));
     final Rect refresh = tester.getRect(h.key(ChaoxingKeys.refresh));
     expect(stale.right, lessThanOrEqualTo(refresh.left));
-    expect(tester.widget<Text>(h.key(ChaoxingKeys.stale)).data, '刚刚');
+    // 用户实测过「只剩一个 …」的形态。测试字体每个字都是一个 fontSize 见方的
+    // 方块（宽度约为真实字形的 1.6 倍），411dp 下这一格只有 76dp，所以这里
+    // **不要求显示出来**，只要求：要么整句、要么不显示，绝不留省略号。
+    expect(find.textContaining('…'), findsNothing);
+    // 文案本体在 `chaoxing_status_text_test.dart` 里逐条钉，位置与「不截断」
+    // 留在这条端到端断言里。
+    expect(
+        stale.width == 0 || find.text('12:00 更新').evaluate().isNotEmpty, isTrue);
   });
 
-  testWidgets('超过 15 分钟：文案追加「建议刷新」', (WidgetTester tester) async {
+  testWidgets('超过 15 分钟：时间后面追加「建议刷新」（宽屏渲染）',
+      (WidgetTester tester) async {
     final ChaoxingHarness h = ChaoxingHarness();
     await h.start(tasks: tasks());
-    await h.pump(tester);
+    await h.pump(tester, width: 600, height: 915);
 
     // 首帧的自动刷新机会已经被「距上次 0 分钟」用掉（§B7），这里只把时间拨旧。
     h.model.fetchedAt =
@@ -72,8 +80,8 @@ void main() {
     h.model.tick();
     await tester.pump();
 
-    expect(tester.widget<Text>(h.key(ChaoxingKeys.stale)).data,
-        '16 分钟前 · 建议刷新');
+    // 12:00 往前 16 分钟 = 11:44（同一天，所以不带日期）。
+    expect(find.text('11:44 更新 · 建议刷新'), findsOneWidget);
   });
 
   testWidgets('生效筛选数 = 2 时 Badge 渲染出「2」（不断言 badge.count）',
@@ -153,6 +161,24 @@ void main() {
     expect(h.model.settings.tab, ChaoxingTab.activities);
     expect(h.cardOf(cxActivity('3', clazzId: 'z3')), findsOneWidget);
     expect(h.cardOf(cxHomework('1')), findsNothing);
+  });
+
+  testWidgets('停在「课堂活动」时点刷新：活动当场补回来，不会刷成空列表',
+      (WidgetTester tester) async {
+    final ChaoxingHarness h = ChaoxingHarness();
+    await h.start(tasks: tasks());
+    h.client.activities = <ChaoxingTask>[cxActivity('3', clazzId: 'z3')];
+    await h.pump(tester);
+    await h.tapIo(tester, h.key(ChaoxingKeys.tabActivity));
+    expect(h.client.activityFetches, 1);
+
+    // 刷新会把活动作废（它们属于上一次快照）。用户正站在这一页上按的刷新，
+    // 结果列表空三秒、要切走再切回才恢复——v1.0.2 真机上就是这么难看的。
+    await h.tapIo(tester, h.key(ChaoxingKeys.refresh));
+
+    expect(h.client.activityFetches, 2, reason: '刷新后要按需重拉一次');
+    expect(h.model.activitiesLoaded, isTrue);
+    expect(h.cardOf(cxActivity('3', clazzId: 'z3')), findsOneWidget);
   });
 
   testWidgets('1280dp 桌面形态同样只有一行头部（双端各 pump 一次）',

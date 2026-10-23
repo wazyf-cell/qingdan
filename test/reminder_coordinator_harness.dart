@@ -78,10 +78,16 @@ class ReminderChaoxingClient extends ChaoxingClient {
   bool fail = false;
 
   @override
-  Future<List<ChaoxingTask>> fetchAllTasks() async {
+  Future<ChaoxingEager> fetchEager({
+    void Function(ChaoxingEager firstWave)? onHomework,
+    void Function(ChaoxingEager all)? onDone,
+  }) async {
     if (fail) throw StateError('作业页 502');
     courseCount = 1;
-    return tasks;
+    return ChaoxingEager(
+        courses: const <ChaoxingCourse>[],
+        homework: tasks,
+        exams: const <ChaoxingTask>[]);
   }
 
   @override

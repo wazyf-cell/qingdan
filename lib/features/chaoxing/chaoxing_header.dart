@@ -21,7 +21,8 @@ class ChaoxingHeader extends StatelessWidget {
     super.key,
     required this.tab,
     required this.onTab,
-    required this.staleText,
+    required this.statusText,
+    required this.statusIsError,
     required this.stale,
     required this.loading,
     required this.loggedIn,
@@ -36,8 +37,11 @@ class ChaoxingHeader extends StatelessWidget {
   final ChaoxingTab tab;
   final ValueChanged<ChaoxingTab> onTab;
 
-  /// 「刚刚 / N 分钟前 / 未刷新」，过期时上游已拼好「 · 建议刷新」。
-  final String staleText;
+  /// 一句话的状态：`22:20 更新` / `更新中…` / `未刷新` / `刷新失败：超时 · 22:20`。
+  final String statusText;
+
+  /// 失败时那一句要红；同时决定它能不能被挤掉（失败比时间更重要）。
+  final bool statusIsError;
   final bool stale;
   final bool loading;
   final bool loggedIn;
@@ -67,17 +71,15 @@ class ChaoxingHeader extends StatelessWidget {
         child: Row(
           children: <Widget>[
             for (final ChaoxingTab t in ChaoxingTab.values) _tab(context, t),
-            const Spacer(),
+            // 状态文案吃掉页签与按钮之间的**全部**剩余宽度。以前这里是
+            // `Spacer` + `Flexible`：两者都是 flex:1，各分一半，窄屏上文案只剩
+            // 二三十 dp，于是用户看到的是一个「…」（2026-10-23 真机实测）。
+            Expanded(
+              child: loggedIn
+                  ? _status(colors)
+                  : const SizedBox.shrink(),
+            ),
             if (loggedIn) ...<Widget>[
-              Flexible(
-                child: Text(staleText,
-                    key: ChaoxingKeys.vkey(ChaoxingKeys.stale),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.meta.copyWith(
-                        fontSize: 12,
-                        color: stale ? colors.priorityMedium : colors.textFaint)),
-              ),
               _refresh(colors),
               IconButton(
                 key: ChaoxingKeys.vkey(ChaoxingKeys.filter),
@@ -85,7 +87,7 @@ class ChaoxingHeader extends StatelessWidget {
                 iconSize: 20,
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 color: colors.textSecondary,
                 onPressed: onFilter,
                 icon: filterCount > 0
@@ -107,6 +109,24 @@ class ChaoxingHeader extends StatelessWidget {
     );
   }
 
+  /// 状态一句：失败红字、过期黄字、正常灰字。放不下就整句不显示（见 [_FitText]）。
+  Widget _status(AppColors colors) {
+    final Color color = statusIsError
+        ? colors.priorityHigh
+        : (stale ? colors.priorityMedium : colors.textFaint);
+    return Padding(
+      padding: const EdgeInsets.only(right: AppDimens.s4),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: _FitText(
+          key: ChaoxingKeys.vkey(ChaoxingKeys.stale),
+          text: statusText,
+          style: AppTypography.meta.copyWith(fontSize: 12, color: color),
+        ),
+      ),
+    );
+  }
+
   Widget _refresh(AppColors colors) {
     // loading 时换成转圈并禁点：刷新是单发的，连着点只会排队打超星。
     return IconButton(
@@ -115,7 +135,7 @@ class ChaoxingHeader extends StatelessWidget {
       iconSize: 20,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       color: colors.textSecondary,
       onPressed: loading ? null : onRefresh,
       icon: loading
@@ -188,6 +208,36 @@ class ChaoxingHeader extends StatelessWidget {
             style: AppTypography.meta.copyWith(
                 color: selected ? colors.accent : colors.textSecondary)),
       ),
+    );
+  }
+}
+
+/// 放得下就显示，放不下就**整句不显示**。
+///
+/// 不用 `TextOverflow.ellipsis`：这一格只有几十 dp，加省略号等于把整句吃掉，
+/// 用户看到的是一个孤零零的「…」——比不显示更难懂，而且没法判断是坏了还是没数据
+/// （2026-10-23 用户在真机上就是这么看到的）。
+class _FitText extends StatelessWidget {
+  const _FitText({super.key, required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext ctx, BoxConstraints c) {
+        final TextPainter measure = TextPainter(
+          text: TextSpan(text: text, style: style),
+          maxLines: 1,
+          textDirection: Directionality.of(ctx),
+          // 系统的字体放大也要算进来，否则「量着放得下」在真机上会溢出一行。
+          textScaler: MediaQuery.textScalerOf(ctx),
+        )..layout();
+        final bool fits = measure.width <= c.maxWidth;
+        measure.dispose();
+        return fits ? Text(text, style: style, maxLines: 1) : const SizedBox.shrink();
+      },
     );
   }
 }

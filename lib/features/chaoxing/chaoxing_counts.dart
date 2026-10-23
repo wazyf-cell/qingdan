@@ -1,9 +1,13 @@
-/// 学习通面板要显示的两个数与「N 分钟前」文案（纯函数，无 IO）。
+/// 学习通面板要显示的几个数、头部那一句时间、以及失败原因的人话（纯函数，无 IO）。
 ///
 /// 从 `chaoxing_model.dart` 搬出来只为了守住「单份源码不超过 300 行」那条红线，
-/// 但顺带把这两件事变成可以直接单测的东西——模型里那两个 getter 只剩一行转发。
+/// 但顺带把这几件事变成可以直接单测的东西——模型里那两个 getter 只剩一行转发。
 library;
 
+import 'dart:async';
+import 'dart:io';
+
+import 'package:qingdan/import/chaoxing/chaoxing_client.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 
 /// 只数「状态仍为待办且未被隐藏」的条目；**没拉取过返回 0**——这个数据刻意
@@ -35,19 +39,53 @@ int countTodos({
   return n;
 }
 
-/// 「数据 · N 分钟前」文案；未抓取过时说「未刷新」。[stale] 由调用方算
-/// （阈值是模型那个 `kStaleAfter`，搬过来会变成两份常量）。
+/// 头部那一句：`22:20 更新`；不是今天就带日期（`10-19 22:20 更新`），跨年带年份。
 ///
-/// 名字不叫 `fetchedAgoText`：模型上有个同名 getter，同名会让 getter 里的
-/// 「转发」在类作用域里解析到自己，变成无限递归。
-String fetchedAgo({
+/// 为什么用绝对时间而不是「16 分钟前」：用户要拿它和作业上写的截止时间对，
+/// 相对时间还得自己在心里换算一次（2026-10-23 用户定案）。
+///
+/// 刷新中固定 `更新中…`：作业先到、考试后到，若作业一到就写时间，那两三秒里
+/// 这句话对考试那一栏是假的（D1 定案——这个时间只代表「这批数据齐了」）。
+String fetchedLabel({
   required DateTime? fetchedAt,
   required DateTime now,
+  required bool loading,
   required bool stale,
 }) {
+  if (loading) return '更新中…';
   final DateTime? at = fetchedAt;
   if (at == null) return '未刷新';
-  final int m = now.difference(at).inMinutes;
-  final String base = m < 1 ? '刚刚' : '$m 分钟前';
+  final DateTime l = at.toLocal();
+  final DateTime n = now.toLocal();
+  final String hm = '${_two(l.hour)}:${_two(l.minute)}';
+  final String base;
+  if (l.year != n.year) {
+    base = '${l.year}-${_two(l.month)}-${_two(l.day)} $hm 更新';
+  } else if (l.month != n.month || l.day != n.day) {
+    base = '${_two(l.month)}-${_two(l.day)} $hm 更新';
+  } else {
+    base = '$hm 更新';
+  }
   return stale ? '$base · 建议刷新' : base;
+}
+
+/// 失败原因压成一句能直接放进行里的中文；`null` 表示这次没失败。
+///
+/// 别把异常原文甩到界面上：它常带完整 URL 甚至 cookie 所在的域名，
+/// 而用户只需要知道「哪一类问题、下一步做什么」。
+String? refreshErrorText(Object? error) {
+  if (error == null) return null;
+  if (error is ChaoxingAuthException) return '会话已失效，请重新登录';
+  if (error is TimeoutException) return '连不上学习通（超时）';
+  if (error is SocketException) return '连不上学习通（网络不通）';
+  return '刷新失败（${error.runtimeType}）';
+}
+
+String _two(int v) => v.toString().padLeft(2, '0');
+
+/// `22:20`——失败行里要带上「上次成功是什么时候」，否则「刷新失败」四个字
+/// 看不出你正看着的是几分钟前还是昨天下午的数据。
+String hhmm(DateTime t) {
+  final DateTime l = t.toLocal();
+  return '${_two(l.hour)}:${_two(l.minute)}';
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -40,12 +42,40 @@ class FakeChaoxingClient extends ChaoxingClient {
   bool failWorkAuth = false;
 
   @override
-  Future<List<ChaoxingTask>> fetchAllTasks() async {
+  Future<ChaoxingEager> fetchEager({
+    void Function(ChaoxingEager firstWave)? onHomework,
+    void Function(ChaoxingEager all)? onDone,
+  }) async {
     fetches++;
     if (failAuth) throw ChaoxingAuthException();
     courseCount = 1;
-    return tasks;
+    // 假客户端不区分作业与考试：整批都当作业，第一波就能看见——真实实现里
+    // 作业也正是先到的那一段，这里的时序与它同形。
+    final ChaoxingEager eager = ChaoxingEager(
+        courses: const <ChaoxingCourse>[],
+        homework: tasks,
+        exams: const <ChaoxingTask>[]);
+    onHomework?.call(eager);
+    // 非空时卡在两波之间，用来观察「作业先上屏、考试还没到」那一刻。
+    if (waveGate != null) await waveGate!.future;
+    onDone?.call(eager);
+    return eager;
   }
+
+  /// 见 [fetchEager]：测试用它把「第一波之后」这个中间态摁住。
+  Completer<void>? waveGate;
+
+  /// 活动的假返回：默认没有，个别用例需要时再喂。
+  @override
+  Future<List<ChaoxingTask>> fetchActivities(List<ChaoxingCourse> courses) async {
+    activityFetches++;
+    if (failActivities) throw ChaoxingAuthException();
+    return activities;
+  }
+
+  List<ChaoxingTask> activities = const <ChaoxingTask>[];
+  int activityFetches = 0;
+  bool failActivities = false;
 
   @override
   Future<ChaoxingWorkDetail?> fetchWorkDetail(String entryUrl) async {
@@ -173,10 +203,9 @@ class ChaoxingHarness {
     );
     await model.restore();
     if (seeded) {
-      model.tasks = tasks;
+      model.seedTasksForTest(tasks);
       model.fetchedAt = kCxNow;
       model.courseCount = 1;
-      model.activityCount = tasks.length;
     }
   }
 

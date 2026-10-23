@@ -14,6 +14,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qingdan/features/chaoxing/chaoxing_grouping.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_keys.dart';
+// 扩展方法（setTab 等）不会随 harness 的传递导入进作用域，必须直接 import 模型库。
+import 'package:qingdan/features/chaoxing/chaoxing_model.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 
 import 'chaoxing_harness.dart';

@@ -46,9 +46,16 @@ class _ChaoxingPaneState extends State<ChaoxingPane> {
     super.initState();
     // 刷新收敛（M6B §B7）：每次进程只有一次自动刷新机会，距上次拉取不足
     // 15 分钟就跳过；另一个入口是头部的 ⟳ 按钮。下拉刷新已取消。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      context.read<ChaoxingModel>().autoRefreshOnce();
+      final ChaoxingModel model = context.read<ChaoxingModel>();
+      await model.autoRefreshOnce();
+      // 上次停在「课堂活动」页签的话，这次进来也得把那一批补上（活动是按需的，
+      // 刷新不再顺带抓）。必须等自动刷新结束：刷新期间活动会被清空重置。
+      if (!mounted) return;
+      if (model.settings.tab == ChaoxingTab.activities) {
+        await model.ensureActivitiesLoaded();
+      }
     });
     // 倒计时得走字：每分钟推进一次模型的时间基准（不发请求）。
     _ticker = Timer.periodic(const Duration(minutes: 1), (Timer _) {
@@ -93,6 +100,18 @@ class _ChaoxingPaneState extends State<ChaoxingPane> {
           query: _search.text,
           course: _course).length;
 
+  /// 头部 ⟳：刷新后如果正停在「课堂活动」页签，把它按需补回来。
+  ///
+  /// 刷新会把活动作废（旧活动属于上一次快照），不清的话这里的列表会先空掉、
+  /// 必须切走再切回才恢复——而用户就站在这一页上按的刷新。
+  Future<void> _refresh(ChaoxingModel model) async {
+    await model.refresh();
+    if (!mounted) return;
+    if (model.settings.tab == ChaoxingTab.activities) {
+      await model.ensureActivitiesLoaded();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ChaoxingModel model = context.watch<ChaoxingModel>();
@@ -113,12 +132,18 @@ class _ChaoxingPaneState extends State<ChaoxingPane> {
               _openKey = null;
             });
             model.setTab(t);
+            // 课堂活动不再跟刷新一起抓（它要按班级一个一个请求，实测占 3 秒），
+            // 切到这个页签才拉一次。
+            if (t == ChaoxingTab.activities) model.ensureActivitiesLoaded();
           },
-          staleText: model.fetchedAgoText,
+          statusText: model.statusText,
+          statusIsError: model.statusIsError,
           stale: model.stale,
-          loading: model.loading,
+          // 活动的按需拉也要占住这个转圈：否则活动页签上按刷新，转圈先停、
+          // 列表空三秒，看起来像「活动被刷没了」。
+          loading: model.loading || model.activitiesLoading,
           loggedIn: model.loggedIn,
-          onRefresh: model.refresh,
+          onRefresh: () => _refresh(model),
           filterCount: _filterCount,
           onFilter: () => showChaoxingFilter(context,
               search: _search,
