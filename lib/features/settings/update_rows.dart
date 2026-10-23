@@ -53,9 +53,12 @@ class _UpdateRowsState extends State<UpdateRows> {
           title: const Text('检查更新'),
           content: SizedBox(
             width: 320,
-            child: Text(_detailText(r),
-                style: AppTypography.body,
-                key: const ValueKey<String>('update-result-text')),
+            // 带上发布说明之后正文可能很长；能滚才不会被裁掉、也不会把按钮顶出屏幕。
+            child: SingleChildScrollView(
+              child: Text(_detailText(r),
+                  style: AppTypography.body,
+                  key: const ValueKey<String>('update-result-text')),
+            ),
           ),
           actions: <Widget>[
             TextButton(
@@ -152,6 +155,12 @@ String _detailText(UpdateResult r) {
       final ReleaseInfo l = r.latest!;
       b.write('\n\n当前 v$kAppVersion → 最新 v${l.version}'
           '（发布于 ${_ymd(l.publishedAt)}）');
+      // 发布说明只在「真的能升级」时有用：已是最新版的提示里塞一遍改动内容，
+      // 只会让那一屏更长，而用户并没有东西可装。
+      final String? notes = _cappedNotes(l.notes);
+      if (notes != null) {
+        b.write('\n\n这一版改了什么：\n$notes');
+      }
       if (l.assetNames.isNotEmpty) {
         b.write('\n\n发布页里的文件：\n${l.assetNames.join('\n')}');
       }
@@ -170,4 +179,40 @@ String _ymd(DateTime? t) {
   final String mm = local.month.toString().padLeft(2, '0');
   final String dd = local.day.toString().padLeft(2, '0');
   return '${local.year}-$mm-$dd';
+}
+
+/// 发布说明的长度上限。GitHub 的 `body` 没有长度限制，真发过一篇带变更表格的长文
+/// 就会把弹层撑成一屏读不完的墙；这里只留够看清「改了什么」的前 1200 字。
+const int kMaxNoteChars = 1200;
+
+/// 取发布说明、压成纯文本并截断。没有说明就返回 null，让调用方保持原有版式。
+String? _cappedNotes(String? raw) {
+  final String text = _plainNotes(raw?.trim() ?? '');
+  if (text.isEmpty) return null;
+  if (text.length <= kMaxNoteChars) return text;
+  int end = kMaxNoteChars;
+  // 不把代理对（emoji 之类）劈成半个字符——那会在界面上显示成一个「豆腐块」。
+  final int last = text.codeUnitAt(end - 1);
+  if (last >= 0xD800 && last <= 0xDBFF) end -= 1;
+  return '${text.substring(0, end)}…';
+}
+
+/// 把 GitHub 的 Markdown 发布说明压成纯文本。
+///
+/// 项目里没有 Markdown 渲染器：`## 这一版改了什么`、`**加粗**`、反引号会连同
+/// 符号原样显示在弹层里，用户看到的第一行就是几个井号。只处理发布说明里
+/// 真会用到的那几种标记，不追求完整的 Markdown 语义。
+String _plainNotes(String raw) {
+  if (raw.isEmpty) return raw;
+  final StringBuffer out = StringBuffer();
+  for (final String line in raw.split('\n')) {
+    String l = line.trimRight();
+    l = l.replaceFirst(RegExp(r'^\s*#{1,6}\s+'), ''); // 标题
+    l = l.replaceFirst(RegExp(r'^\s*[-*]\s+'), '· '); // 无序列表 → 与自带说明同形
+    l = l.replaceAll('**', '').replaceAll('`', ''); // 加粗 / 行内代码
+    // 链接只留文字：URL 在弹层里既长又点不动。
+    l = l.replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]*\)'), (m) => m[1] ?? '');
+    out.writeln(l);
+  }
+  return out.toString().trim();
 }

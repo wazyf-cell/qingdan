@@ -24,6 +24,7 @@ class ReleaseInfo {
     this.tagName = '',
     this.publishedAt,
     this.assetNames = const <String>[],
+    this.notes,
   });
 
   /// 规范化后的版本号（去掉前缀 `v` 与 `+build`）。
@@ -33,15 +34,22 @@ class ReleaseInfo {
   final DateTime? publishedAt;
   final List<String> assetNames;
 
+  /// 发布说明原文（GitHub Release 的 `body`）。只有空白时按 null 处理：
+  /// 「没写说明」与「写了一堆空格」在界面上是同一件事，调用方只想判一次空。
+  final String? notes;
+
   /// 拿不到 `tag_name` 就返回 null，由调用方报「发布页里没有版本号」——
   /// 退化成 v0.0.0 会让界面显示「发现新版本 v0.0.0」这种自相矛盾的话。
   static ReleaseInfo? fromJson(Map<String, dynamic> json) {
     final String tag = (json['tag_name'] as String?)?.trim() ?? '';
     if (tag.isEmpty) return null;
     final Object? assets = json['assets'];
+    // `body` 可能是 null（发布时没填说明）、空串，或带首尾空白的多行文本。
+    final String body = (json['body'] as String?)?.trim() ?? '';
     return ReleaseInfo(
       version: normalizeVersion(tag),
       tagName: tag,
+      notes: body.isEmpty ? null : body,
       url: (json['html_url'] as String?)?.trim().isNotEmpty == true
           ? (json['html_url'] as String).trim()
           : '$kRepoUrl/releases',

@@ -2,6 +2,7 @@ package com.qingdan.qingdan
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -22,6 +23,25 @@ object SystemIntents {
 
     fun register(activity: FlutterActivity, engine: FlutterEngine) {
         MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, reply ->
+            // 安装时间不是「打开某个系统页」，返回值是两个毫秒时间戳，单独回。
+            // 更新说明靠它区分「全新安装」与「从旧版升级」：1.0.2 没有写过
+            // app.lastSeenVersion，只看偏好分不出这两种情况。
+            if (call.method == "installTimes") {
+                val pm = activity.packageManager
+                val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    pm.getPackageInfo(activity.packageName, PackageManager.PackageInfoFlags.of(0))
+                } else {
+                    @Suppress("DEPRECATION")
+                    pm.getPackageInfo(activity.packageName, 0)
+                }
+                reply.success(
+                    mapOf(
+                        "firstInstallTime" to info.firstInstallTime,
+                        "lastUpdateTime" to info.lastUpdateTime,
+                    ),
+                )
+                return@setMethodCallHandler
+            }
             val opened: Boolean? = when (call.method) {
                 // 8.0 以下没有「本应用通知页」，按规格回落到应用详情页
                 "openNotificationSettings" -> start(activity, notificationIntent(activity) ?: detailsIntent(activity))

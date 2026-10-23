@@ -8,6 +8,7 @@ import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_theme.dart';
 import 'package:qingdan/theme/app_typography.dart';
 import 'package:qingdan/theme/theme_mode_model.dart';
+import 'package:qingdan/update/update_notice.dart';
 
 /// M1 界面第一入口的根组件：装配主题与主窗口壳。
 ///
@@ -36,13 +37,41 @@ class QingdanApp extends StatelessWidget {
             darkTheme: AppTheme.dark(),
             themeMode: theme.mode,
             home: dbInitError == null
-                ? const _FirstRunGate(child: AppShell())
+                ? const _UpdateNoticeHost(
+                    child: _FirstRunGate(child: AppShell()))
                 : _DbInitErrorScreen(message: dbInitError!),
           );
         },
       ),
     );
   }
+}
+
+/// 升级后首次启动弹一次「本次更新内容」（v1.0.3）。
+///
+/// 挂在 `home` 里而不是 `MaterialApp.builder`：builder 的 context 在 Navigator
+/// **之上**，从那里 `showDialog` 找不到路由。判定「版本变过没有」在
+/// [maybeShowUpdateNotice] 里（落盘的上次版本号），这里只负责在首帧之后叫它一次。
+class _UpdateNoticeHost extends StatefulWidget {
+  const _UpdateNoticeHost({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_UpdateNoticeHost> createState() => _UpdateNoticeHostState();
+}
+
+class _UpdateNoticeHostState extends State<_UpdateNoticeHost> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowUpdateNotice(context);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// 数据库初始化失败页：完整报错原文呈现，不静默。

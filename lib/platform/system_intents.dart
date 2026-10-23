@@ -45,6 +45,29 @@ class SystemIntents {
     return _invoke('openUrl', <String, String>{'url': url});
   }
 
+  /// 安装时间与最近更新时间（毫秒时间戳）。拿不到就返回 null。
+  ///
+  /// 更新说明用它区分「全新安装」与「从旧版升级」：1.0.2 从没写过
+  /// `app.lastSeenVersion`，只看偏好文件会把升级当成第一次装这应用。
+  /// 升级时 [lastUpdateTime] 晚于 [firstInstallTime]，全新安装两者是同一刻。
+  static Future<({int firstInstallTime, int lastUpdateTime})?> installTimes() async {
+    if (!_isAndroid) return null;
+    try {
+      // 先按 Object? 取再判类型：通道那头回错形状（旧版本 APK、测试假实现）
+      // 不该在这里抛 TypeError，调用方只需要「拿不到」这一个结论。
+      final Object? raw = await _ch.invokeMethod<Object?>('installTimes');
+      if (raw is! Map) return null;
+      final Object? first = raw['firstInstallTime'];
+      final Object? last = raw['lastUpdateTime'];
+      if (first is! int || last is! int) return null;
+      return (firstInstallTime: first, lastUpdateTime: last);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   static Future<bool> _invoke(String method, [Map<String, String>? args]) async {
     if (!_isAndroid) return false; // Windows 端也会调到这里，必须先短路再碰通道
     try {
