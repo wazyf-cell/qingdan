@@ -31,6 +31,10 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.47.5"
+  # 正式证书的 SHA-256。**这是一道防回归门禁**：2026-10-23 用户手机上的包与
+  # 发布包签名不一致，覆盖安装被系统拒绝，而当时没有任何地方检查过这件事。
+  # 换钥匙时必须同时改这里和 README/关于页里的指纹。
+  EXPECTED_CERT_SHA256: "7bc0ca26455dc64848647765b395b3c56d0ede95af334a2c9764eff3142df1ea"
 
 jobs:
   release:
@@ -114,6 +118,13 @@ jobs:
             fi
             if printf '%s' "$DN" | grep -qi "Android Debug"; then
               echo "::error::$apk 是 debug 签名，不能发布"; exit 1
+            fi
+            # 光「不是 debug」不够：换了一把正式钥匙同样会让用户装不上。
+            SHA=$("$APKSIGNER" verify --print-certs "$apk" 2>/dev/null \
+                 | grep -m1 -i "SHA-256 digest" | awk '{print $NF}')
+            if [ "${SHA,,}" != "${EXPECTED_CERT_SHA256,,}" ]; then
+              echo "::error::$apk 的证书指纹是 ${SHA:-（读不到）}，与正式证书 ${EXPECTED_CERT_SHA256} 不一致"
+              exit 1
             fi
           done
 
