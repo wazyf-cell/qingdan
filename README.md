@@ -94,10 +94,13 @@ flutter build apk --release --split-per-abi
 
 - **唯一真相是 `pubspec.yaml` 的 `version:`**（形如 `1.0.1+2`：`+` 前是 versionName，
   后面是 versionCode）。
-- 发布靠打 tag：确认 `pubspec.yaml` 的版本后
-  `git tag v1.0.1 && git push --tags`，CI 会**硬比对 tag 与 pubspec 版本**，不一致直接拒绝发布。
-- 手动 Run workflow 是「彩排」：跑完 analyze、测试、构建与签名核对，但**不创建 Release、
-  也不上传任何产物**（公开仓库的 Actions 产物不登录就能下载，没经你过目的包不该挂上去）。
+- 发布目前是**本机出包、手工上传**：`flutter build apk --release --split-per-abi`，把产物与
+  `sha256sums.txt` 挂到 Release 页面。正式签名钥匙不离开本机，GitHub 上也没有它的副本。
+- CI 工作流的 **tag 触发已暂停**（仓库没配 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` 两个 Secret，
+  加了 tag 触发也会在还原密钥那一步失败）：现在打 tag 不会触发构建。
+- 手动 Run workflow 是「彩排」：跑完 analyze、测试、构建与签名核对（硬比对证书指纹），
+  但**不创建 Release、也不上传任何产物**（公开仓库的 Actions 产物不登录就能下载，
+  没经你过目的包不该挂上去）。
 
 ## 怎么跑测试
 
@@ -136,7 +139,7 @@ lib/
   features/      界面：shell / tasks / detail / calendar / course / settings / trash
 test/            单元与 widget 测试
 android/         Android 工程
-.github/         CI（tag 触发，构建 release APK 并发 Release）
+.github/         CI（手动触发：analyze / 测试 / 构建 / 签名核对；发布走本机出包）
 ```
 
 分层约定：UI 层不得直接访问 DAO，只调用 `lib/application/`；写库与记录待同步意图必须在
