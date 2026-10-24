@@ -56,6 +56,45 @@ void main() {
     expect(text, isNot(contains('  · 学习通')), reason: '首尾空白不该原样搬进弹层');
   });
 
+  testWidgets('新版发布页分了段 → 只取「更新内容」，不把下载与安装说明搬进弹层',
+      (WidgetTester tester) async {
+    await pumpRows(tester, returning(<String, dynamic>{
+      'tag_name': 'v9.9.9',
+      'body': '## 更新内容\n\n'
+          '- 学习通小组件改成可滚动\n'
+          '- 检测更新能看见公告\n\n'
+          '## 下载\n\n'
+          '- 大多数手机：`qingdan-9.9.9-arm64-v8a.apk`\n\n'
+          '## 覆盖安装说明\n\n'
+          '- 同一把签名可以直接覆盖\n',
+    }));
+    await openResult(tester);
+
+    final String text = detailOf(tester);
+    expect(text, contains('学习通小组件改成可滚动'));
+    expect(text, contains('检测更新能看见公告'));
+    expect(text, isNot(contains('qingdan-9.9.9-arm64-v8a.apk')),
+        reason: '下载段与弹层里的附件列表重复，还会把改动挤下去');
+    expect(text, isNot(contains('覆盖安装说明')),
+        reason: '安装说明由弹层自己的常量负责，正文里这段是重复的');
+  });
+
+  testWidgets('已是最新版 → 仍然显示最新发布这一版的公告',
+      (WidgetTester tester) async {
+    await pumpRows(tester, returning(<String, dynamic>{
+      'tag_name': 'v$kAppVersion',
+      'body': '## 更新内容\n\n- 改到期后角标立刻更新\n',
+    }));
+    await openResult(tester);
+
+    final String text = detailOf(tester);
+    expect(text, contains('已是最新版'));
+    expect(text, contains('最新发布 v$kAppVersion 改了什么'));
+    expect(text, contains('改到期后角标立刻更新'));
+    expect(find.byKey(const ValueKey<String>('update-result-install')),
+        findsNothing);
+  });
+
   testWidgets('发布页没写说明 → 不出「这一版改了什么」，保持原来的版式',
       (WidgetTester tester) async {
     await pumpRows(tester, returning(<String, dynamic>{'tag_name': 'v9.9.9'}));

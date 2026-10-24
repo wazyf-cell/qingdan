@@ -7,10 +7,11 @@ import android.view.View
 import android.widget.RemoteViews
 
 /**
- * 三个卡片的共同骨架：`onUpdate` / 尺寸变化都走一次 [build]。
+ * 「清单」与「课表」卡片的共同骨架：`onUpdate` / 尺寸变化都走一次 [build]。
  *
  * 尺寸不做两套布局：同一份布局里藏行。`minHeight >= 180dp` 视为 2×4（五行），
  * 否则 2×2（两行）。这样用户拖动改尺寸时内容自然增减，不用维护两份 XML。
+ * 学习通卡片是集合（`ListView`），行数由 [ChaoxingWidgetService] 管，不走这里。
  */
 abstract class BaseWidgetProvider : AppWidgetProvider() {
     protected abstract fun build(

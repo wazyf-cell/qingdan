@@ -3,8 +3,12 @@
      values-night 里有同名的深色一套；改色两边一起改。 -->
 <resources>
     <color name="widget_bg">#FFFFFF</color>
+    <color name="widget_row_bg">#F4F5F7</color>
     <color name="widget_text">#1F2328</color>
     <color name="widget_text_secondary">#6B7280</color>
     <color name="widget_accent">#4263EB</color>
+    <color name="widget_accent_faint">#1A4263EB</color>
+    <color name="widget_warn">#E8590C</color>
     <color name="widget_divider">#E5E7EB</color>
+    <color name="widget_stroke">#E7E8EC</color>
 </resources>

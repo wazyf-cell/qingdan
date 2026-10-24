@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一行一条的浅底卡片，让 15 行在滚动时仍有清晰的分条。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="12dp"/>
+    <solid android:color="@color/widget_row_bg"/>
+</shape>

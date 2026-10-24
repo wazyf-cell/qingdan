@@ -129,6 +129,12 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/chaoxing_widget_info"/>
         </receiver>
+        <!-- 学习通卡片的可滚动列表（v1.0.9）。由系统桌面以
+             BIND_REMOTEVIEWS 权限绑定，所以不需要 exported。 -->
+        <service
+            android:name=".widgets.ChaoxingWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false"/>
         <!-- 把缓存目录里的 APK 以 content:// 交给系统安装器：Android 7+ 直接
              传 file:// 会抛 FileUriExposedException。authority 必须与
              SystemIntents.kt 里拼的 "<包名>.fileprovider" 一致。 -->

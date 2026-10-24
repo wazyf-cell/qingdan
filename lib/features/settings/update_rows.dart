@@ -177,11 +177,18 @@ String _detailText(UpdateResult r) {
   final StringBuffer b = StringBuffer(r.summary);
   switch (r.status) {
     case UpdateStatus.upToDate:
+      final ReleaseInfo l = r.latest!;
       // 「GitHub 上最新是 vX」必须带版本号。本机包比 GitHub 那条 release 更新是
       // 正常状态（发了版还没推 tag / 用户装的是预发布的包），只写「最新发布：日期」
       // 会被读成「最新的就是我今天这个」，而那个日期其实是旧版的发布日。
-      b.write('\n\nGitHub 上最新是 v${r.latest!.version}'
-          '（发布于 ${_ymd(r.latest!.publishedAt)}）');
+      b.write('\n\nGitHub 上最新是 v${l.version}'
+          '（发布于 ${_ymd(l.publishedAt)}）');
+      // 已是最新版也要把这一版的公告露出来：否则「检测更新」只剩一句结论，
+      // 用户想看这次改了什么就得自己开浏览器（2026-10-24 反馈）。
+      final String? latestNotes = _cappedNotes(l.notes);
+      if (latestNotes != null) {
+        b.write('\n\n最新发布 v${l.version} 改了什么：\n$latestNotes');
+      }
       b.write('\n版本源：$kRepoUrl/releases/latest');
     case UpdateStatus.available:
       final ReleaseInfo l = r.latest!;
@@ -232,6 +239,32 @@ String? _cappedNotes(String? raw) {
   return '${text.substring(0, end)}…';
 }
 
+/// 新版发布页按 `## 更新内容` / `## 下载` / `## 覆盖安装说明` 分段。
+///
+/// 弹层自己已经列了附件与安装说明，整篇 body 搬进来只会重复一遍，还把真正的
+/// 改动挤到一眼看不见的地方。只取「更新内容」那一段；老格式（整篇就是改动）
+/// 没有这段时原样返回。
+String _notesSection(String raw) {
+  final List<String> lines = raw.split('\n');
+  final RegExp heading = RegExp(r'^\s*#{1,6}\s+(.+?)\s*$');
+  int start = -1;
+  for (int i = 0; i < lines.length; i++) {
+    final RegExpMatch? m = heading.firstMatch(lines[i]);
+    if (m != null && m[1]!.trim() == '更新内容') {
+      start = i + 1;
+      break;
+    }
+  }
+  if (start < 0) return raw;
+  final List<String> kept = <String>[];
+  for (int i = start; i < lines.length; i++) {
+    if (heading.hasMatch(lines[i])) break;
+    kept.add(lines[i]);
+  }
+  final String text = kept.join('\n').trim();
+  return text.isEmpty ? raw : text;
+}
+
 /// 把 GitHub 的 Markdown 发布说明压成纯文本。
 ///
 /// 项目里没有 Markdown 渲染器：`## 这一版改了什么`、`**加粗**`、反引号会连同
@@ -240,7 +273,7 @@ String? _cappedNotes(String? raw) {
 String _plainNotes(String raw) {
   if (raw.isEmpty) return raw;
   final StringBuffer out = StringBuffer();
-  for (final String line in raw.split('\n')) {
+  for (final String line in _notesSection(raw).split('\n')) {
     String l = line.trimRight();
     l = l.replaceFirst(RegExp(r'^\s*#{1,6}\s+'), ''); // 标题
     l = l.replaceFirst(RegExp(r'^\s*[-*]\s+'), '· '); // 无序列表 → 与自带说明同形

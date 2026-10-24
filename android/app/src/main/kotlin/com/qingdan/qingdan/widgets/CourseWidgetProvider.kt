@@ -28,14 +28,13 @@ class CourseWidgetProvider : BaseWidgetProvider() {
         val courses = if (fresh && state == "ok") snap?.optJSONArray("courses") else null
         val total = courses?.length() ?: 0
 
-        rv.setTextViewText(
-            R.id.w_header,
-            if (state == "ok") {
-                "第 ${snap?.optInt("week", 0)} 周 · ${WidgetSnapshot.weekdayCn()}"
-            } else {
-                "课表 · 今日"
-            },
-        )
+        if (state == "ok") {
+            rv.setTextViewText(R.id.w_header, "第 ${snap?.optInt("week", 0)} 周")
+            rv.setTextViewText(R.id.w_sub, WidgetSnapshot.weekdayCn())
+        } else {
+            rv.setTextViewText(R.id.w_header, "课表")
+            rv.setTextViewText(R.id.w_sub, "今日")
+        }
         rv.setTextViewText(R.id.w_count, if (total > 0) "$total 门" else "")
 
         var shown = 0
@@ -48,6 +47,11 @@ class CourseWidgetProvider : BaseWidgetProvider() {
             val time = if (start.isNotEmpty() && end.isNotEmpty()) "$start–$end" else c.optString("section")
             val meta = listOf(time, room).filter { it.isNotEmpty() }.joinToString(" · ")
             rv.setViewVisibility(WidgetRows.ROW_IDS[i], View.VISIBLE)
+            rv.setInt(
+                WidgetRows.COLOR_IDS[i],
+                "setBackgroundColor",
+                WidgetPalette.course(ctx, c.optInt("color", 0)),
+            )
             rv.setTextViewText(WidgetRows.TITLE_IDS[i], c.optString("name"))
             rv.setTextViewText(WidgetRows.META_IDS[i], meta)
             // 点课不会定位到某一节（列表页没有这一层的入口），统一进课表页。

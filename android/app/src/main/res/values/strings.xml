@@ -19,7 +19,7 @@
     <string name="widget_course_label">课表 · 今日</string>
     <string name="widget_course_desc">今天要上的课，2×4 显示五节</string>
     <string name="widget_chaoxing_label">学习通 · 待办</string>
-    <string name="widget_chaoxing_desc">学习通里还没交的作业与考试</string>
+    <string name="widget_chaoxing_desc">学习通里还没交的作业与考试，最多 15 条，可滚动</string>
 
     <string name="widget_today_empty">今天没有安排</string>
     <string name="widget_today_stale">打开应用查看今天的安排</string>

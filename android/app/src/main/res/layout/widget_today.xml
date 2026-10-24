@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 清单 · 今天。2×2 与 2×4 共用这一个布局：Provider 按高度决定显示几行
-     （2×2 两行，2×4 五行），多出来的行直接 gone，不另做一套布局。 -->
+<!-- 清单 · 今天。2×2 与 2×4 共用这一个布局：Provider 按高度决定显示几行。
+     头部是「今天 + 周六 · 10/24 + 计数胶囊」，行是浅底圆角卡片。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_root"
     android:layout_width="match_parent"
@@ -17,22 +17,37 @@
 
         <TextView
             android:id="@+id/w_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textColor="@color/widget_text"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:text="今天"/>
+
+        <TextView
+            android:id="@+id/w_sub"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginStart="6dp"
             android:maxLines="1"
             android:ellipsize="end"
-            android:textColor="@color/widget_text"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:text="今天"/>
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="10sp"/>
 
         <TextView
             android:id="@+id/w_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp"/>
+            android:background="@drawable/widget_pill_bg"
+            android:paddingStart="7dp"
+            android:paddingEnd="7dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:maxLines="1"
+            android:textColor="@color/widget_accent"
+            android:textSize="10sp"/>
     </LinearLayout>
 
     <TextView
@@ -50,22 +65,27 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:layout_marginTop="6dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
         android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="@drawable/widget_row_bg"
         android:visibility="gone">
-
         <TextView
             android:id="@+id/row1_time"
-            android:layout_width="46dp"
+            android:layout_width="42dp"
             android:layout_height="wrap_content"
+            android:maxLines="1"
             android:textColor="@color/widget_accent"
-            android:textSize="11sp"/>
-
+            android:textSize="11sp"
+            android:textStyle="bold"/>
         <TextView
             android:id="@+id/row1_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="1"
+            android:maxLines="2"
             android:ellipsize="end"
             android:textColor="@color/widget_text"
             android:textSize="13sp"/>
@@ -77,22 +97,27 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:layout_marginTop="6dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
         android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="@drawable/widget_row_bg"
         android:visibility="gone">
-
         <TextView
             android:id="@+id/row2_time"
-            android:layout_width="46dp"
+            android:layout_width="42dp"
             android:layout_height="wrap_content"
+            android:maxLines="1"
             android:textColor="@color/widget_accent"
-            android:textSize="11sp"/>
-
+            android:textSize="11sp"
+            android:textStyle="bold"/>
         <TextView
             android:id="@+id/row2_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="1"
+            android:maxLines="2"
             android:ellipsize="end"
             android:textColor="@color/widget_text"
             android:textSize="13sp"/>
@@ -104,22 +129,27 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:layout_marginTop="6dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
         android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="@drawable/widget_row_bg"
         android:visibility="gone">
-
         <TextView
             android:id="@+id/row3_time"
-            android:layout_width="46dp"
+            android:layout_width="42dp"
             android:layout_height="wrap_content"
+            android:maxLines="1"
             android:textColor="@color/widget_accent"
-            android:textSize="11sp"/>
-
+            android:textSize="11sp"
+            android:textStyle="bold"/>
         <TextView
             android:id="@+id/row3_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="1"
+            android:maxLines="2"
             android:ellipsize="end"
             android:textColor="@color/widget_text"
             android:textSize="13sp"/>
@@ -131,22 +161,27 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:layout_marginTop="6dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
         android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="@drawable/widget_row_bg"
         android:visibility="gone">
-
         <TextView
             android:id="@+id/row4_time"
-            android:layout_width="46dp"
+            android:layout_width="42dp"
             android:layout_height="wrap_content"
+            android:maxLines="1"
             android:textColor="@color/widget_accent"
-            android:textSize="11sp"/>
-
+            android:textSize="11sp"
+            android:textStyle="bold"/>
         <TextView
             android:id="@+id/row4_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="1"
+            android:maxLines="2"
             android:ellipsize="end"
             android:textColor="@color/widget_text"
             android:textSize="13sp"/>
@@ -158,22 +193,27 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:layout_marginTop="6dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
         android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="@drawable/widget_row_bg"
         android:visibility="gone">
-
         <TextView
             android:id="@+id/row5_time"
-            android:layout_width="46dp"
+            android:layout_width="42dp"
             android:layout_height="wrap_content"
+            android:maxLines="1"
             android:textColor="@color/widget_accent"
-            android:textSize="11sp"/>
-
+            android:textSize="11sp"
+            android:textStyle="bold"/>
         <TextView
             android:id="@+id/row5_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="1"
+            android:maxLines="2"
             android:ellipsize="end"
             android:textColor="@color/widget_text"
             android:textSize="13sp"/>
@@ -183,8 +223,10 @@
         android:id="@+id/w_more"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingTop="6dp"
+        android:paddingTop="5dp"
+        android:maxLines="1"
+        android:ellipsize="end"
         android:textColor="@color/widget_text_secondary"
-        android:textSize="11sp"
+        android:textSize="10sp"
         android:visibility="gone"/>
 </LinearLayout>

@@ -23,9 +23,10 @@ class TodayWidgetProvider : BaseWidgetProvider() {
         val tall = isTall(mgr, widgetId)
         val limit = rowLimit(tall)
         val rv = RemoteViews(ctx.packageName, R.layout.widget_today)
+        rv.setTextViewText(R.id.w_header, "今天")
         rv.setTextViewText(
-            R.id.w_header,
-            "今天 · ${WidgetSnapshot.weekdayCn()} ${WidgetSnapshot.mmdd()}",
+            R.id.w_sub,
+            "${WidgetSnapshot.weekdayCn()} · ${WidgetSnapshot.mmdd()}",
         )
         rv.setOnClickPendingIntent(R.id.w_root, WidgetNav.open(ctx, "today", 10))
 

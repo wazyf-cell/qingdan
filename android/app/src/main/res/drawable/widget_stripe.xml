@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 课表行的课程色条；具体颜色由 Provider 按 colorIndex 覆盖。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="2dp"/>
+    <solid android:color="@color/widget_accent"/>
+</shape>

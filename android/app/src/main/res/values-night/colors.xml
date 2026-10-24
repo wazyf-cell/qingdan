@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="widget_bg">#1C1D21</color>
+    <color name="widget_row_bg">#24262B</color>
     <color name="widget_text">#E6E6E9</color>
     <color name="widget_text_secondary">#9BA1AB</color>
     <color name="widget_accent">#7C8CFF</color>
+    <color name="widget_accent_faint">#297C8CFF</color>
+    <color name="widget_warn">#FF9A62</color>
     <color name="widget_divider">#2E3036</color>
+    <color name="widget_stroke">#2E3036</color>
 </resources>

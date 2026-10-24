@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 学习通 · 待办。结构与课表卡片相同；缩小成 2×2 时只留两行。 -->
+<!-- 学习通 · 待办。列表由 ChaoxingWidgetService 提供，可滚动；
+     最多 15 条，超过的部分只在页脚写「还有 N 条」。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_root"
     android:layout_width="match_parent"
@@ -16,22 +17,38 @@
 
         <TextView
             android:id="@+id/w_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textColor="@color/widget_text"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:text="学习通"/>
+
+        <TextView
+            android:id="@+id/w_sub"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginStart="6dp"
             android:maxLines="1"
             android:ellipsize="end"
-            android:textColor="@color/widget_text"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:text="学习通"/>
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="10sp"
+            android:text="待办"/>
 
         <TextView
             android:id="@+id/w_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp"/>
+            android:background="@drawable/widget_pill_bg"
+            android:paddingStart="7dp"
+            android:paddingEnd="7dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:maxLines="1"
+            android:textColor="@color/widget_accent"
+            android:textSize="10sp"/>
     </LinearLayout>
 
     <TextView
@@ -43,137 +60,43 @@
         android:textSize="12sp"
         android:visibility="gone"/>
 
+    <ListView
+        android:id="@+id/w_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="6dp"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:scrollbars="none"
+        android:clipToPadding="false"/>
+
     <LinearLayout
-        android:id="@+id/row1"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="7dp"
-        android:visibility="gone">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="4dp">
+
         <TextView
-            android:id="@+id/row1_title"
-            android:layout_width="match_parent"
+            android:id="@+id/w_more"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text"
-            android:textSize="13sp"/>
-        <TextView
-            android:id="@+id/row1_meta"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:maxLines="1"
             android:ellipsize="end"
             android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp"/>
-    </LinearLayout>
+            android:textSize="10sp"
+            android:visibility="gone"/>
 
-    <LinearLayout
-        android:id="@+id/row2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="7dp"
-        android:visibility="gone">
         <TextView
-            android:id="@+id/row2_title"
-            android:layout_width="match_parent"
+            android:id="@+id/w_due"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
             android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text"
-            android:textSize="13sp"/>
-        <TextView
-            android:id="@+id/row2_meta"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp"/>
+            android:textColor="@color/widget_warn"
+            android:textSize="10sp"
+            android:visibility="gone"/>
     </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/row3"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="7dp"
-        android:visibility="gone">
-        <TextView
-            android:id="@+id/row3_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text"
-            android:textSize="13sp"/>
-        <TextView
-            android:id="@+id/row3_meta"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/row4"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="7dp"
-        android:visibility="gone">
-        <TextView
-            android:id="@+id/row4_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text"
-            android:textSize="13sp"/>
-        <TextView
-            android:id="@+id/row4_meta"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/row5"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="7dp"
-        android:visibility="gone">
-        <TextView
-            android:id="@+id/row5_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text"
-            android:textSize="13sp"/>
-        <TextView
-            android:id="@+id/row5_meta"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp"/>
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/w_more"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="6dp"
-        android:textColor="@color/widget_text_secondary"
-        android:textSize="11sp"
-        android:visibility="gone"/>
 </LinearLayout>

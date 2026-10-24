@@ -93,7 +93,7 @@ class _AddWidgetBodyState extends State<_AddWidgetBody> {
             rowKey: 'add-widget-chaoxing',
             icon: Icons.school,
             title: '学习通 · 待办',
-            subtitle: '未交的作业与考试（2×4 为主）；停在最后一次刷新',
+            subtitle: '未交的作业与考试；最多 15 条，再多的部分可滚动查看',
             onAdd: _supported == true
                 ? () => _pin('chaoxing', '学习通 · 待办')
                 : null,
