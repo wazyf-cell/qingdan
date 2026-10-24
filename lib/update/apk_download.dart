@@ -154,8 +154,8 @@ Future<void> _httpDownload({
     onProgress(received, total);
   } on TimeoutException {
     throw const DownloadFailed('下载超时，请检查网络后重试');
-  } on SocketException {
-    throw const DownloadFailed('连不上 GitHub（这台设备当前没有网络）');
+  } on SocketException catch (e) {
+    throw DownloadFailed(socketErrorReason(e));
   } on HttpException {
     throw const DownloadFailed('下载连接中断，请重试');
   } finally {

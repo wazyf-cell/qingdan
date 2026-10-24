@@ -137,6 +137,7 @@ class _ChaoxingPaneState extends State<ChaoxingPane> {
             if (t == ChaoxingTab.activities) model.ensureActivitiesLoaded();
           },
           statusText: model.statusText,
+          statusCompact: model.statusTextCompact,
           statusIsError: model.statusIsError,
           stale: model.stale,
           // 活动的按需拉也要占住这个转圈：否则活动页签上按刷新，转圈先停、

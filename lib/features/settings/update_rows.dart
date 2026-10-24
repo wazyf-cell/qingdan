@@ -82,17 +82,28 @@ class _UpdateRowsState extends State<UpdateRows> {
             ),
           ),
           actions: <Widget>[
+            // 失败时不能只给「关闭」：网络访问不了 GitHub API 的时候，浏览器里的
+            // 发布页仍是唯一的手动下载路径（2026-10-24 截图里就是一条死路）。
+            if (r.status == UpdateStatus.failed)
+              TextButton(
+                key: const ValueKey<String>('update-result-retry'),
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  _check();
+                },
+                child: const Text('重试'),
+              ),
             TextButton(
               key: const ValueKey<String>('update-result-close'),
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('关闭'),
             ),
-            if (r.status == UpdateStatus.available)
+            if (r.status != UpdateStatus.upToDate)
               TextButton(
                 key: const ValueKey<String>('update-result-open'),
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  _open(r.latest!.url, '发布页');
+                  _open(r.latest?.url ?? '$kRepoUrl/releases/latest', '发布页');
                 },
                 child: const Text('打开发布页'),
               ),
@@ -190,7 +201,9 @@ String _detailText(UpdateResult r) {
           '系统仍会让你点一次「安装」——普通应用无权跳过那一步。');
     case UpdateStatus.failed:
       b.write('\n\n没有拿到 GitHub 的发布页。检查更新只是读一个公开网页，'
-          '失败不影响任务、课表与同步。');
+          '失败不影响任务、课表与同步。'
+          '\n可以点「重试」，或点「打开发布页」用浏览器手动下载；'
+          '如果浏览器也打不开 GitHub，说明这个网络访问不了它，换一个网络再试。');
   }
   return b.toString();
 }

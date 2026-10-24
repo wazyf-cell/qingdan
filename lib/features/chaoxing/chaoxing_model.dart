@@ -126,6 +126,10 @@ class ChaoxingModel extends ChangeNotifier {
     return at == null ? '刷新失败：$cause' : '刷新失败：$cause · ${hhmm(at)}';
   }
 
+  /// 放不下完整句时用的短版：只留时间（没有时间就留状态）。
+  String get statusTextCompact => compactLabel(
+      fetchedAt: fetchedAt, loading: loading, hasError: statusIsError);
+
   bool get statusIsError => error != null;
 
   /// 待办总条数（底部页签角标，M5 定案第 10 条）。没有截止时间的待办也数进来。

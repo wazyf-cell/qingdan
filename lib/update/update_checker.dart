@@ -194,8 +194,8 @@ Future<Map<String, dynamic>> _httpFetch(String url) async {
     return decoded;
   } on TimeoutException {
     throw const UpdateFetchException('GitHub 响应超时，稍后再试');
-  } on SocketException {
-    throw const UpdateFetchException('连不上 GitHub（这台设备当前没有网络）');
+  } on SocketException catch (e) {
+    throw UpdateFetchException(socketErrorReason(e));
   } on FormatException {
     throw const UpdateFetchException('GitHub 返回的内容看不懂');
   } on HttpException {
@@ -203,6 +203,31 @@ Future<Map<String, dynamic>> _httpFetch(String url) async {
   } finally {
     client.close(force: true);
   }
+}
+
+/// `SocketException` → 三种人话。
+///
+/// 以前一律说「这台设备当前没有网络」，可域名解析失败时设备明明连着 3G/5G，
+/// 用户会去反复开关 Wi-Fi（2026-10-24 真机截图）。三种原因的下一步完全不同：
+/// 解析失败多半是网络访问不了 GitHub、无路由才是真没网、其余按连接中断重试。
+String socketErrorReason(SocketException e) {
+  final int? code = e.osError?.errorCode;
+  final String text =
+      '${e.osError?.message ?? ''} ${e.message}'.toLowerCase();
+  final bool lookup = code == 11001 || // Windows: WSAHOST_NOT_FOUND
+      code == 7 || // Android/Linux: EAI_NONAME
+      text.contains('failed host lookup') ||
+      text.contains('no address associated with hostname');
+  if (lookup) {
+    return '连不上 GitHub（域名解析失败：这台设备的网络可能访问不了 GitHub）';
+  }
+  final bool noRoute = code == 101 || // ENETUNREACH
+      code == 113 || // EHOSTUNREACH
+      text.contains('network is unreachable') ||
+      text.contains('network unreachable') ||
+      text.contains('no route to host');
+  if (noRoute) return '这台设备当前没有网络';
+  return '连不上 GitHub（连接被拒绝或中断）';
 }
 
 /// HTTP 状态码 → 用户看得懂、且知道下一步该做什么的一句话。

@@ -231,6 +231,32 @@ void main() {
     expect(subtitleOf(tester), contains('检查失败：连不上 GitHub'));
   });
 
+  testWidgets('检查失败：弹层给「重试」与「打开发布页」，不是一条死路',
+      (WidgetTester tester) async {
+    int hits = 0;
+    await pumpRows(
+        tester,
+        UpdateChecker(fetch: (_) async {
+          hits++;
+          throw const UpdateFetchException('连不上 GitHub（域名解析失败）');
+        }));
+
+    await tester.tap(find.byKey(const ValueKey<String>('settings-update')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('update-result-retry')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('update-result-open')),
+        findsOneWidget);
+
+    // 失败时没有 ReleaseInfo，发布页按钮要退到 releases/latest，不能跳空地址。
+    await tester.tap(find.byKey(const ValueKey<String>('update-result-open')));
+    await tester.pumpAndSettle();
+    expect(
+        (calls.single.arguments as Map<Object?, Object?>)['url'],
+        '$kRepoUrl/releases/latest');
+    expect(hits, 1, reason: '只是打开发布页，不该再查一次');
+  });
+
   /// 弹层正文。抽出来是为了三条「发布说明」测试不必各写一遍取 Text 的样板。
   String detailOf(WidgetTester tester) => tester
       .widget<Text>(find.byKey(const ValueKey<String>('update-result-text')))

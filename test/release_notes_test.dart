@@ -22,6 +22,16 @@ void main() {
     expect(notes, contains('检测更新弹层里会显示这一版的更新说明'));
   });
 
+  test('1.0.7 起按「更新内容 / 下载」两段写', () {
+    final String notes = releaseNotesFor('1.0.7')!;
+    final List<String> lines = notes.split('\n');
+    expect(lines.first, '更新内容');
+    expect(lines, contains('下载'));
+    expect(notes, contains('上次刷新时间'));
+    expect(notes, contains('重试'));
+    expect(notes, contains('下载并安装'));
+  });
+
   test('1.0.2 的说明说清设置里多了哪两个入口，以及不自己装包', () {
     final String notes = releaseNotesFor('1.0.2')!;
     expect(notes, contains('设置 → 通用'));

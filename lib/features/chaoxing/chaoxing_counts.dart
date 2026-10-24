@@ -69,6 +69,22 @@ String fetchedLabel({
   return stale ? '$base · 建议刷新' : base;
 }
 
+/// 窄屏退让版：只留「上次刷新是什么时候」。
+///
+/// 360dp 的手机上页签与三个图标占掉大部分宽度，完整句（`12:00 更新 · 建议刷新`）
+/// 在那几十 dp 里必然放不下。原来的做法是整句不显示，用户就完全看不到刷新时间
+/// （2026-10-24 反馈）。这版保证**有时间就显示时间**，失败/未刷新没有时间可显示。
+String compactLabel({
+  required DateTime? fetchedAt,
+  required bool loading,
+  required bool hasError,
+}) {
+  if (loading) return '更新中';
+  final DateTime? at = fetchedAt;
+  if (at != null) return hhmm(at);
+  return hasError ? '刷新失败' : '未刷新';
+}
+
 /// 失败原因压成一句能直接放进行里的中文；`null` 表示这次没失败。
 ///
 /// 别把异常原文甩到界面上：它常带完整 URL 甚至 cookie 所在的域名，

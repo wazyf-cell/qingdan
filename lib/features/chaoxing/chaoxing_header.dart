@@ -22,6 +22,7 @@ class ChaoxingHeader extends StatelessWidget {
     required this.tab,
     required this.onTab,
     required this.statusText,
+    required this.statusCompact,
     required this.statusIsError,
     required this.stale,
     required this.loading,
@@ -40,7 +41,10 @@ class ChaoxingHeader extends StatelessWidget {
   /// 一句话的状态：`22:20 更新` / `更新中…` / `未刷新` / `刷新失败：超时 · 22:20`。
   final String statusText;
 
-  /// 失败时那一句要红；同时决定它能不能被挤掉（失败比时间更重要）。
+  /// 放不下完整句时的退让版：有时间就只留时间（`22:20`）。
+  final String statusCompact;
+
+  /// 失败时那一句要红；刷新按钮也带一个红点，窄屏退化成图标时仍看得出出过错。
   final bool statusIsError;
   final bool stale;
   final bool loading;
@@ -85,9 +89,12 @@ class ChaoxingHeader extends StatelessWidget {
                 key: ChaoxingKeys.vkey(ChaoxingKeys.filter),
                 tooltip: '筛选',
                 iconSize: 20,
-                visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                // Material 3 的默认最小尺寸 48dp（compact 也有 40）会盖掉
+                // constraints，窄屏上多吃的这 8dp 正是时间那一格缺的。
+                style: IconButton.styleFrom(
+                    minimumSize: const Size(32, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                 color: colors.textSecondary,
                 onPressed: onFilter,
                 icon: filterCount > 0
@@ -109,7 +116,8 @@ class ChaoxingHeader extends StatelessWidget {
     );
   }
 
-  /// 状态一句：失败红字、过期黄字、正常灰字。放不下就整句不显示（见 [_FitText]）。
+  /// 状态一句：失败红字、过期黄字、正常灰字。完整句 → 紧凑时间 → 图标三级回退
+  /// （见 [_FitText]），窄屏上也必须看得到上次刷新时间。
   Widget _status(AppColors colors) {
     final Color color = statusIsError
         ? colors.priorityHigh
@@ -118,10 +126,15 @@ class ChaoxingHeader extends StatelessWidget {
       padding: const EdgeInsets.only(right: AppDimens.s4),
       child: Align(
         alignment: Alignment.centerRight,
-        child: _FitText(
-          key: ChaoxingKeys.vkey(ChaoxingKeys.stale),
-          text: statusText,
-          style: AppTypography.meta.copyWith(fontSize: 12, color: color),
+        child: Tooltip(
+          message: statusText,
+          child: _FitText(
+            key: ChaoxingKeys.vkey(ChaoxingKeys.stale),
+            text: statusText,
+            compact: statusCompact,
+            style: AppTypography.meta.copyWith(fontSize: 12, color: color),
+            icon: statusIsError ? Icons.error_outline : Icons.schedule,
+          ),
         ),
       ),
     );
@@ -133,9 +146,10 @@ class ChaoxingHeader extends StatelessWidget {
       key: ChaoxingKeys.vkey(ChaoxingKeys.refresh),
       tooltip: '刷新',
       iconSize: 20,
-      visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      style: IconButton.styleFrom(
+          minimumSize: const Size(32, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap),
       color: colors.textSecondary,
       onPressed: loading ? null : onRefresh,
       icon: loading
@@ -144,44 +158,55 @@ class ChaoxingHeader extends StatelessWidget {
               height: 18,
               child: CircularProgressIndicator(
                   strokeWidth: 2, color: colors.accent))
-          : const Icon(Icons.refresh),
+          // 状态文案被挤到只剩图标时，红点是「上次刷新失败」唯一还看得见的信号。
+          : Badge(
+              isLabelVisible: statusIsError,
+              backgroundColor: colors.priorityHigh,
+              smallSize: 6,
+              child: const Icon(Icons.refresh),
+            ),
     );
   }
 
   /// ⋮ 菜单三项，顺序固定：重新登录 / 隐藏列表 / 退出登录（破坏性动作放最后）。
   Widget _account(BuildContext context, AppColors colors) {
-    return PopupMenuButton<String>(
-      key: ChaoxingKeys.vkey(ChaoxingKeys.account),
-      tooltip: '账号',
-      icon: Icon(Icons.more_vert, size: 20, color: colors.textSecondary),
-      color: colors.surface,
-      itemBuilder: (BuildContext _) => <PopupMenuItem<String>>[
-        PopupMenuItem<String>(
-            key: ChaoxingKeys.vkey(ChaoxingKeys.menuRelogin),
-            value: 'relogin',
-            height: 44,
-            child: Text('重新登录', style: AppTypography.body)),
-        PopupMenuItem<String>(
-            key: ChaoxingKeys.vkey(ChaoxingKeys.menuHidden),
-            value: 'hidden',
-            height: 44,
-            child: Text('隐藏列表', style: AppTypography.body)),
-        PopupMenuItem<String>(
-            key: ChaoxingKeys.vkey(ChaoxingKeys.menuLogout),
-            value: 'logout',
-            height: 44,
-            child: Text('退出登录', style: AppTypography.body)),
-      ],
-      onSelected: (String v) {
-        switch (v) {
-          case 'relogin':
-            onRelogin();
-          case 'hidden':
-            onHiddenList();
-          default:
-            onLogout();
-        }
-      },
+    // 默认 IconButton 是 48dp 见方；这一行要在 360dp 里挤出状态时间，收窄到 32。
+    return SizedBox(
+      width: 32,
+      child: PopupMenuButton<String>(
+        key: ChaoxingKeys.vkey(ChaoxingKeys.account),
+        padding: EdgeInsets.zero,
+        tooltip: '账号',
+        icon: Icon(Icons.more_vert, size: 20, color: colors.textSecondary),
+        color: colors.surface,
+        itemBuilder: (BuildContext _) => <PopupMenuItem<String>>[
+          PopupMenuItem<String>(
+              key: ChaoxingKeys.vkey(ChaoxingKeys.menuRelogin),
+              value: 'relogin',
+              height: 44,
+              child: Text('重新登录', style: AppTypography.body)),
+          PopupMenuItem<String>(
+              key: ChaoxingKeys.vkey(ChaoxingKeys.menuHidden),
+              value: 'hidden',
+              height: 44,
+              child: Text('隐藏列表', style: AppTypography.body)),
+          PopupMenuItem<String>(
+              key: ChaoxingKeys.vkey(ChaoxingKeys.menuLogout),
+              value: 'logout',
+              height: 44,
+              child: Text('退出登录', style: AppTypography.body)),
+        ],
+        onSelected: (String v) {
+          switch (v) {
+            case 'relogin':
+              onRelogin();
+            case 'hidden':
+              onHiddenList();
+            default:
+              onLogout();
+          }
+        },
+      ),
     );
   }
 
@@ -197,7 +222,8 @@ class ChaoxingHeader extends StatelessWidget {
       child: Container(
         height: _rowHeight,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: AppDimens.s8),
+        // 6dp 而不是 8：三个页签省下的 12dp 正好让窄屏那格放得下 `12:00`。
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -212,31 +238,53 @@ class ChaoxingHeader extends StatelessWidget {
   }
 }
 
-/// 放得下就显示，放不下就**整句不显示**。
+/// 完整句 → 紧凑句 → 图标，三级退让，**绝不显示省略号**。
 ///
 /// 不用 `TextOverflow.ellipsis`：这一格只有几十 dp，加省略号等于把整句吃掉，
 /// 用户看到的是一个孤零零的「…」——比不显示更难懂，而且没法判断是坏了还是没数据
 /// （2026-10-23 用户在真机上就是这么看到的）。
+///
+/// 也不能像 v1.0.3 那样放不下就整句不显示：360dp 的手机上这一格只剩几十 dp，
+/// 结果连「上次什么时候刷新的」都看不到（2026-10-24 反馈）。时间优先，完整句进
+/// tooltip；实在连时间都放不下才退成图标。
 class _FitText extends StatelessWidget {
-  const _FitText({super.key, required this.text, required this.style});
+  const _FitText({
+    super.key,
+    required this.text,
+    required this.compact,
+    required this.style,
+    required this.icon,
+  });
 
   final String text;
+  final String compact;
   final TextStyle style;
+  final IconData icon;
+
+  bool _fits(BuildContext ctx, double maxWidth, String s) {
+    final TextPainter measure = TextPainter(
+      text: TextSpan(text: s, style: style),
+      maxLines: 1,
+      textDirection: Directionality.of(ctx),
+      // 系统的字体放大也要算进来，否则「量着放得下」在真机上会溢出一行。
+      textScaler: MediaQuery.textScalerOf(ctx),
+    )..layout();
+    final bool ok = measure.width <= maxWidth;
+    measure.dispose();
+    return ok;
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (BuildContext ctx, BoxConstraints c) {
-        final TextPainter measure = TextPainter(
-          text: TextSpan(text: text, style: style),
-          maxLines: 1,
-          textDirection: Directionality.of(ctx),
-          // 系统的字体放大也要算进来，否则「量着放得下」在真机上会溢出一行。
-          textScaler: MediaQuery.textScalerOf(ctx),
-        )..layout();
-        final bool fits = measure.width <= c.maxWidth;
-        measure.dispose();
-        return fits ? Text(text, style: style, maxLines: 1) : const SizedBox.shrink();
+        if (_fits(ctx, c.maxWidth, text)) {
+          return Text(text, style: style, maxLines: 1);
+        }
+        if (compact != text && _fits(ctx, c.maxWidth, compact)) {
+          return Text(compact, style: style, maxLines: 1);
+        }
+        return Icon(icon, size: 14, color: style.color);
       },
     );
   }

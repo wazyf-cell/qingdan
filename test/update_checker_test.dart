@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qingdan/update/update_checker.dart';
@@ -150,6 +152,33 @@ void main() {
         expect(r.status, isA<UpdateStatus>());
         expect(r.summary, isNotEmpty);
       }
+    });
+  });
+
+  group('网络异常文案（不能一律说「没有网络」）', () {
+    test('域名解析失败：设备有网但访问不了 GitHub', () {
+      final String s = socketErrorReason(const SocketException(
+        'Failed host lookup: \'api.github.com\'',
+        osError: OSError('Failed host lookup', 7),
+      ));
+      expect(s, contains('域名解析失败'));
+      expect(s, isNot(contains('没有网络')));
+    });
+
+    test('无路由 / 真没网：才说设备没有网络', () {
+      final String s = socketErrorReason(const SocketException(
+        'Network is unreachable',
+        osError: OSError('Network is unreachable', 101),
+      ));
+      expect(s, contains('没有网络'));
+    });
+
+    test('连接被拒/中断：按可重试的说法', () {
+      final String s = socketErrorReason(const SocketException(
+        'Connection refused',
+        osError: OSError('Connection refused', 111),
+      ));
+      expect(s, contains('连接被拒绝或中断'));
     });
   });
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -68,6 +70,32 @@ void main() {
         stale.width == 0 || find.text('12:00 更新').evaluate().isNotEmpty, isTrue);
   });
 
+  testWidgets('360dp 窄屏：刷新时间必须看得见，不能被整句吞掉',
+      (WidgetTester tester) async {
+    final ChaoxingHarness h = ChaoxingHarness();
+    await h.start(tasks: tasks());
+    await h.pump(tester, width: 360, height: 780);
+
+    // 完整句在测试字体下放不下时允许退成紧凑时间，但**不能什么都不显示**。
+    final bool full = find.text('12:00 更新').evaluate().isNotEmpty;
+    final bool compact = find.text('12:00').evaluate().isNotEmpty;
+    expect(full || compact, isTrue,
+        reason: '状态格整句被隐藏时用户看不到上次刷新时间（2026-10-24 用户报）');
+    expect(find.textContaining('…'), findsNothing);
+  });
+
+  testWidgets('360dp 刷新失败：时间仍在，刷新按钮带红点', (WidgetTester tester) async {
+    final ChaoxingHarness h = ChaoxingHarness();
+    await h.start(tasks: tasks());
+    h.model.error = TimeoutException('x');
+    await h.pump(tester, width: 360, height: 780);
+
+    expect(find.text('12:00'), findsOneWidget, reason: '失败时也得看得到上次成功的时间');
+    final Badge dot = tester.widget<Badge>(find.descendant(
+        of: h.key(ChaoxingKeys.refresh), matching: find.byType(Badge)));
+    expect(dot.isLabelVisible, isTrue, reason: '窄屏只剩图标时，红点是失败唯一还看得见的信号');
+  });
+
   testWidgets('超过 15 分钟：时间后面追加「建议刷新」（宽屏渲染）',
       (WidgetTester tester) async {
     final ChaoxingHarness h = ChaoxingHarness();
@@ -95,12 +123,12 @@ void main() {
     expect(find.text('2'), findsOneWidget);
     // 用 key 定位而不是 `find.byWidget(const Icon(Icons.tune))`：后者在
     // IconButton(M3) 内部包装下匹配不到（实测 0 candidates），key 路径更稳。
-    final Badge badge = tester.widget<Badge>(
-        find.descendant(
-            of: h.key(ChaoxingKeys.filter), matching: find.byType(Badge)));
+    // 刷新按钮上的错误红点也是 Badge，所以这里必须限定在筛选图标下面取。
+    final Finder filterBadge = find.descendant(
+        of: h.key(ChaoxingKeys.filter), matching: find.byType(Badge));
+    final Badge badge = tester.widget<Badge>(filterBadge);
     // 默认底色是 colorScheme.error（红），必须被显式换成主题色（总纲陷阱表）。
-    final AppColors colors =
-        AppColors.of(tester.element(find.byType(Badge)));
+    final AppColors colors = AppColors.of(tester.element(filterBadge));
     expect(badge.backgroundColor, colors.accent);
   });
 

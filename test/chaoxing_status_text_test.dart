@@ -74,6 +74,40 @@ void main() {
     });
   });
 
+  group('窄屏退让版（只留时间）', () {
+    test('刷新过：只给时分，完整句放不下时也看得到上次刷新时间', () {
+      expect(
+          compactLabel(
+              fetchedAt: DateTime(2026, 10, 23, 22, 20),
+              loading: false,
+              hasError: false),
+          '22:20');
+    });
+
+    test('刷新中优先说状态，不拿旧时间冒充这次已更新', () {
+      expect(
+          compactLabel(
+              fetchedAt: DateTime(2026, 10, 23, 22, 20),
+              loading: true,
+              hasError: false),
+          '更新中');
+    });
+
+    test('失败但刷新过：仍然给出上次成功的时间', () {
+      expect(
+          compactLabel(
+              fetchedAt: DateTime(2026, 10, 23, 22, 20),
+              loading: false,
+              hasError: true),
+          '22:20');
+    });
+
+    test('从没刷新过：没有时间可给，退回状态词', () {
+      expect(compactLabel(fetchedAt: null, loading: false, hasError: false), '未刷新');
+      expect(compactLabel(fetchedAt: null, loading: false, hasError: true), '刷新失败');
+    });
+  });
+
   group('失败原因', () {
     test('会话失效要说「重新登录」，不能只说「刷新失败」', () {
       expect(refreshErrorText(ChaoxingAuthException()), '会话已失效，请重新登录');
