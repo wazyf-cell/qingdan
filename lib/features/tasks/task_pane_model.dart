@@ -27,8 +27,13 @@ class TaskPaneModel extends ChangeNotifier {
   TaskPaneModel({TaskUseCase? useCase, required SidebarModel sidebar})
       : _useCase = useCase,
         _sidebar = sidebar {
+    _lastViewId = sidebar.selectedId;
     _sidebar.addListener(_onViewChanged);
   }
+
+  /// 上一次真正处理过的视图 id。侧栏通知有两种：**用户切了视图**与
+  /// **只是计数/清单名变了**（写操作后 `sidebar.load()`）。后者不该清空选中与详情。
+  String? _lastViewId;
 
   final TaskUseCase? _useCase;
   final SidebarModel _sidebar;
@@ -118,6 +123,10 @@ class TaskPaneModel extends ChangeNotifier {
   /// M6-A §A3 换成 `pickDateWithOptionalTime` 那一批。「清除日期」仍不做（M1 定）。
   Future<void> setDueDate(Task task, DateTime dueLocal) async {
     await _useCase?.update(task.copyWith(dueDate: dueLocal.toUtc()));
+    // 到期时间决定「今天 / 最近 7 天」的计数：不刷侧栏就会出现列表已经是 2 条、
+    // chips 还写着「今天 1」（2026-10-24 用户报）。详情面板由 `_onViewChanged`
+    // 的同视图早退保住，不会被这次刷新关掉。
+    _refreshSidebar();
     await load();
   }
 
@@ -125,6 +134,11 @@ class TaskPaneModel extends ChangeNotifier {
   bool get collapsesCompleted => collapsesCompletedView(viewId);
 
   void _onViewChanged() {
+    final String current = viewId;
+    // 计数刷新（写操作后的 sidebar.load）也会发通知，但它不是「切视图」：
+    // 照旧清空选中 + load 会把用户正在编辑的详情面板关掉。
+    if (current == _lastViewId) return;
+    _lastViewId = current;
     detailTaskId = null;
     selectedTaskId = null;
     load();

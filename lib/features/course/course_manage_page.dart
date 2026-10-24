@@ -50,8 +50,11 @@ class CourseManagePage extends StatelessWidget {
         padding: const EdgeInsets.all(AppDimens.panelPadding),
         children: <Widget>[
           _row(colors, Icons.file_download_outlined, '导入课表文件',
-              'xlsx / csv / WakeUp 课程表导出文件，进五步向导',
-              () => showImportWizard(context), key: 'manage-import'),
+              'xlsx / csv / WakeUp 课程表导出文件，进五步向导', () async {
+            await showImportWizard(context);
+            // 向导中途「返回」时它自己不会 load；这里补一次，学期与课程都刷新。
+            if (context.mounted) await model.load();
+          }, key: 'manage-import'),
           _row(colors, Icons.public_outlined, '从教务系统抓取',
               '打开教务网页，自己登录到学生课表页后抓当前页',
               () => _capture(context), key: 'manage-capture'),
@@ -75,6 +78,7 @@ class CourseManagePage extends StatelessWidget {
     final ScheduleTable? scraped = await showJiaowuCapture(context);
     if (scraped == null || !context.mounted) return;
     await showImportWizard(context, scraped: scraped);
+    if (context.mounted) await context.read<CoursePaneModel>().load();
   }
 
   Widget _row(AppColors colors, IconData icon, String title, String what,

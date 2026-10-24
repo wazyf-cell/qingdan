@@ -22,6 +22,14 @@ void main() {
     expect(notes, contains('检测更新弹层里会显示这一版的更新说明'));
   });
 
+  test('1.0.8 的说明覆盖两个刷新缺陷', () {
+    final String notes = releaseNotesFor('1.0.8')!;
+    expect(notes.split('\n').first, '更新内容');
+    expect(notes, contains('角标'));
+    expect(notes, contains('学期列表'));
+    expect(notes, contains('下载'));
+  });
+
   test('1.0.7 起按「更新内容 / 下载」两段写', () {
     final String notes = releaseNotesFor('1.0.7')!;
     final List<String> lines = notes.split('\n');

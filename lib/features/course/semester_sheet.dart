@@ -9,8 +9,8 @@ import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
 import 'semester_create_sheet.dart';
+import 'semester_edit_dialog.dart';
 import 'semester_switcher.dart' show showSemesterSheetShell;
-import 'semester_editor.dart';
 import 'week_picker_sheet.dart' show weekMondayText;
 
 /// 学期面板（M6-D §7.1）。返回**该交给课表页行内回执**的那句话（切换 / 校准），
@@ -70,9 +70,29 @@ class _SemesterListViewState extends State<SemesterListView> {
   @override
   void initState() {
     super.initState();
+    // 导入向导结束时（以及同步拉回新数据时）`CoursePaneModel.load()` 会通知；
+    // 本列表是本地 state，不自己重读就会一直显示导入前那几行（2026-10-24 用户报）。
+    widget.model.addListener(_onModelChanged);
     // 首帧后再读库：构造期间同步 setState 等于在 build 里改状态。
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
+
+  @override
+  void didUpdateWidget(covariant SemesterListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.model != widget.model) {
+      oldWidget.model.removeListener(_onModelChanged);
+      widget.model.addListener(_onModelChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.model.removeListener(_onModelChanged);
+    super.dispose();
+  }
+
+  void _onModelChanged() => _refresh();
 
   Future<void> _refresh() async {
     final List<Semester> all = await widget.semesters.allSemesters();
@@ -101,35 +121,11 @@ class _SemesterListViewState extends State<SemesterListView> {
     }
   }
 
-  /// 重命名 / 改开学日期与总周数：整个复用 [SemesterEditPanel]（§7.1）。
+  /// 重命名 / 改开学日期与总周数（§7.1）。对话框本体在
+  /// `semester_edit_dialog.dart`（行数红线，行为不变）。
   Future<void> _edit(Semester s) async {
-    final bool? ok = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext ctx) => AlertDialog(
-        title: Text('编辑学期「${s.name}」'),
-        content: SizedBox(
-          width: 360,
-          child: SingleChildScrollView(
-            child: SemesterEditPanel(
-              initial: s,
-              // 三个字段一次写完：拆三次写各自拿同一份旧快照整行写回，
-              // 后一次盖掉前一次（2026-10-18 用户报的「点了没反应」）。
-              onSave: ({
-                required String name,
-                required DateTime firstWeekDate,
-                required int totalWeeks,
-              }) async {
-                await widget.semesters.saveSemester(s,
-                    name: name,
-                    firstWeekDate: firstWeekDate,
-                    totalWeeks: totalWeeks);
-                if (ctx.mounted) Navigator.of(ctx).pop(true);
-              },
-            ),
-          ),
-        ),
-      ),
-    );
+    final bool? ok = await showSemesterEditDialog(context,
+        semester: s, semesters: widget.semesters);
     if (ok != true) return;
     await _refresh();
     if (widget.model.semester?.id == s.id) await widget.model.load();

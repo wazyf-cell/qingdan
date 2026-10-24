@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/features/course/course_manage_page.dart';
 import 'package:qingdan/features/course/import_wizard/import_wizard.dart';
 import 'package:qingdan/features/course/semester_sheet.dart';
@@ -174,6 +175,35 @@ void main() {
       });
     });
   }
+
+  testWidgets('导入/create 新学期的 model.load() 一到，管理页列表立刻出现新行（v1.0.8 用户报）',
+      (WidgetTester tester) async {
+    await h.seed(tester);
+    await h.openManage(tester, 411);
+    await h.tapIo(tester, 'open-shell');
+
+    final String idA = await h.idOf(tester, 'A 学期');
+    expect(h.key('semester-row-$idA'), findsOneWidget);
+    expect(find.text('C 学期'), findsNothing);
+
+    // 复现向导步 3 建学期 + 完成时 `pane.load()` 的真实调用顺序：
+    // 页面不会重建（State 还在），列表必须自己跟着 model 的通知重读。
+    final String idC = (await h.io(tester, () async {
+      final Semester created = await h.semesters.createSemester(
+          name: 'C 学期',
+          firstWeekDate: DateTime.utc(2025, 9, 1),
+          setActive: false);
+      await h.model.load();
+      return created.id;
+    }))!;
+    await h.settle(tester);
+    await tester.pump();
+
+    expect(h.key('semester-row-$idC'), findsOneWidget,
+        reason: '新导入的学期不能等重启才出现在「课表管理」里');
+    expect(find.text('C 学期'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('对照 §7.1：弹层形态把回执交给外层 pop，列表自己不留 semester-said',
       (WidgetTester tester) async {
