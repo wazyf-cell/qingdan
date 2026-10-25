@@ -11,6 +11,13 @@ library;
 
 /// 键是去掉 `v` 前缀与 `+build` 的版本号，与 `kAppVersion` 同一形状。
 const Map<String, String> kReleaseNotes = <String, String>{
+  '1.0.13': '更新内容\n'
+      '· 使用说明不再涉及 Windows 版本：提醒只在 Android 端生效；'
+      '应用密码只写进系统凭据库（Android Keystore）\n'
+      '· WebDAV 说明补充为通用协议，并建议优先使用坚果云\n'
+      '· 通知与权限页的平台说明改为通用文案；若干操作指引措辞更正式\n'
+      '\n下载\n'
+      '· 设置 → 通用 → 检测更新 → 下载并安装，或到 GitHub Releases 选对应 ABI 的 APK',
   '1.0.12': '更新内容\n'
       '· 修复首次进入时欢迎引导框在前台、冷启动自动检查直接放弃的问题：'
       '现在等引导关闭后再弹新版本公告\n'
