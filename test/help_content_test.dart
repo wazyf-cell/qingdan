@@ -29,11 +29,12 @@ void main() {
     '清单',
     '学习通',
     '课表',
+    '声明与边界',
     '同步',
     '提醒',
   ];
 
-  testWidgets('411dp：六节标题齐全且不溢出', (WidgetTester tester) async {
+  testWidgets('411dp：七节标题齐全且不溢出', (WidgetTester tester) async {
     await pumpHelp(tester, width: 411);
     expect(find.byKey(const ValueKey<String>('help-page')), findsOneWidget);
     for (final String title in chapterTitles) {
@@ -41,7 +42,7 @@ void main() {
     }
   });
 
-  testWidgets('1280dp：同样六节（双端各 pump 一次）',
+  testWidgets('1280dp：同样七节（双端各 pump 一次）',
       (WidgetTester tester) async {
     await pumpHelp(tester, width: 1280);
     for (final String title in chapterTitles) {
@@ -71,6 +72,10 @@ void main() {
       '课程没有回收站',
       '.wakeup_schedule',
       '抓当前页',
+      '培养管理 → 我的课表 → 学期课表信息',
+      '蓝航APP',
+      '只适配南昌航空大学强智教务',
+      'GitHub Issues',
       '逐行校正 → 确认导入',
       '文件 / 映射 / 学期作息 / 校正 / 导入',
       '合并 / 覆盖 / 仅新增',

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
+import 'package:qingdan/platform/system_intents.dart';
 import 'package:qingdan/theme/app_typography.dart';
 import 'package:qingdan/update/install_policy.dart';
+import 'package:qingdan/update/update_checker.dart' show kRepoUrl;
 
 import 'help_section.dart';
+import 'licenses_page.dart';
 import 'settings_section_page.dart';
 
 /// 与 `pubspec.yaml` 的 `version:` 手工同步。
@@ -13,7 +16,7 @@ import 'settings_section_page.dart';
 /// 不引 `package_info_plus`（本轮定死「不新增依赖」），代价是它是个手抄常量，
 /// 所以 `test/app_version_test.dart` 直接读 pubspec 比对：改了版本号忘了改这里，
 /// 那条测试就红——留一个永远显示 0.1.0 的死字符串比不显示更糟。
-const String kAppVersion = '1.0.10';
+const String kAppVersion = '1.0.11';
 
 /// 设置 · 关于节（M5 定案第 13 条 + M6-C C1 / C6 / E1）。
 class AboutSection extends StatelessWidget {
@@ -64,6 +67,13 @@ class AboutSection extends StatelessWidget {
         Text('学习通待办是登录状态下现拉的只读快照，不落本地库、不参与同步。',
             style: AppTypography.meta
                 .copyWith(color: colors.textFaint, height: 1.5)),
+        const SizedBox(height: AppDimens.s8),
+        Text(
+            '课表仅作参考，可能因教务调整而更新不及时；实时信息请以「蓝航APP」或学校教务系统为准。'
+            '本应用只适配南昌航空大学强智教务，其他学校需自行 fork 或改源码。',
+            key: const ValueKey<String>('about-disclaimer'),
+            style: AppTypography.meta
+                .copyWith(color: colors.textFaint, height: 1.5)),
         const SizedBox(height: AppDimens.s16),
         ListTile(
           key: const ValueKey<String>('settings-help'),
@@ -78,21 +88,36 @@ class AboutSection extends StatelessWidget {
               title: '使用说明', content: (bool showTitle) => HelpSection(showTitle: showTitle)),
         ),
         ListTile(
+          key: const ValueKey<String>('settings-issues'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('问题与建议',
+              style: AppTypography.body.copyWith(color: colors.textPrimary)),
+          subtitle: const Text('GitHub Issues；合适的建议会采用',
+              style: AppTypography.meta),
+          trailing: const Icon(Icons.open_in_new, size: 18),
+          onTap: () => _openIssues(context),
+        ),
+        ListTile(
           key: const ValueKey<String>('settings-licenses'),
           contentPadding: EdgeInsets.zero,
           dense: true,
           title: Text('开源许可',
               style: AppTypography.body.copyWith(color: colors.textPrimary)),
-          subtitle: const Text('本应用用到的第三方依赖的许可证',
+          subtitle: const Text('应用许可证、上游来源与第三方依赖',
               style: AppTypography.meta),
           trailing: const Icon(Icons.chevron_right, size: 20),
-          onTap: () => showLicensePage(
-            context: context,
-            applicationName: '清单',
-            applicationVersion: 'v$kAppVersion',
-          ),
+          onTap: () => showLicensesPage(context),
         ),
       ],
+    );
+  }
+
+  Future<void> _openIssues(BuildContext context) async {
+    final bool ok = await SystemIntents.openUrl('$kRepoUrl/issues');
+    if (ok || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('打不开浏览器。地址是 $kRepoUrl/issues')),
     );
   }
 }
