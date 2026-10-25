@@ -167,6 +167,7 @@ void main() {
         await tester.enterText(key('tpl-name'), '生成作息');
         await tester.pump();
         await tapIo(tester, 'tt-save');
+        await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('生成作息'), findsOneWidget);
         final List<TimeTable> tpls = (await io(tester, templates.templates))!;
         final TimeTable created =
@@ -203,6 +204,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
         await tapIo(tester, 'tt-save');
+        await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('大学默认 副本'), findsOneWidget);
         final List<TimeTable> tpls = (await io(tester, templates.templates))!;
         final TimeTable copy =
@@ -225,7 +227,8 @@ void main() {
         expect(tester.widget<Text>(key('tpl-edit-said')).data,
             contains('内置模板不可修改'),
             reason: '用例层守卫的错误串必须显示在编辑面板内，不许静默 return');
-        expect(key('timetable-library'), findsOneWidget, reason: '被拒不弹窗消失');
+        expect(find.byKey(ValueKey<String>('tpl-editor-$builtinId')), findsOneWidget,
+            reason: '被拒时编辑页不关闭');
         final List<TimeDetail> still =
             (await io(tester, () => templates.templateDetails(builtinId)))!;
         expect(still[0].startMinutes, 480, reason: '被拒的保存一行都不写');
@@ -244,6 +247,7 @@ void main() {
 
         await tapPlain(tester, 'tpl-row-${tmp.id}');
         await tapIo(tester, 'tpl-default-${tmp.id}');
+        await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('当前默认'), findsOneWidget,
             reason: '默认那行要有可见标记（§7.3）');
         final SharedPreferences p =
@@ -253,6 +257,7 @@ void main() {
 
         await tapIo(tester, 'tpl-del-${tmp.id}');
         await tapIo(tester, 'tpl-del-confirm');
+        await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('临时'), findsNothing);
         expect(await io(tester, () => env.semesterDao.findTimetableById(tmp.id)),
             isNull);

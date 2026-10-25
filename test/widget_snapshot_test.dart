@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/task.dart';
+import 'package:qingdan/domain/course_uid.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/widgets/widget_snapshot.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
@@ -210,6 +211,8 @@ void main() {
       expect(snap['count'], 3);
       expect(snap['dueSoon'], 1, reason: '只有 2 小时后那条在 24 小时内');
       expect(rows.first['due'], soon.dueAt!.millisecondsSinceEpoch);
+      expect(rows.first['color'], courseColorIndex('软件建模技术'),
+          reason: '颜色按课名派生，与课表同一套 8 色');
     });
   });
 }

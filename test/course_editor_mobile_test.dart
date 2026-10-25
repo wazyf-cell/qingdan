@@ -14,6 +14,7 @@ import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/data/migrations.dart';
 import 'package:qingdan/features/course/course_day_axis.dart';
+import 'package:qingdan/features/course/course_edit_page.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/course/course_setup.dart';
 import 'package:qingdan/features/course/course_week_header.dart';
@@ -93,7 +94,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey<String>('open-editor')));
     await tester.pumpAndSettle();
-    expect(find.byType(DraggableScrollableSheet), findsOneWidget);
+    expect(find.byType(CourseEditPage), findsOneWidget);
   }
 
   testWidgets('手机 411dp：星期独占一行，两个节次 stepper 落在下一行不溢出',
@@ -114,7 +115,7 @@ void main() {
         reason: '两个 stepper 不重叠');
   });
 
-  testWidgets('键盘弹出后「保存」仍在键盘上方可滚到（不被 IME 盖住）',
+  testWidgets('键盘弹出后 AppBar 上的「保存」仍在键盘上方',
       (tester) async {
     await pumpMobileEditor(tester);
 
@@ -123,19 +124,35 @@ void main() {
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle();
 
-    final Rect sheet =
-        tester.getRect(find.byType(DraggableScrollableSheet));
-    expect(sheet.bottom, lessThanOrEqualTo(screenH - keyboardH + 1),
-        reason: '抽屉必须让出键盘高度，否则里面的按钮永远点不到');
-
-    final Finder save = find.byKey(const ValueKey<String>('btn-save'));
-    await tester.dragUntilVisible(
-      save,
-      find.byType(SingleChildScrollView),
-      const Offset(0, -120),
-    );
+    // v1.0.10：保存移到 AppBar，键盘从底部弹出也不会盖住它。
+    final Finder save =
+        find.byKey(const ValueKey<String>('course-page-save'));
+    expect(save, findsOneWidget);
     expect(tester.getRect(save).bottom, lessThanOrEqualTo(screenH - keyboardH + 1),
-        reason: '滚到底后保存键完整落在键盘之上');
+        reason: 'AppBar 上的保存键必须完整落在键盘之上');
+  });
+
+  testWidgets('有改动时返回先问「放弃未保存的修改？」', (tester) async {
+    await pumpMobileEditor(tester);
+    await tester.enterText(
+        find.byKey(const ValueKey<String>('field-name')), '新课程');
+    await tester.pump();
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('course-discard-confirm')),
+        findsOneWidget);
+    await tester.tap(
+        find.byKey(const ValueKey<String>('course-discard-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CourseEditPage), findsOneWidget,
+        reason: '点「继续编辑」应该留在页面');
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await tester.tap(
+        find.byKey(const ValueKey<String>('course-discard-confirm')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CourseEditPage), findsNothing);
   });
 
   testWidgets('手机 411dp：周次标签不换行，第二行不压到星期轴上', (tester) async {

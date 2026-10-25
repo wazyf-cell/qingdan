@@ -7,13 +7,11 @@ import 'package:qingdan/theme/app_dimens.dart';
 
 import 'course_color_picker.dart';
 import 'course_steppers.dart';
+import 'course_weeks_section.dart';
 import 'week_chip_picker.dart';
 
 /// 课程编辑面板（§4.3 规则 2：课名文本框 / 星期下拉 / 节次双 stepper /
 /// 老师地点 / 周次 chip 选择器 + 从文本重建）。
-///
-/// 面板只产出一个 [Course]（经 [onSave] 交回调用方落库），自己不碰 DAO；
-/// UID 也在这里算好，保证「所见即所存」。
 class CourseEditPanel extends StatefulWidget {
   const CourseEditPanel({
     super.key,
@@ -23,18 +21,28 @@ class CourseEditPanel extends StatefulWidget {
     this.isMobile = false,
     this.scrollController,
     this.onSave,
+    this.showSaveButton = true,
+    this.onDirty,
+    this.onSaveHandle,
   });
 
   final int totalWeeks;
-
-  /// 作息表里的最大节数（没有作息表时给个保守值）。
   final int maxSection;
   final Course? initial;
   final bool isMobile;
 
-  /// 移动端底部抽屉把它的滚动控制器交进来（拖拽把手才能带动内容）。
+  /// 移动端抽屉的滚动控制器（整页形态不用）。
   final ScrollController? scrollController;
   final void Function(Course course)? onSave;
+
+  /// 整页形态把保存放到 AppBar，面板自己不再渲染底部按钮。
+  final bool showSaveButton;
+
+  /// 用户改过任意字段时回调：整页用它决定返回时是否要拦。
+  final VoidCallback? onDirty;
+
+  /// 整页形态取走「提交」动作，AppBar 的保存按钮调用它。
+  final ValueChanged<VoidCallback>? onSaveHandle;
 
   @override
   State<CourseEditPanel> createState() => _CourseEditPanelState();
@@ -68,6 +76,9 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
     _end = c?.endSection ?? (_start + 1 <= widget.maxSection ? _start + 1 : _start);
     _weeks = <int>[...?c?.weeks];
     _colorIndex = c?.colorIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onSaveHandle?.call(_save);
+    });
   }
 
   @override
@@ -85,7 +96,10 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
   bool get _canSave => _nameOk && _weeksOk && _rangeOk;
 
   void _save() {
-    if (!_canSave) return;
+    if (!_canSave) {
+      setState(() => _nameDirty = true);
+      return;
+    }
     final String name = _name.text.trim();
     final Course source = widget.initial ??
         Course(
@@ -119,9 +133,12 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
     ));
   }
 
+  void _touch() => widget.onDirty?.call();
+
   void _rebuildFromText() {
     final ({List<int>? weeks, String? error}) r =
         rebuildWeeksFromText(_weeksText.text, widget.totalWeeks);
+    _touch();
     setState(() {
       _weeksTextError = r.error;
       if (r.weeks != null) _weeks = r.weeks!;
@@ -143,27 +160,33 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
         for (int w = 1; w <= 7; w++)
           DropdownMenuItem<int>(value: w, child: Text(_names[w - 1])),
       ],
-      onChanged: (int? v) => setState(() => _weekday = v ?? 1),
+      onChanged: (int? v) { _touch(); setState(() => _weekday = v ?? 1); },
     );
     final Widget startStepper = CourseSectionStepper(
       key: const ValueKey<String>('field-start'),
       label: '起始节',
       value: _start,
       max: widget.maxSection,
-      onChanged: (int v) => setState(() {
-        _start = v;
-        if (_end < _start) _end = v;
-      }),
+      onChanged: (int v) {
+        _touch();
+        setState(() {
+          _start = v;
+          if (_end < _start) _end = v;
+        });
+      },
     );
     final Widget endStepper = CourseSectionStepper(
       key: const ValueKey<String>('field-end'),
       label: '结束节',
       value: _end,
       max: widget.maxSection,
-      onChanged: (int v) => setState(() {
-        _end = v;
-        if (_end < _start) _start = v;
-      }),
+      onChanged: (int v) {
+        _touch();
+        setState(() {
+          _end = v;
+          if (_end < _start) _start = v;
+        });
+      },
     );
     final Widget sectionRow = widget.isMobile
         ? Column(
@@ -202,7 +225,7 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
               labelText: '课程名称',
               errorText: _nameDirty && !_nameOk ? '不能为空' : null,
             ),
-            onChanged: (_) => setState(() => _nameDirty = true),
+            onChanged: (_) { _touch(); setState(() => _nameDirty = true); },
           ),
           const SizedBox(height: AppDimens.s12),
           sectionRow,
@@ -220,6 +243,7 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
                   key: const ValueKey<String>('field-teacher'),
                   controller: _teacher,
                   decoration: const InputDecoration(labelText: '老师（可空）'),
+                  onChanged: (_) => _touch(),
                 ),
               ),
               const SizedBox(width: AppDimens.s12),
@@ -228,6 +252,7 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
                   key: const ValueKey<String>('field-location'),
                   controller: _location,
                   decoration: const InputDecoration(labelText: '地点（可空）'),
+                  onChanged: (_) => _touch(),
                 ),
               ),
             ],
@@ -236,53 +261,31 @@ class _CourseEditPanelState extends State<CourseEditPanel> {
           CourseColorPicker(
             value: _colorIndex,
             courseName: _name.text.trim(),
-            onChanged: (int? v) => setState(() => _colorIndex = v),
+            onChanged: (int? v) { _touch(); setState(() => _colorIndex = v); },
           ),
           const SizedBox(height: AppDimens.s16),
-          Text('周次', style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: AppDimens.s8),
-          WeekChipPicker(
+          CourseWeeksSection(
             totalWeeks: widget.totalWeeks,
             selected: _weeks,
             isMobile: widget.isMobile,
-            onChanged: (List<int> v) => setState(() => _weeks = v),
-          ),
-          if (!_weeksOk)
-            Padding(
-              padding: const EdgeInsets.only(top: AppDimens.s4),
-              child: Text('至少选一个周次',
-                  style: TextStyle(fontSize: 12, color: colors.overdue)),
-            ),
-          const SizedBox(height: AppDimens.s8),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: TextField(
-                  key: const ValueKey<String>('field-weeks-text'),
-                  controller: _weeksText,
-                  decoration: InputDecoration(
-                    labelText: '从文本重建（如 1-5、7-11单）',
-                    errorText: _weeksTextError,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppDimens.s8),
-              TextButton(
-                key: const ValueKey<String>('btn-rebuild'),
-                onPressed: _rebuildFromText,
-                child: const Text('重建'),
-              ),
-            ],
+            onChanged: (List<int> v) {
+              _touch();
+              setState(() => _weeks = v);
+            },
+            weeksController: _weeksText,
+            weeksTextError: _weeksTextError,
+            onRebuild: _rebuildFromText,
           ),
           const SizedBox(height: AppDimens.s16),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              key: const ValueKey<String>('btn-save'),
-              onPressed: _canSave ? _save : null,
-              child: const Text('保存'),
+          if (widget.showSaveButton)
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                key: const ValueKey<String>('btn-save'),
+                onPressed: _canSave ? _save : null,
+                child: const Text('保存'),
+              ),
             ),
-          ),
         ],
       ),
     );

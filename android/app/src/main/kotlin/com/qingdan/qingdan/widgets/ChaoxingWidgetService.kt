@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import com.qingdan.qingdan.R
@@ -22,8 +23,10 @@ class ChaoxingWidgetService : RemoteViewsService() {
 
     private data class Row(
         val title: String,
-        val meta: String,
+        val due: String,
+        val course: String,
         val urgent: Boolean,
+        val colorIndex: Int,
     )
 
     private class Factory(private val ctx: Context) : RemoteViewsFactory {
@@ -48,12 +51,17 @@ class ChaoxingWidgetService : RemoteViewsService() {
                 val t: JSONObject = todos.optJSONObject(i) ?: continue
                 val due: Long? = if (t.isNull("due")) null else t.optLong("due")
                 val course = t.optString("course")
-                val meta = listOf(course, WidgetSnapshot.formatDue(due))
-                    .filter { it.isNotEmpty() }
-                    .joinToString(" · ")
+                // 截止时间放前面、课程名放后面（v1.0.10 用户定案）。
+                val dueText = if (due == null) "" else WidgetSnapshot.formatDue(due)
                 // 「24h 内」与 Dart 侧 dueSoon 同一口径：还没到点、且只剩不到一天。
                 val urgent = due != null && due > now && due <= soon
-                out.add(Row(t.optString("title"), meta, urgent))
+                out.add(Row(
+                    title = t.optString("title"),
+                    due = dueText,
+                    course = course,
+                    urgent = urgent,
+                    colorIndex = t.optInt("color", 0),
+                ))
             }
             return out
         }
@@ -64,15 +72,33 @@ class ChaoxingWidgetService : RemoteViewsService() {
             val row = rows.getOrNull(position) ?: return null
             return RemoteViews(ctx.packageName, R.layout.widget_chaoxing_row).apply {
                 setTextViewText(R.id.row_title, row.title)
-                setTextViewText(R.id.row_meta, row.meta)
+                setTextViewText(R.id.row_due, row.due)
+                setViewVisibility(
+                    R.id.row_due,
+                    if (row.due.isEmpty()) View.GONE else View.VISIBLE,
+                )
+                setTextViewText(
+                    R.id.row_course,
+                    if (row.due.isEmpty() || row.course.isEmpty()) row.course
+                    else "· ${row.course}",
+                )
+                setViewVisibility(
+                    R.id.row_course,
+                    if (row.course.isEmpty()) View.GONE else View.VISIBLE,
+                )
                 // 颜色必须每次都设：ListView 会复用行视图，不设的话上一条的橙色
                 // 会留在这一条上（真机截图里 11-01 的作业被染成了「24h 内」）。
                 setTextColor(
-                    R.id.row_meta,
+                    R.id.row_due,
                     ctx.getColor(
                         if (row.urgent) R.color.widget_warn
                         else R.color.widget_text_secondary,
                     ),
+                )
+                setInt(
+                    R.id.row_color,
+                    "setBackgroundColor",
+                    WidgetPalette.course(ctx, row.colorIndex),
                 )
                 // 模板 PendingIntent 只到 MainActivity；这里补上路由 data。
                 setOnClickFillInIntent(

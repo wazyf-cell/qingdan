@@ -8,6 +8,7 @@ import 'package:qingdan/application/course_use_case.dart';
 import 'package:qingdan/application/semester_use_case.dart';
 import 'package:qingdan/application/timetable_use_case.dart';
 import 'package:qingdan/features/course/course_manage_page.dart';
+import 'package:qingdan/features/course/semester_detail_page.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/settings/course_section.dart';
 import 'package:qingdan/theme/app_theme.dart';
@@ -179,16 +180,31 @@ void main() {
     }
   });
 
-  testWidgets('点「学期与作息」：窄屏打开底部抽屉，形态与课表面板一致',
+  testWidgets('点「学期与作息」：窄屏且没有学期 → 进课表管理页去建',
       (WidgetTester tester) async {
     await pump(tester, width: 411);
     await tapIo(tester, kCourseOpenSetupKey);
 
-    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byType(CourseManagePage), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
     expect(find.byType(AlertDialog), findsNothing);
-    // 弹层里既有的两个入口（导入文件 / 教务抓取）说明用的是同一份实现。
-    expect(tile('setup-import'), findsOneWidget);
-    expect(tile('setup-capture'), findsOneWidget);
+  });
+
+  testWidgets('点「学期与作息」：窄屏有学期 → 整页详情（字段 + 作息入口）',
+      (WidgetTester tester) async {
+    await io(tester, () async {
+      await semesters.createSemester(
+          name: '2026-2027-1', firstWeekDate: DateTime.utc(2026, 8, 31));
+      await paneModel.load();
+    });
+    await pump(tester, width: 411);
+    await tapIo(tester, kCourseOpenSetupKey);
+
+    expect(find.byType(SemesterDetailPage), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(tile('semester-save'), findsOneWidget);
+    expect(tile('semester-edit-timetable'), findsOneWidget);
   });
 
   testWidgets('点「学期与作息」：宽屏打开居中弹窗（isMobile 按断点传，不写死）',

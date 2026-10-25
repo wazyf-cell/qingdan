@@ -157,17 +157,23 @@ void main() {
       expect(key('timetable-library'), findsOneWidget);
       await tapIo(tester, 'tpl-del-${custom.id}');
       await tapIo(tester, 'tpl-del-confirm');
+      await tester.pump(const Duration(milliseconds: 400));
 
       // 关掉模板库：退场动画 + 回来后那次重扫都要读库，全程留在真实异步区。
-      // （不用 `pageBack()`：弹层与抽屉都没有 BackButton，它会直接断言失败。）
+      // 手机端 v1.0.10 起是整页，直接点 AppBar 的返回；宽屏仍是弹窗。
       await tester.runAsync(() async {
-        Navigator.of(tester.element(key('timetable-library'))).pop();
+        if (width < 720) {
+          await tester.tap(find.byType(BackButton));
+        } else {
+          Navigator.of(tester.element(key('timetable-library'))).pop();
+        }
         await tester.pump();
         await Future<void>.delayed(const Duration(milliseconds: 400));
         await tester.pump();
       });
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      for (int i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
       expect(key('timetable-library'), findsNothing, reason: '$label：模板库没关掉');
       expect(find.text('晚间作息（12 节）'), findsNothing,

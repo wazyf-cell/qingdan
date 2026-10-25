@@ -12,6 +12,7 @@
 library;
 
 import 'package:qingdan/domain/course.dart';
+import 'package:qingdan/domain/course_uid.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/task.dart';
 import 'package:qingdan/domain/time_table.dart';
@@ -200,6 +201,8 @@ Map<String, Object?> buildChaoxingSnapshot({
                 'course': t.courseName,
                 'kind': t.kind,
                 'due': t.dueAt?.millisecondsSinceEpoch,
+                // 与课表同一套按课名派生的 8 色，课表里没有的课也能拿到稳定颜色。
+                'color': courseColorIndex(t.courseName),
               },
           ],
   };

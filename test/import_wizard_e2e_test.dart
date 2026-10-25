@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/features/course/import_wizard/wizard_file_picker.dart';
+import 'package:qingdan/features/course/course_edit_page.dart';
 
 import 'dao_test_helper.dart';
 import 'import_wizard_harness.dart';
@@ -111,12 +112,12 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey<String>('row-3')));
     await tester.pumpAndSettle();
-    expect(find.byType(DraggableScrollableSheet), findsOneWidget,
-        reason: '移动端点行 → 底部抽屉承载同一个编辑面板');
+    expect(find.byType(CourseEditPage), findsOneWidget,
+        reason: '移动端点行 → 整页承载同一个编辑面板');
     await tester.tap(find.byKey(const ValueKey<String>('field-location')));
     await tester.enterText(
         find.byKey(const ValueKey<String>('field-location')), '理工楼110');
-    await tester.tap(find.byKey(const ValueKey<String>('btn-save')));
+    await tester.tap(find.byKey(const ValueKey<String>('course-page-save')));
     await tester.pumpAndSettle();
 
     await next(tester);

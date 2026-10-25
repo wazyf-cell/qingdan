@@ -11,6 +11,7 @@ import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
 
 import 'course_pane_model.dart';
+import 'course_setup_page.dart';
 import 'export_sheet.dart';
 import 'import_wizard/import_wizard.dart';
 import 'semester_timetable_cards.dart';
@@ -19,42 +20,22 @@ import 'semester_timetable_cards.dart';
 // 这里再导出一次：课表面板与向导步 4 的 `import 'course_setup.dart'` 不用改。
 export 'course_editor_sheet.dart';
 
-/// 课表设置弹层（§4.2 步骤 3 的「学期卡 + 作息卡」，平时也从头部 ⚙ 进来）。
+/// 课表设置（§4.2 步骤 3 的「学期卡 + 作息卡」，平时也从头部 ⚙ 进来）。
 ///
-/// 形态按 §2.6/§五 的双端约定：桌面 = 居中弹窗两卡并排；移动 = 底部抽屉上下堆叠。
-///
-/// 三条高频近路都在这一层：导入课表文件、从教务系统抓取（头部那一行的两个按钮），
-/// 以及导出课表文件（紧接其下的整行 [_ExportNearPath]，§9.2「近路」那条）。
+/// v1.0.10 起：手机端推到「课表设置」整页；宽屏仍保留这个居中弹窗
+/// （学期卡 + 作息卡并排编辑），避免把桌面调试路径也一起换掉。
 Future<void> showCourseSetup(BuildContext context, {required bool isMobile}) {
-  return isMobile
-      ? showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          showDragHandle: true,
-          builder: (BuildContext ctx) => Padding(
-            padding: EdgeInsets.only(
-                bottom: MediaQuery.viewInsetsOf(ctx).bottom, top: AppDimens.s8),
-            child: DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.85,
-              builder: (BuildContext ctx, ScrollController controller) =>
-                  SingleChildScrollView(
-                controller: controller,
-                child: const _CourseSetupBody(),
-              ),
-            ),
-          ),
-        )
-      : showDialog<void>(
-          context: context,
-          builder: (BuildContext ctx) => const AlertDialog(
-            insetPadding: EdgeInsets.all(AppDimens.s32),
-            content: SizedBox(
-              width: 720,
-              child: _CourseSetupBody(),
-            ),
-          ),
-        );
+  if (isMobile) return showCourseSetupPage(context);
+  return showDialog<void>(
+    context: context,
+    builder: (BuildContext ctx) => const AlertDialog(
+      insetPadding: EdgeInsets.all(AppDimens.s32),
+      content: SizedBox(
+        width: 720,
+        child: _CourseSetupBody(),
+      ),
+    ),
+  );
 }
 
 class _CourseSetupBody extends StatefulWidget {

@@ -11,6 +11,7 @@ import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_block.dart';
 import 'package:qingdan/features/course/course_pane.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
+import 'package:qingdan/features/course/course_setup_page.dart';
 import 'package:qingdan/theme/app_theme.dart';
 
 import 'dao_test_helper.dart';
@@ -215,6 +216,8 @@ void main() {
     await tapIo(tester, 'btn-setup');
     await tester.pumpAndSettle();
 
+    expect(find.byType(AlertDialog), findsOneWidget,
+        reason: '宽屏保持居中弹窗');
     expect(tester.widget<ListTile>(exportRow()).enabled, isTrue);
     expect(tester.widget<ListTile>(exportRow()).onTap, isNotNull);
 
@@ -236,6 +239,8 @@ void main() {
     await tapIo(tester, 'btn-setup');
     await tester.pumpAndSettle();
 
+    expect(find.byType(CourseSetupPage), findsOneWidget,
+        reason: '手机端 ⚙ 应进整页，而不是底部弹层');
     expect(tester.widget<ListTile>(exportRow()).enabled, isTrue);
     final Rect row = tester.getRect(exportRow());
     expect(row.left, greaterThanOrEqualTo(0));

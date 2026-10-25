@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/features/course/course_manage_page.dart';
+import 'package:qingdan/features/course/semester_detail_page.dart';
 import 'package:qingdan/features/course/import_wizard/import_wizard.dart';
 import 'package:qingdan/features/course/semester_sheet.dart';
 
@@ -44,8 +45,8 @@ void main() {
 
         final String idA = await h.idOf(tester, 'A 学期');
         final String idB = await h.idOf(tester, 'B 学期');
-        expect(h.key('semester-row-$idA'), findsOneWidget);
-        expect(h.key('semester-row-$idB'), findsOneWidget);
+        expect(h.key('semester-card-$idA'), findsOneWidget);
+        expect(h.key('semester-card-$idB'), findsOneWidget);
         expect(h.key('semester-check-$idA'), findsOneWidget);
         expect(h.key('semester-check-$idB'), findsNothing,
             reason: '$label：勾只有一个，而且挂在当前学期那行');
@@ -54,7 +55,7 @@ void main() {
         final Rect row1 = tester.getRect(h.key('manage-import'));
         final Rect row2 = tester.getRect(h.key('manage-capture'));
         final Rect row3 = tester.getRect(h.key('manage-templates'));
-        final Rect sem = tester.getRect(h.key('semester-row-$idA'));
+        final Rect sem = tester.getRect(h.key('semester-card-$idA'));
         expect(row1.width, greaterThan(width * 0.8), reason: '$label：入口行没铺满');
         expect(row2.width, closeTo(row1.width, 0.5));
         expect(row2.top, greaterThan(row1.bottom - 1));
@@ -118,7 +119,7 @@ void main() {
         expect(h.key('manage-import'), findsOneWidget);
       });
 
-      testWidgets('P3 「时间表管理」= 打开同一份模板库（两端都是弹层）',
+      testWidgets('P3 「时间表管理」= 打开同一份模板库（手机整页 / 宽屏弹窗）',
           (WidgetTester tester) async {
         await h.seed(tester);
         await h.openManage(tester, width);
@@ -133,7 +134,9 @@ void main() {
         expect(tester.getRect(h.key('timetable-library')).width,
             lessThanOrEqualTo(width));
         if (width < 720) {
-          expect(find.byType(DraggableScrollableSheet), findsOneWidget);
+          // v1.0.10：手机端是整页，不再有抽屉。
+          expect(find.byType(BottomSheet), findsNothing);
+          expect(find.byType(DraggableScrollableSheet), findsNothing);
           expect(find.byType(AlertDialog), findsNothing);
         } else {
           expect(find.byType(AlertDialog), findsOneWidget);
@@ -147,7 +150,7 @@ void main() {
             reason: '$label：关掉模板库要还在本页');
       });
 
-      testWidgets('P4 整页形态点一行学期：切换成功且回执 semester-said 留在本页',
+      testWidgets('P4 整页形态点「使用」：切换成功且回执 semester-said 留在本页',
           (WidgetTester tester) async {
         await h.seed(tester);
         await h.openManage(tester, width);
@@ -155,7 +158,7 @@ void main() {
         final String idB = await h.idOf(tester, 'B 学期');
         expect(h.key('semester-said'), findsNothing, reason: '没操作过不该有回执');
 
-        await tester.tap(h.key('semester-row-$idB'));
+        await tester.tap(h.key('semester-use-$idB'));
         await tester.pump();
         await h.settle(tester);
         await tester.pumpAndSettle();
@@ -183,7 +186,7 @@ void main() {
     await h.tapIo(tester, 'open-shell');
 
     final String idA = await h.idOf(tester, 'A 学期');
-    expect(h.key('semester-row-$idA'), findsOneWidget);
+    expect(h.key('semester-card-$idA'), findsOneWidget);
     expect(find.text('C 学期'), findsNothing);
 
     // 复现向导步 3 建学期 + 完成时 `pane.load()` 的真实调用顺序：
@@ -199,10 +202,27 @@ void main() {
     await h.settle(tester);
     await tester.pump();
 
-    expect(h.key('semester-row-$idC'), findsOneWidget,
+    expect(h.key('semester-card-$idC'), findsOneWidget,
         reason: '新导入的学期不能等重启才出现在「课表管理」里');
     expect(find.text('C 学期'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('点学期卡片 = 进「学期与作息」详情页（不再就地切换）',
+      (WidgetTester tester) async {
+    await h.seed(tester);
+    await h.openManage(tester, 411);
+    await h.tapIo(tester, 'open-shell');
+    final String idB = await h.idOf(tester, 'B 学期');
+    await tester.tap(h.key('semester-card-$idB'));
+    await tester.pump();
+    await h.settle(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SemesterDetailPage), findsOneWidget);
+    expect(h.key('semester-edit-timetable'), findsOneWidget);
+    expect(h.model.semester?.id, isNot(idB),
+        reason: '看详情不该顺手把当前学期切过去');
   });
 
   testWidgets('对照 §7.1：弹层形态把回执交给外层 pop，列表自己不留 semester-said',

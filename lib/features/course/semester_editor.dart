@@ -12,9 +12,13 @@ class SemesterEditPanel extends StatefulWidget {
     super.key,
     this.initial,
     this.onSave,
+    this.onDirty,
   });
 
   final Semester? initial;
+
+  /// 任意字段变化时回调：整页用它决定返回是否要拦。
+  final VoidCallback? onDirty;
 
   /// 保存回调：[firstWeekDate] 是用户选的原始日期，归一化由用例层负责。
   final void Function({
@@ -71,7 +75,10 @@ class _SemesterEditPanelState extends State<SemesterEditPanel> {
             labelText: '学期名称',
             errorText: _ok ? null : '不能为空',
           ),
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) {
+            widget.onDirty?.call();
+            setState(() {});
+          },
         ),
         const SizedBox(height: AppDimens.s12),
         InkWell(
@@ -83,7 +90,10 @@ class _SemesterEditPanelState extends State<SemesterEditPanel> {
               firstDate: DateTime(2000),
               lastDate: DateTime(2100),
             );
-            if (picked != null) setState(() => _firstWeek = picked);
+            if (picked != null) {
+              widget.onDirty?.call();
+              setState(() => _firstWeek = picked);
+            }
           },
           child: InputDecorator(
             decoration: const InputDecoration(
@@ -102,7 +112,10 @@ class _SemesterEditPanelState extends State<SemesterEditPanel> {
               key: const ValueKey<String>('semester-weeks-minus'),
               icon: const Icon(Icons.remove_circle_outline, size: 20),
               onPressed: _totalWeeks > Semester.minTotalWeeks
-                  ? () => setState(() => _totalWeeks--)
+                  ? () {
+                      widget.onDirty?.call();
+                      setState(() => _totalWeeks--);
+                    }
                   : null,
             ),
             SizedBox(
@@ -115,7 +128,10 @@ class _SemesterEditPanelState extends State<SemesterEditPanel> {
               key: const ValueKey<String>('semester-weeks-plus'),
               icon: const Icon(Icons.add_circle_outline, size: 20),
               onPressed: _totalWeeks < Semester.maxTotalWeeks
-                  ? () => setState(() => _totalWeeks++)
+                  ? () {
+                      widget.onDirty?.call();
+                      setState(() => _totalWeeks++);
+                    }
                   : null,
             ),
           ],

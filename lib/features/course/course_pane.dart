@@ -16,6 +16,7 @@ import 'course_toast.dart';
 import 'course_week_header.dart';
 import 'import_history_sheet.dart';
 import 'import_wizard/import_wizard.dart';
+import 'semester_detail_page.dart';
 import 'semester_switcher.dart';
 import 'today_summary_bar.dart';
 
@@ -155,7 +156,15 @@ class _CoursePaneState extends State<CoursePane> with CoursePaneActions {
           Expanded(
             child: NoTimetableState(
               courseCount: model.allCourses.length,
-              onFill: () => showCourseSetup(context, isMobile: isMobile),
+              onFill: () {
+                // 手机端「去填作息」直接进当前学期的详情页；宽屏保留原对话框。
+                final semester = model.semester;
+                if (isMobile && semester != null) {
+                  openSemesterDetailPage(context, semester: semester);
+                } else {
+                  showCourseSetup(context, isMobile: isMobile);
+                }
+              },
             ),
           )
         else ...<Widget>[

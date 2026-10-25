@@ -87,8 +87,11 @@ void main() {
   }
 
   Icon iconOf(WidgetTester tester, String key) => tester.widget<Icon>(
-      find.descendant(
-          of: find.byKey(ValueKey<String>(key)), matching: find.byType(Icon)));
+      find
+          .descendant(
+              of: find.byKey(ValueKey<String>(key)),
+              matching: find.byType(Icon))
+          .first);
 
   Future<void> openSetup(WidgetTester tester) async {
     await tester.tap(find.byKey(const ValueKey<String>('btn-setup')));

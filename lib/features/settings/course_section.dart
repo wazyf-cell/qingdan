@@ -14,6 +14,7 @@ import 'package:qingdan/features/course/course_manage_page.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
 import 'package:qingdan/features/course/course_setup.dart';
 import 'package:qingdan/features/course/export_sheet.dart';
+import 'package:qingdan/features/course/semester_detail_page.dart';
 import 'package:qingdan/features/course/timetable_library_page.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
@@ -53,7 +54,21 @@ class CourseSection extends StatelessWidget {
           subtitle: Text('学期名称、开学日期、总周数，以及每天各节课的上/下课时间',
               style: AppTypography.meta),
           trailing: const Icon(Icons.chevron_right, size: 20),
-          onTap: () => showCourseSetup(context, isMobile: isMobile),
+          onTap: () {
+            if (isMobile) {
+              // 手机端这一行直接进「学期与作息」详情页；还没有学期时去管理页建。
+              final CoursePaneModel? model =
+                  context.read<CoursePaneModel?>();
+              final semester = model?.semester;
+              if (semester == null) {
+                showCourseManagePage(context);
+              } else {
+                openSemesterDetailPage(context, semester: semester);
+              }
+            } else {
+              showCourseSetup(context, isMobile: false);
+            }
+          },
         ),
         ListTile(
           key: const ValueKey<String>(kCourseManageTimetableKey),

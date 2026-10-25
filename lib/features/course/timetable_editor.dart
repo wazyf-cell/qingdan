@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'package:qingdan/domain/time_table.dart';
-import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 
 import 'timetable_generate_form.dart';
+import 'timetable_editor_footer.dart';
 import 'timetable_rows.dart';
 
 /// 作息时间表编辑面板（§2.3）：预设 → 参数 → 生成预览 → 逐节微调 → 保存。
@@ -21,11 +21,23 @@ class TimetableEditPanel extends StatefulWidget {
     required this.initialDetails,
     this.onSave,
     this.isMobile = false,
+    this.showSaveButton = true,
+    this.onDirty,
+    this.onSaveHandle,
   });
 
   final List<TimeDetail> initialDetails;
   final void Function(List<TimeDetail> draft)? onSave;
   final bool isMobile;
+
+  /// 整页形态把保存放到 AppBar，面板自己不再渲染底部按钮。
+  final bool showSaveButton;
+
+  /// 任意节次变化时回调：整页用它决定返回是否要拦。
+  final VoidCallback? onDirty;
+
+  /// 整页形态取走「提交」动作，AppBar 的保存按钮调用它。
+  final ValueChanged<VoidCallback>? onSaveHandle;
 
   @override
   State<TimetableEditPanel> createState() => _TimetableEditPanelState();
@@ -53,6 +65,9 @@ class _TimetableEditPanelState extends State<TimetableEditPanel> {
     _draft = <TimeDetail>[...widget.initialDetails];
     _seeded = <TimeDetail>[...widget.initialDetails];
     _auditLoaded();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onSaveHandle?.call(_save);
+    });
   }
 
   @override
@@ -90,6 +105,7 @@ class _TimetableEditPanelState extends State<TimetableEditPanel> {
 
   /// 草稿换一遍：顺带清掉「那一节已被真值覆盖回去」的账（幽灵红框就是这么来的）。
   void _applyDraft(List<TimeDetail> next) {
+    widget.onDirty?.call();
     final Map<int, String> before = snapshotOf(_draft);
     setState(() {
       _draft = next;
@@ -99,6 +115,7 @@ class _TimetableEditPanelState extends State<TimetableEditPanel> {
   }
 
   void _generate(GenerateParams p) {
+    widget.onDirty?.call();
     _breakMinutes = p.breakMinutes;
     final List<TimeDetail> next = generateTimeDetails(
       timetableId: '',
@@ -153,6 +170,7 @@ class _TimetableEditPanelState extends State<TimetableEditPanel> {
   /// 时间格上报「当前文本解析不过」：先记账，只有该上色时才动红框与错误行。
   /// 每次上报都重建：账变了红态就得跟着变，少一次 setState 会留一个下不来的红框。
   void _onCellUnparsed(int section, String tag, String raw) {
+    widget.onDirty?.call();
     final String? message = _rec.mark(section, tag, raw);
     setState(() {
       if (message != null) _error = message.isEmpty ? null : message;
@@ -239,7 +257,6 @@ class _TimetableEditPanelState extends State<TimetableEditPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final AppColors colors = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -259,31 +276,14 @@ class _TimetableEditPanelState extends State<TimetableEditPanel> {
           onInvalid: _onCellUnparsed,
           onDelete: _deleteSection,
         ),
-        // 红字紧贴底部按钮行上方：与用户刚点的那一下同屏，不需要滚动。旧版渲染
-        // 在限高 240 的节次列表**上方**，手机上改第 8 节时红字已经在可视区外。
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppDimens.s4),
-            child: Text(
-              _error!,
-              key: const ValueKey<String>('tt-error'),
-              style: TextStyle(fontSize: 12, color: colors.overdue),
-            ),
-          ),
-        Row(
-          children: <Widget>[
-            TextButton(
-              key: const ValueKey<String>('tt-add'),
-              onPressed: _canAdd ? _addSection : null,
-              child: const Text('＋ 添加一节'),
-            ),
-            const Spacer(),
-            FilledButton(
-              key: const ValueKey<String>('tt-save'),
-              onPressed: _draft.isEmpty ? null : _save,
-              child: const Text('保存'),
-            ),
-          ],
+        // 红字紧贴底部按钮行上方：与用户刚点的那一下同屏，不需要滚动。
+        TimetableEditorFooter(
+          error: _error,
+          canAdd: _canAdd,
+          canSave: _draft.isNotEmpty,
+          showSaveButton: widget.showSaveButton,
+          onAdd: _addSection,
+          onSave: _save,
         ),
       ],
     );

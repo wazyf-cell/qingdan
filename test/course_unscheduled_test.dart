@@ -11,6 +11,7 @@ import 'package:qingdan/data/migrations.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/course/course_pane.dart';
 import 'package:qingdan/features/course/course_pane_model.dart';
+import 'package:qingdan/features/course/semester_detail_page.dart';
 import 'package:qingdan/theme/app_theme.dart';
 
 import 'dao_test_helper.dart';
@@ -165,8 +166,10 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey<String>('no-timetable-fill')));
     await tester.pumpAndSettle();
-    expect(find.text('学期与作息'), findsOneWidget,
-        reason: '出口要真的能进到填作息那张卡');
+    expect(find.byType(SemesterDetailPage), findsOneWidget,
+        reason: '出口要真的能进到能改作息的学期详情页');
+    expect(find.byKey(const ValueKey<String>('semester-edit-timetable')),
+        findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
