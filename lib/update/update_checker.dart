@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_initializing_formals — 命名参数不能以 _ 开头
 /// 更新通道：向 GitHub Releases 查一次「有没有新版本」。
 ///
 /// 为什么只查不装：本项目没有服务端（需求定死），能借的公开渠道只有 GitHub 的
@@ -12,6 +13,8 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
+import 'update_cache.dart';
 
 /// 仓库地址：换仓库时只有这一处要改，测试与界面都从这里取。
 const String kRepoSlug = 'wazyf-cell/qingdan';
@@ -123,17 +126,25 @@ class UpdateFetchException implements Exception {
 typedef ReleaseJsonFetcher = Future<Map<String, dynamic>> Function(String url);
 
 class UpdateChecker {
-  UpdateChecker({String repoSlug = kRepoSlug, ReleaseJsonFetcher? fetch})
+  UpdateChecker(
+      {String repoSlug = kRepoSlug,
+      ReleaseJsonFetcher? fetch,
+      UpdateHttpCache? cache})
       : _api = 'https://api.github.com/repos/$repoSlug',
-        _fetch = fetch ?? _httpFetch;
+        _fetch = fetch,
+        _cache = cache ?? UpdateHttpCache(repoSlug: repoSlug);
 
   final String _api;
-  final ReleaseJsonFetcher _fetch;
+  final ReleaseJsonFetcher? _fetch;
+  final UpdateHttpCache _cache;
+
+  Future<Map<String, dynamic>> _load(String url) =>
+      _fetch != null ? _fetch(url) : _httpFetch(url, _cache);
 
   Future<UpdateResult> check(String currentVersion) async {
     try {
       final ReleaseInfo? latest =
-          ReleaseInfo.fromJson(await _fetch('$_api/releases/latest'));
+          ReleaseInfo.fromJson(await _load('$_api/releases/latest'));
       if (latest == null) {
         return UpdateResult(UpdateStatus.failed, currentVersion,
             error: '发布页里没有版本号');
@@ -172,7 +183,9 @@ int compareVersions(String a, String b) {
 List<int> _segments(String v) =>
     normalizeVersion(v).split('.').map((String s) => int.tryParse(s) ?? 0).toList();
 
-Future<Map<String, dynamic>> _httpFetch(String url) async {
+Future<Map<String, dynamic>> _httpFetch(
+    String url, UpdateHttpCache cache) async {
+  final ({String etag, String body})? cached = await cache.read();
   final HttpClient client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 8);
   try {
@@ -180,12 +193,40 @@ Future<Map<String, dynamic>> _httpFetch(String url) async {
     // GitHub API 没有 User-Agent 直接 403，这是它文档里写明的硬性要求。
     req.headers.set(HttpHeaders.userAgentHeader, 'qingdan-app');
     req.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
+    // 条件请求：发布页没变时 GitHub 回 304，**不计入匿名额度**。
+    if (cached != null) {
+      req.headers.set(HttpHeaders.ifNoneMatchHeader, cached.etag);
+    }
     final HttpClientResponse res =
         await req.close().timeout(const Duration(seconds: 12));
-    final String body =
-        await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 12));
-    if (res.statusCode != HttpStatus.ok) {
-      throw UpdateFetchException(githubStatusReason(res.statusCode));
+    final int status = res.statusCode;
+    String? body;
+    if (status == HttpStatus.notModified && cached != null) {
+      body = cached.body;
+    } else {
+      body = await res
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 12));
+    }
+    if (status != HttpStatus.ok && status != HttpStatus.notModified) {
+      String? lastKnown;
+      if (cached != null) {
+        try {
+          final Object? old = jsonDecode(cached.body);
+          if (old is Map<String, dynamic> && old['tag_name'] is String) {
+            lastKnown = normalizeVersion(old['tag_name'] as String);
+          }
+        } catch (_) {}
+      }
+      throw UpdateFetchException(
+          githubStatusReason(status, lastKnownVersion: lastKnown));
+    }
+    if (status == HttpStatus.ok) {
+      final String? etag = res.headers.value(HttpHeaders.etagHeader);
+      if (etag != null && etag.isNotEmpty) {
+        await cache.write(etag, body);
+      }
     }
     final Object? decoded = jsonDecode(body);
     if (decoded is! Map<String, dynamic>) {
@@ -234,8 +275,14 @@ String socketErrorReason(SocketException e) {
 ///
 /// 单独暴露是为了能在离线测试里逐条钉住：真实网络失败（超时 / 连不上）
 /// 只有设备能验，但「GitHub 说了 403 时界面该讲什么」不该也一起靠肉眼。
-String githubStatusReason(int code) => switch (code) {
-      404 => 'GitHub 上找不到这个仓库的发布（可能还没发过版，或仓库改过名）',
-      403 || 429 => 'GitHub 拒绝了请求（同一个网络一小时内查太多次，等一会儿再试）',
-      _ => 'GitHub 返回 HTTP $code',
-    };
+String githubStatusReason(int code, {String? lastKnownVersion}) {
+  final String last = lastKnownVersion == null
+      ? ''
+      : '；上次成功查到的最新版是 v$lastKnownVersion';
+  return switch (code) {
+    404 => 'GitHub 上找不到这个仓库的发布（可能还没发过版，或仓库改过名）',
+    403 || 429 => 'GitHub 限制了查询（这个网络查得太多次了：匿名额度每小时 60 次，'
+        '共享网络可能更少）$last。可以点「打开发布页」用浏览器手动下载，或稍后再试',
+    _ => 'GitHub 返回 HTTP $code',
+  };
+}

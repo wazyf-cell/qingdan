@@ -11,6 +11,7 @@ import 'package:qingdan/theme/app_theme.dart';
 import 'package:qingdan/theme/app_typography.dart';
 import 'package:qingdan/theme/theme_mode_model.dart';
 import 'package:qingdan/update/apk_download.dart';
+import 'package:qingdan/update/launch_update_check.dart';
 import 'package:qingdan/update/update_notice.dart';
 
 /// 根 Navigator 的钥匙：快捷方式/小组件路由要先弹掉「设置 → 通用」这类推上来的
@@ -76,8 +77,13 @@ class _UpdateNoticeHostState extends State<_UpdateNoticeHost> {
     // 上次装完/放弃后留下的 APK（缓存目录，25MB 一份）不该一直躺着。
     // 只删一小时前的：刚交给系统安装器的那份还要等用户点「安装」。
     unawaited(cleanupOldDownloads());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) maybeShowUpdateNotice(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // 先让「升级后首启」的说明弹完，再查有没有比当前更新的版本：
+      // 两个公告排队，不叠在一起。
+      await maybeShowUpdateNotice(context);
+      if (!mounted) return;
+      await maybeShowUpdateOnLaunch(context);
     });
   }
 

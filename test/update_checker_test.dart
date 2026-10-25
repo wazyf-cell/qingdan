@@ -190,5 +190,12 @@ void main() {
       expect(githubStatusReason(500), contains('500'));
       expect(githubStatusReason(503), 'GitHub 返回 HTTP 503');
     });
+
+    test('被限流时带上上次成功查到的最新版，不让用户两眼一抹黑', () {
+      final String text =
+          githubStatusReason(403, lastKnownVersion: '1.0.9');
+      expect(text, contains('1.0.9'));
+      expect(text, contains('60 次'));
+    });
   });
 }
