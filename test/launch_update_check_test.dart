@@ -77,6 +77,40 @@ void main() {
     }
   });
 
+  testWidgets('首次欢迎框在前台时，等它关掉再弹更新公告', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final SharedPreferences prefs = await freshPrefs();
+      final BuildContext ctx = await host(tester);
+      int shown = 0;
+      Future<void> shower(BuildContext _, String _, ReleaseInfo _, UpdateChecker _) async {
+        shown++;
+      }
+
+      // 模拟首启欢迎框：它挡住 home 路由，自动检查不能直接放弃。
+      showDialog<void>(
+        context: ctx,
+        builder: (BuildContext _) => const AlertDialog(title: Text('欢迎使用')),
+      );
+      await tester.pumpAndSettle();
+
+      final Future<void> pending = maybeShowUpdateOnLaunch(ctx,
+          checker: UpdateChecker(fetch: (_) async => available('1.1.0')),
+          currentVersion: '1.0.0',
+          prefs: prefs,
+          showDialogFn: shower);
+      await tester.pump();
+      expect(shown, 0, reason: '欢迎框还在时不能叠一个更新公告');
+
+      Navigator.of(ctx).pop();
+      await tester.pumpAndSettle();
+      await pending;
+      expect(shown, 1, reason: '欢迎框关掉后应该补上这次更新提醒');
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('已是最新版 / 检查失败都不弹', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {

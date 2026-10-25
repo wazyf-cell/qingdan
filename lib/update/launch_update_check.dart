@@ -34,9 +34,9 @@ Future<void> maybeShowUpdateOnLaunch(
     final UpdateChecker c = checker ?? UpdateChecker();
     final UpdateResult r = await c.check(currentVersion);
     if (r.status != UpdateStatus.available || !context.mounted) return;
-    // 检查期间用户可能已经进了某个页面/开着别的弹层：这次不叠一个公告上去。
-    final ModalRoute<dynamic>? route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) return;
+    // 首次启动时欢迎框正在前台：等它关掉再弹，而不是直接漏掉这次提醒。
+    // 用户主动进了别的页面时也先等，最多 20 秒；离开就放弃这一次。
+    if (!await _waitForCurrentRoute(context)) return;
 
     final SharedPreferences p =
         prefs ?? await SharedPreferences.getInstance();
@@ -56,6 +56,16 @@ Future<void> maybeShowUpdateOnLaunch(
   } catch (e) {
     debugPrint('启动检测更新失败（静默）：${e.runtimeType}');
   }
+}
+
+Future<bool> _waitForCurrentRoute(BuildContext context) async {
+  for (int i = 0; i < 100; i++) {
+    if (!context.mounted) return false;
+    final ModalRoute<dynamic>? route = ModalRoute.of(context);
+    if (route == null || route.isCurrent) return true;
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+  }
+  return false;
 }
 
 Future<void> _showDialog(BuildContext context, String currentVersion,
