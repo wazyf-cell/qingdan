@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用说明与免责声明
+    url: https://github.com/wazyf-cell/qingdan/blob/main/README.md
+    about: 先看导入步骤、课表免责声明与支持范围
+  - name: 私密安全报告
+    url: https://github.com/wazyf-cell/qingdan/security/advisories/new
+    about: 凭据、APK 更新、WebDAV 等安全问题请走私密报告，不要开公开 Issue

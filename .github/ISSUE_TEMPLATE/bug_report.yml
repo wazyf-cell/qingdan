@@ -1,0 +1,57 @@
+name: Bug 报告
+description: 报告可复现的问题（不要粘贴账号、cookie、真实课表或 WebDAV 口令）
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先确认使用的是最新 Release，并阅读 README 的「免责声明与反馈」。
+        课表只适配南昌航空大学强智教务；其他学校/系统的问题通常属于适配范围外。
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本
+      description: 设置 → 关于 里的 vX.Y.Z（例如 v1.0.12）
+      placeholder: v1.0.12
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android 版本与机型
+      placeholder: Android 14 / Pixel 6
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 尽量写成可以照着点的步骤
+      placeholder: |
+        1. 打开设置 → 通用 → 检测更新
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果 / 报错
+      description: 日志和截图请先删掉账号、cookie、真实课程与作业标题、WebDAV 地址
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 我已经遮掉了真实课表、作业标题、账号、cookie 和 WebDAV 信息
+          required: true
+        - label: 这不是安全漏洞（安全问题请走私密报告）
+          required: true

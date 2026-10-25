@@ -31,7 +31,7 @@ Future<void> maybeShowFirstRunGuide(
       key: const ValueKey<String>('first-run-guide'),
       title: const Text('欢迎使用清单'),
       content: Text(
-        '首次使用建议先看一眼「使用说明」（设置 → 关于 → 使用说明），'
+        '首次使用建议先阅读「使用说明」（设置 → 关于 → 使用说明），'
         '里面有登录学习通、导入课表、设置提醒的做法。',
         style: AppTypography.body
             .copyWith(color: colors.textSecondary, height: 1.5),

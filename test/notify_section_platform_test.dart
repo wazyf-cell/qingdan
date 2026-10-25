@@ -49,7 +49,7 @@ void main() {
         (WidgetTester tester) async {
       await pumpSection(tester, supported: false);
 
-      expect(find.text('Windows 端暂不支持系统通知，提醒功能仅在 Android 上生效。'),
+      expect(find.text('当前平台不支持系统通知；提醒功能仅在 Android 端生效。'),
           findsOneWidget);
       expect(sink.calls, isNot(contains('requestPermission')),
           reason: '不支持的平台不该弹权限框');

@@ -40,8 +40,7 @@ class _PermissionsBodyState extends State<_PermissionsBody> {
     if (!mounted) return;
     setState(() => _said = ok
         ? null
-        : '「$label」打不开：请手动到 系统设置 → 应用 → 清单 里找。'
-            '${Theme.of(context).platform == TargetPlatform.windows ? '（Windows 端没有这些系统页，提醒也只在 Android 生效。）' : ''}');
+        : '「$label」打不开：请手动到 系统设置 → 应用 → 清单 里找。');
   }
 
   @override

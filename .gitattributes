@@ -1,0 +1,7 @@
+# 统一按文本处理；Windows 的 .bat 保留 CRLF，其余不强制换行符。
+* text=auto
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.jks binary

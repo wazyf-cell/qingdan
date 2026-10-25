@@ -81,6 +81,9 @@ void main() {
       '合并 / 覆盖 / 仅新增',
       // 同步（`sync_section.dart` / `sync_coordinator.dart` / `sync_slot.dart`）
       '填的是「应用密码」，不是网站登录密码',
+      'WebDAV 是通用协议',
+      '建议优先使用坚果云',
+      '应用密码只写进系统凭据库',
       '每 30 分钟兜底轮询',
       '1 → 2 → 4 → 8 → 15 分钟退避',
       '600 请求 / 30 分钟',
@@ -93,7 +96,6 @@ void main() {
       '顺延到区间结束那一刻',
       '已排入的提醒仍会响',
       '新增或改动的待办要等应用下次打开才会重新排程',
-      'Windows 端没有系统通知',
     ];
     for (final String phrase in verified) {
       expect(find.textContaining(phrase), findsWidgets,
@@ -118,6 +120,13 @@ void main() {
       expect(find.textContaining(phrase), findsNothing,
           reason: '说明里写了不存在的能力：$phrase');
     }
+  });
+
+  testWidgets('说明里不出现 Windows 版本相关文案',
+      (WidgetTester tester) async {
+    await pumpHelp(tester, width: 411);
+    expect(find.textContaining('Windows'), findsNothing,
+        reason: '这是 Android 应用；使用说明不涉及 Windows 版本');
   });
 
   testWidgets('正文里不许漏 markdown 星号（Flutter 不渲染，用户会看见字面 **）',

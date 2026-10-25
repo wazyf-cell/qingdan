@@ -1,0 +1,30 @@
+name: 功能建议
+description: 提出改进建议；合适的会采用，但不保证全部实现
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决什么问题
+      description: 先描述使用场景，而不是直接指定实现
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议的做法
+      description: 如果有具体界面或交互想法，可以写在这里
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过的替代方案
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 范围确认
+      options:
+        - label: 这个建议不要求自建服务端、账号体系或云端存储
+          required: true
+        - label: 我理解课表解析只适配南昌航空大学强智教务，其他学校需要自行 fork 适配
+          required: true

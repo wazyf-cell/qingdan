@@ -1,6 +1,16 @@
 NOTICE — 上游来源与移植声明
 ================================================================================
 
+版权与应用许可
+--------------------------------------------------------------------------------
+qingdan — 自用任务清单（Android）
+Copyright (c) 2026 Zhong Yongfu
+
+本程序以 GNU AGPL-3.0-or-later 发布；`LICENSE` 保留 FSF 的 AGPL-3.0 原始全文。
+选择 AGPL 而非 MIT 的原因：`lib/import/chaoxing/` 下的解析与取数代码移植自
+AGPL-3.0-or-later 的油猴脚本（上游 Cooanyh/chaoxing-list），其派生作品必须延续
+同样的 copyleft；完整来源与行号对照见本文件第一节。
+
 本文件登记 qingdan 仓库里**不是从零写**的部分。仓库自身的许可证见 `LICENSE`
 （GNU AGPL-3.0-or-later）。项目规矩（AGENTS.md 禁止事项）：每一个移植/参考的
 源码文件都必须在**文件头**写明原路径、原类名与参考行号；本文件只是索引与汇总，
@@ -80,7 +90,7 @@ dart pub cache list                 # 给出包在本机的目录
 - `flutter` / `dart` SDK —— 框架与语言（Flutter stable 3.47.5 / Dart 3.13.4）。
 - `flutter_inappwebview` —— 内嵌 WebView：学习通登录取 cookie、教务系统登录后抓当前页 HTML。（用的是 6.2.0-beta.3，原因见 `pubspec.yaml` 注释：稳定版自带的 Android 子包使用了被 AGP 拒绝的 `proguard-android.txt`。）
 - `sqflite_common_ffi` / `path_provider` —— 本地 SQLite 数据库与数据目录。
-- `flutter_secure_storage` —— 系统凭据库（Windows 凭据管理器 / Android Keystore），存 WebDAV 口令与学习通 cookie。
+- `flutter_secure_storage` —— 系统凭据库（Android Keystore），存 WebDAV 口令与学习通 cookie。
 - `shared_preferences` —— 轻量配置（同步设置、外观偏好等）。
 - `provider` —— 状态管理。
 - `flutter_local_notifications` + `timezone` —— 本地通知与提醒排程。

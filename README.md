@@ -1,7 +1,7 @@
 # qingdan（自用任务清单）
 
 给**一个人、多台设备**用的任务清单 App：数据完全归自己、可离线、能把课表与日历合并进来。
-当前这一支**只发布 Android 端**（`android/`），桌面端目录不随仓库发布。
+当前**只发布 Android 端**（`android/`）。
 
 许可证：**GNU AGPL-3.0-or-later**（见 `LICENSE`）；移植来源与第三方依赖清单见 `NOTICE`。
 
@@ -28,7 +28,7 @@
 - **界面只有简体中文**，没有做 i18n，也没有排期。
 - **没有全局搜索**（只有清单页/学习通面板内的标题过滤）。
 - 学习通数据不落库、不同步、不写回（不会把「已完成」同步到没登录超星的那台设备）。
-- 没有 iOS 端；Windows 端在本分支视为不存在。
+- 只提供 Android 端。
 - **不保证课表实时**：它只是导入时的快照，教务调整后可能过期；实时信息以「蓝航APP」
   或学校教务系统为准。
 - **不承诺适配其他学校**：只按南昌航空大学强智教务的页面结构解析；其他学校要自己
@@ -66,9 +66,9 @@
 
 | 项 | 版本 | 说明 |
 | --- | --- | --- |
-| Flutter | **3.47.5** stable | CI 也钉这个值（`.github/workflows/android-release.yml`） |
+| Flutter | **3.47.5** stable | 两个 CI 工作流都钉这个值（`.github/workflows/ci.yml` 与 `android-release.yml`） |
 | Dart | 3.13.4 | 随 Flutter 3.47.5 |
-| JDK | **17** | `android/app/build.gradle.kts` 里 `compileOptions` 与 Kotlin `jvmTarget` 都钉 17 |
+| JDK | **17** | `android/app/build.gradle.kts` 里 `compileOptions` 与 Kotlin `jvmTarget` 都钉 17；本机 JDK 25 也实测可构建 |
 | Gradle | 9.3.1 | wrapper 声明的发行版（`android/gradle/wrapper/gradle-wrapper.properties`） |
 | Android Gradle Plugin | 9.1.0 | `android/settings.gradle.kts` |
 | Kotlin | 2.4.0 | `android/settings.gradle.kts` |
@@ -129,9 +129,11 @@ flutter build apk --release --split-per-abi
   `sha256sums.txt` 挂到 Release 页面。正式签名钥匙不离开本机，GitHub 上也没有它的副本。
 - CI 工作流的 **tag 触发已暂停**（仓库没配 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` 两个 Secret，
   加了 tag 触发也会在还原密钥那一步失败）：现在打 tag 不会触发构建。
-- 手动 Run workflow 是「彩排」：跑完 analyze、测试、构建与签名核对（硬比对证书指纹），
-  但**不创建 Release、也不上传任何产物**（公开仓库的 Actions 产物不登录就能下载，
-  没经你过目的包不该挂上去）。
+- PR 与 main 的常规检查在 `.github/workflows/ci.yml`：analyze + `flutter test --concurrency=1`，
+  不接触签名密钥、不产出 Release。
+- 手动 Run `android-release.yml` 是「彩排」：跑完 analyze、测试、构建与签名核对
+  （硬比对证书指纹），但**不创建 Release、也不上传任何产物**。
+- 正常发布要升 `versionName`；同版本 build 仅历史例外（`v1.0.10-build12`），以后不要重复。
 
 ## 怎么跑测试
 
@@ -140,16 +142,17 @@ flutter analyze
 flutter test --concurrency=1
 ```
 
-> **`--concurrency=1` 不是可选的**：Windows 上多个测试文件并发会争抢 sqflite 而卡死。
+> **`--concurrency=1` 不是可选的**：多个测试文件并发会争抢 sqflite 而卡死（本机实测）。
 > CI 用的也是这条命令。当前基线：`flutter analyze` 0 告警、全量测试全绿。
 
 ## 首次运行要自备什么
 
 - **学习通账号**：在 App 内 WebView 自己登录；导出的 cookie 只进**系统凭据库**
-  （Android Keystore / Windows 凭据管理器），不写进数据库、不进日志。
+  （Android Keystore），不写进数据库、不进日志。
 - **教务系统账号与网络**：「从教务系统抓取」要求你能访问本校教务站点——**多数教务只在校内网
   可达**，校外网络与模拟器上都打不通，这不是 App 的 bug。
-- **WebDAV（可选）**：地址 + 账号 + 口令（口令同样只进系统凭据库）。用坚果云时需要
+- **WebDAV（可选）**：地址 + 账号 + 口令（口令同样只进系统凭据库）。WebDAV 是通用协议，
+  其他兼容实现也可能可用；本项目主要按坚果云测试，建议优先使用坚果云。用坚果云时需要
   「应用密码」，并且同步目录由 App 自己 `MKCOL` 创建。
 - **通知权限**：Android 13+ 要手动授予，否则提醒静默失效。
 - **明文 HTTP**：`AndroidManifest.xml` 里开了 `usesCleartextTraffic="true"`，因为教务站点
@@ -170,11 +173,16 @@ lib/
   features/      界面：shell / tasks / detail / calendar / course / settings / trash
 test/            单元与 widget 测试
 android/         Android 工程
-.github/         CI（手动触发：analyze / 测试 / 构建 / 签名核对；发布走本机出包）
+.github/         CI（PR/main 检查 analyze + 测试；手动签名彩排；发布走本机出包）
 ```
 
 分层约定：UI 层不得直接访问 DAO，只调用 `lib/application/`；写库与记录待同步意图必须在
 同一事务内；单一源码文件不超过 300 行。
+
+## 参与贡献
+
+提交 PR 前先读 [CONTRIBUTING.md](CONTRIBUTING.md)；安全漏洞请按 [SECURITY.md](SECURITY.md)
+私密报告，不要在公开 Issue 贴账号、cookie、课表或 WebDAV 信息。
 
 ## 第三方与许可证
 

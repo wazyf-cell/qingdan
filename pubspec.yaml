@@ -29,7 +29,7 @@ environment:
   # 工具链钉在实测过的 Flutter 版本上：compileSdk / minSdk / targetSdk / NDK 都是
   # 从 Flutter 工具链默认值解析的（见 android/app/build.gradle.kts），换版本会连带
   # 改这四项并可能要求升 AGP。细节见 README「环境要求」。
-  flutter: ">=3.47.5 <4.0.0"
+  flutter: ">=3.47.5 <3.48.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions

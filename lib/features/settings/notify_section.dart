@@ -45,7 +45,7 @@ class NotifySection extends StatelessWidget {
           Text('通知', style: AppTypography.panelTitle.copyWith(color: colors.textPrimary)),
           const SizedBox(height: AppDimens.s8),
         ],
-        if (grayed) _note(colors, 'Windows 端暂不支持系统通知，提醒功能仅在 Android 上生效。'),
+        if (grayed) _note(colors, '当前平台不支持系统通知；提醒功能仅在 Android 端生效。'),
         if (service != null && !grayed) _PermCard(service: service),
         _switch(colors, 'notify-enabled', '启用提醒', s.enabled, store.setEnabled),
         _group(colors, '清单'),

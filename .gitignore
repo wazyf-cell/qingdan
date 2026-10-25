@@ -60,6 +60,11 @@ app.*.map.json
 *.sqlite
 *.sqlite3
 
+# --- 本地环境变量文件（可能含凭据；示例文件需显式白名单）---
+.env
+.env.*
+!.env.example
+
 # --- 含真实数据或凭据的备份，绝不入库 ---
 # _bak_20261010/android_device_v4.db = 真机拉回的业务库（真实待办 + sync_state etag）
 /_bak_20261010/
