@@ -99,8 +99,10 @@ void main() {
     });
 
     test('writeToUri 写不进去 → false（目录不存在）', () async {
-      expect(await FileIntents.writeToUri(r'D:\no_such_dir\x.ics', bytes),
-          isFalse);
+      // 用「临时目录下不存在的子目录」而不是某个平台的盘符，Windows/Linux 都成立。
+      final String path = '${Directory.systemTemp.path}'
+          '/qingdan_no_such_${DateTime.now().microsecondsSinceEpoch}/x.ics';
+      expect(await FileIntents.writeToUri(path, bytes), isFalse);
     });
   });
 
@@ -121,12 +123,16 @@ void main() {
     });
 
     test('目录创建不了 → null，不抛', () async {
-      // 用 Windows 非法路径字符（|）而不是「D 盘不存在的目录」：后者在
-      // recursive:true 下会被当场创建出来，测不到失败分支。
+      // 拿一个普通文件当父目录：recursive:true 也创建不出子目录，且不依赖
+      // Windows 的非法字符（Linux 上 `x|y` 是能创建的，CI 曾因此红）。
+      final Directory tmp = Directory.systemTemp.createTempSync('qingdan_app_fail');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      final File blocker = File('${tmp.path}/not_a_dir')
+        ..writeAsStringSync('x');
       final String? saved = await FileIntents.writeAppDocument(
           fileName: 'a.csv',
           bytes: bytes,
-          documentsPathOverride: r'x|y');
+          documentsPathOverride: blocker.path);
       expect(saved, isNull);
     });
   });
