@@ -16,7 +16,7 @@ import 'settings_section_page.dart';
 /// 不引 `package_info_plus`（本轮定死「不新增依赖」），代价是它是个手抄常量，
 /// 所以 `test/app_version_test.dart` 直接读 pubspec 比对：改了版本号忘了改这里，
 /// 那条测试就红——留一个永远显示 0.1.0 的死字符串比不显示更糟。
-const String kAppVersion = '1.0.13';
+const String kAppVersion = '1.0.14';
 
 /// 设置 · 关于节（M5 定案第 13 条 + M6-C C1 / C6 / E1）。
 class AboutSection extends StatelessWidget {
@@ -96,7 +96,18 @@ class AboutSection extends StatelessWidget {
           subtitle: const Text('GitHub Issues；合适的建议会采用',
               style: AppTypography.meta),
           trailing: const Icon(Icons.open_in_new, size: 18),
-          onTap: () => _openIssues(context),
+          onTap: () => _openExternal(context, '$kRepoUrl/issues'),
+        ),
+        ListTile(
+          key: const ValueKey<String>('settings-star'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('喜欢这个项目？',
+              style: AppTypography.body.copyWith(color: colors.textPrimary)),
+          subtitle:
+              const Text('可以去 GitHub 点个 Star', style: AppTypography.meta),
+          trailing: const Icon(Icons.star_border, size: 20),
+          onTap: () => _openExternal(context, kRepoUrl),
         ),
         ListTile(
           key: const ValueKey<String>('settings-licenses'),
@@ -113,11 +124,11 @@ class AboutSection extends StatelessWidget {
     );
   }
 
-  Future<void> _openIssues(BuildContext context) async {
-    final bool ok = await SystemIntents.openUrl('$kRepoUrl/issues');
+  Future<void> _openExternal(BuildContext context, String url) async {
+    final bool ok = await SystemIntents.openUrl(url);
     if (ok || !context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('打不开浏览器。地址是 $kRepoUrl/issues')),
+      SnackBar(content: Text('打不开浏览器。地址是 $url')),
     );
   }
 }

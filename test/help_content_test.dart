@@ -96,6 +96,10 @@ void main() {
       '顺延到区间结束那一刻',
       '已排入的提醒仍会响',
       '新增或改动的待办要等应用下次打开才会重新排程',
+      '提醒只在 Android 端生效',
+      // v1.0.14：关于页有 Star 入口，说明里也要给出仓库地址
+      'GitHub 仓库点个 Star',
+      'https://github.com/wazyf-cell/qingdan',
     ];
     for (final String phrase in verified) {
       expect(find.textContaining(phrase), findsWidgets,

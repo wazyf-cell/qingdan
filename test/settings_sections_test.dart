@@ -124,6 +124,8 @@ void main() {
     expect(find.text('v$kAppVersion'), findsOneWidget);
     expect(find.textContaining('也不会自建任何服务器'), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('about-disclaimer')), findsOneWidget);
+    // v1.0.14：Star 入口在完整设置页里也要看得见（点击行为见 about_star_test.dart）。
+    expect(find.byKey(const ValueKey<String>('settings-star')), findsOneWidget);
     // 能不能覆盖安装的说法只此一份：关于页、检测更新弹层、发布页正文共用。
     final Text policy = tester.widget<Text>(find.byKey(
         const ValueKey<String>('about-install-policy')));

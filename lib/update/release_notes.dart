@@ -11,6 +11,12 @@ library;
 
 /// 键是去掉 `v` 前缀与 `+build` 的版本号，与 `kAppVersion` 同一形状。
 const Map<String, String> kReleaseNotes = <String, String>{
+  '1.0.14': '更新内容\n'
+      '· 设置 → 关于 新增「喜欢这个项目？」：点一下用系统浏览器打开 GitHub 仓库，'
+      '可以在那里点 Star\n'
+      '· 使用说明的「声明与边界」补上仓库地址\n'
+      '\n下载\n'
+      '· 设置 → 通用 → 检测更新 → 下载并安装，或到 GitHub Releases 选对应 ABI 的 APK',
   '1.0.13': '更新内容\n'
       '· 使用说明不再涉及 Windows 版本：提醒只在 Android 端生效；'
       '应用密码只写进系统凭据库（Android Keystore）\n'
