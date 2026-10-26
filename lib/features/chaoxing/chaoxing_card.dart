@@ -77,7 +77,10 @@ class ChaoxingCard extends StatelessWidget {
                   style:
                       AppTypography.body.copyWith(color: colors.textPrimary)),
               const SizedBox(height: 2),
-              _deadline(t, u, colors),
+              if (t.source == ChaoxingSource.exam)
+                _examWindow(t, u, colors)
+              else
+                _deadline(t, u, colors),
               const SizedBox(height: AppDimens.s4),
               Wrap(
                 spacing: AppDimens.s8,
@@ -95,6 +98,32 @@ class ChaoxingCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// 考试卡才显示开始 / 截止两行；作业与活动仍用原来的单行截止文案。
+  Widget _examWindow(ChaoxingTask t, ChaoxingUrgency u, AppColors colors) {
+    final ({String start, String end}) times = formatExamWindow(t, now);
+    final bool live = t.ongoing;
+    final Color endColor = live && u == ChaoxingUrgency.urgent
+        ? colors.overdue
+        : live && u == ChaoxingUrgency.soon
+            ? colors.textPrimary
+            : colors.textSecondary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(times.start,
+            style:
+                AppTypography.meta.copyWith(color: colors.textSecondary)),
+        const SizedBox(height: 2),
+        Text(times.end,
+            style: AppTypography.meta.copyWith(
+              color: endColor,
+              fontWeight:
+                  live && u == ChaoxingUrgency.urgent ? FontWeight.w600 : null,
+            )),
+      ],
     );
   }
 

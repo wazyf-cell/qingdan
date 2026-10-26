@@ -50,15 +50,48 @@ class _ChaoxingDetailPageState extends State<ChaoxingDetailPage> {
   /// 重新登录后重建 WebView 的计数（同一个 key 不会重新加载 URL）。
   int _reloadTick = 0;
 
+  /// 用户点了「打开网页版」后的地址；null = 还在降级说明页。
+  String? _fallbackUrl;
+
   String? get _url => detailUrlOf(widget.task);
 
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
     final String? url = _url;
+    final String? fallback = _fallbackUrl;
+    final Widget body;
+    if (fallback != null) {
+      body = _fallbackWeb(context, fallback);
+    } else if (url == null && widget.task.detailEntryUrl == null) {
+      // 既没有网页地址、也没有入口地址（课堂活动 / 缺参数的条目）：
+      // 只能如实降级，见 [_unsupported]。
+      body = _unsupported(context);
+    } else {
+      // 有入口地址时交给主体去试抽取——**抽取不需要 clazzId**，所以
+      // 「拼不出网页地址」的条目也可能抽得出正文，不能在这里就判它看不了。
+      body = Column(
+        children: <Widget>[
+          if (_sessionLost) _lostBanner(context),
+          Expanded(
+            child: ChaoxingDetailView(
+              // 重新登录后整块重建：换 key 才会重跑一次抽取（登录前那次
+              // 必然失败，不重建就永远停在「登录态已失效」那一屏）。
+              key: ValueKey<int>(_reloadTick),
+              task: widget.task,
+              webView: widget.webView ?? _inAppWebView,
+              onSessionLost: (bool lost) {
+                if (lost == _sessionLost) return;
+                setState(() => _sessionLost = lost);
+              },
+            ),
+          ),
+        ],
+      );
+    }
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.task.courseName,
+        title: Text(fallback == null ? widget.task.courseName : '学习通网页版',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTypography.panelTitle),
@@ -78,30 +111,37 @@ class _ChaoxingDetailPageState extends State<ChaoxingDetailPage> {
           ),
         ),
       ),
-      body: url == null && widget.task.detailEntryUrl == null
-          // 既没有网页地址、也没有入口地址（课堂活动 / 缺参数的条目）：
-          // 只能如实降级，见 [_unsupported]。
-          ? _unsupported(context)
-          // 有入口地址时交给主体去试抽取——**抽取不需要 clazzId**，所以
-          // 「拼不出网页地址」的条目也可能抽得出正文，不能在这里就判它看不了。
-          : Column(
-              children: <Widget>[
-                if (_sessionLost) _lostBanner(context),
-                Expanded(
-                  child: ChaoxingDetailView(
-                    // 重新登录后整块重建：换 key 才会重跑一次抽取（登录前那次
-                    // 必然失败，不重建就永远停在「登录态已失效」那一屏）。
-                    key: ValueKey<int>(_reloadTick),
-                    task: widget.task,
-                    webView: widget.webView ?? _inAppWebView,
-                    onSessionLost: (bool lost) {
-                      if (lost == _sessionLost) return;
-                      setState(() => _sessionLost = lost);
-                    },
-                  ),
-                ),
-              ],
-            ),
+      body: body,
+    );
+  }
+
+  /// 网页版兜底：带登录态的 WebView 打开课程页 / 全局考试列表，
+  /// 用户自己在页面里找到那条考试。不是「假装拼出了题目页」。
+  Widget _fallbackWeb(BuildContext context, String url) {
+    final AppColors colors = AppColors.of(context);
+    return Column(
+      children: <Widget>[
+        if (_sessionLost) _lostBanner(context),
+        Container(
+          width: double.infinity,
+          color: colors.surfaceHigh,
+          padding: const EdgeInsets.fromLTRB(
+              AppDimens.s16, AppDimens.s8, AppDimens.s16, AppDimens.s8),
+          child: Text(
+            '网页版 · 在页面里找到「${widget.task.title}」并点开',
+            key: const ValueKey<String>('detail-fallback-note'),
+            style: AppTypography.meta.copyWith(color: colors.textSecondary),
+          ),
+        ),
+        Expanded(
+          child: (widget.webView ?? _inAppWebView)(context, url, (Uri? uri) {
+            final String text = uri.toString().toLowerCase();
+            final bool lost =
+                text.contains('passport') || text.contains('/login');
+            if (lost != _sessionLost) setState(() => _sessionLost = lost);
+          }),
+        ),
+      ],
     );
   }
 
@@ -142,6 +182,9 @@ class _ChaoxingDetailPageState extends State<ChaoxingDetailPage> {
             '我们拼不出地址。请在「学习通」App 或网页版里进这门课打开。'
         : '这类「${t.kind}」在超星里没有单独的题目页，'
             '请在「学习通」App 或网页版的课程里打开。';
+    final String? fallback = webFallbackUrlOf(t);
+    final bool coursePage =
+        t.courseId.isNotEmpty && (t.clazzId?.isNotEmpty ?? false);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppDimens.s24),
@@ -158,6 +201,23 @@ class _ChaoxingDetailPageState extends State<ChaoxingDetailPage> {
                 key: const ValueKey<String>('detail-reason'),
                 textAlign: TextAlign.center,
                 style: AppTypography.meta.copyWith(color: colors.textSecondary)),
+            if (fallback != null) ...<Widget>[
+              const SizedBox(height: AppDimens.s12),
+              Text(
+                  coursePage
+                      ? '可以用带登录态的网页版课程打开，自己找到这一条。'
+                      : '可以直接打开学习通网页版考试列表，按标题找到它。',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.meta
+                      .copyWith(color: colors.textFaint)),
+              const SizedBox(height: AppDimens.s8),
+              FilledButton.tonal(
+                key: const ValueKey<String>('detail-open-web-fallback'),
+                onPressed: () => setState(() => _fallbackUrl = fallback),
+                child: Text(
+                    coursePage ? '打开网页版课程' : '打开学习通网页版考试列表'),
+              ),
+            ],
           ],
         ),
       ),

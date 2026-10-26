@@ -20,6 +20,12 @@ const String _kVisitCourse =
 const String _kOpenExam =
     'https://mooc1-api.chaoxing.com/exam-ans/exam/test/examcode/examnotes';
 
+/// 全局考试列表页（`chaoxing_client.dart` 抓的同一页）。详情参数缺失时，
+/// 让用户在带登录态的 WebView 里自己找到那场考试。
+const String kChaoxingExamListUrl =
+    'https://mooc1.chaoxing.com/exam-ans/exam/test/examcode/examlist'
+    '?edition=1&nohead=0&fid=';
+
 /// 详情地址；**返回 null 表示本应用打不开真实题目页**，界面要如实降级。
 ///
 /// 三个来源页各有各的判据，共同的底线是**缺参数就不拼**（宁可不给，也不给一条
@@ -36,15 +42,30 @@ String? detailUrlOf(ChaoxingTask t) {
   if (t.courseId.isEmpty || clazzId == null || clazzId.isEmpty) return null;
   if (t.source == ChaoxingSource.exam) return _examUrl(t, clazzId);
   if (t.serverStatus == null) return null;
-  return Uri.parse(_kVisitCourse)
-      .replace(queryParameters: <String, String>{
-        'ismooc2': '1',
-        'courseid': t.courseId,
-        'clazzid': clazzId,
-        'pageHeader': '8',
-      })
-      .toString();
+  return _courseUrl(t.courseId, clazzId);
 }
+
+/// 拼不出单条题目页时的**网页版兜底**：
+///  - 有 courseId + clazzId：打开课程中间页，用户在课程里自己找这场考试；
+///  - 考试连班级参数都没有：打开全局考试列表，用户按标题找。
+/// 其他类型缺参数时返回 null（不拿考试页去糊弄作业）。
+String? webFallbackUrlOf(ChaoxingTask t) {
+  final String? clazzId = t.clazzId;
+  if (t.courseId.isNotEmpty && clazzId != null && clazzId.isNotEmpty) {
+    return _courseUrl(t.courseId, clazzId);
+  }
+  if (t.source == ChaoxingSource.exam) return kChaoxingExamListUrl;
+  return null;
+}
+
+String _courseUrl(String courseId, String clazzId) => Uri.parse(_kVisitCourse)
+    .replace(queryParameters: <String, String>{
+      'ismooc2': '1',
+      'courseid': courseId,
+      'clazzid': clazzId,
+      'pageHeader': '8',
+    })
+    .toString();
 
 /// 考试那条 `examnotes`：`courseId` / `classId` / `examId` **缺一个都不拼**。
 ///

@@ -27,6 +27,7 @@
 /// 拆分）各自写在函数注释里。
 library;
 
+import 'chaoxing_exam_ids.dart';
 import 'chaoxing_html.dart';
 import 'chaoxing_models.dart';
 import 'chaoxing_time.dart';
@@ -51,8 +52,6 @@ class ChaoxingExam {
   static final RegExp _kTr = RegExp(
       r'<tr\b[^>]*class="[^"]*\bdataTr\b[^"]*"[^>]*>([\s\S]*?)</tr>');
   static final RegExp _kTd = RegExp(r'<td\b[^>]*>([\s\S]*?)</td>');
-  static final RegExp _kAnchor = RegExp(r'<a\b([^>]*)>');
-  static final RegExp _kGo = RegExp('''go\\(\\s*['"]([^'"]+)['"]''');
   static final RegExp _kStamp =
       RegExp(r'(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})');
 
@@ -86,13 +85,30 @@ class ChaoxingExam {
       bool expired = timeLeft.contains('过期') || timeLeft.contains('已结束');
       if (submitted) expired = true;
       final Map<String, String> p = queryOf(attrOf(li.group(1)!, 'data'));
+      // `li[data]` 是脚本唯一读的位置，但真页面有把链接放在标题 `<a>` 里、
+      // 或只写 `taskrefId` 不写 `courseId` 的行；整卡再扫一遍，只补空位。
+      final Map<String, String> extra = examIdsOf(li.group(0)!);
+      final String courseId = firstNonEmpty(<String?>[
+        p['courseId'],
+        extra['courseId'],
+      ]);
+      final String examId = firstNonEmpty(<String?>[
+        p['taskrefId'],
+        p['examId'],
+        extra['examId'],
+      ]);
+      final String clazzId = firstNonEmpty(<String?>[
+        p['classId'],
+        p['clazzId'],
+        extra['classId'],
+      ]);
       final Duration? left = parseRemaining(timeLeft);
       out.add(_task(
-        examId: p['taskrefId'] ?? '',
+        examId: examId,
         title: title,
-        courseId: p['courseId'] ?? '',
+        courseId: courseId,
         courseNames: courseNames,
-        clazzId: p['classId'],
+        clazzId: clazzId.isEmpty ? null : clazzId,
         dueAt: left == null ? null : now.add(left),
         status: status,
         expired: expired,
@@ -120,7 +136,9 @@ class ChaoxingExam {
       if (cells[1].isEmpty) continue; // 没有考试名称的行留不住（隐藏键会撞）
       final ({DateTime? start, DateTime? end}) span = _rangeOf(cells[2]);
       final String examStatus = cells[4], answerStatus = cells[5];
-      final Map<String, String> ids = _idsOf(raw[8]);
+      // 操作列优先，整行兜底：真页面里见过 ID 只出现在标题链接 / 行属性 /
+      // 隐藏 input 的行（脚本只读操作列，那种行会整条变成「缺参数」）。
+      final Map<String, String> ids = examIdsOf('${raw[8]}${tr.group(1)!}');
       // :882 只认「考试状态」列里的「已结束」。但那一列不刷新、结束时刻却已经
       // 过去的情况真实存在（2026-10-19 用户那条「10-11 22:00 结束」的单元测验
       // 就是），所以再加一道**按绝对结束时刻**判的闸：过点了就算关掉了——
@@ -209,42 +227,4 @@ class ChaoxingExam {
     return (start: hits.first, end: hits.last);
   }
 
-  /// 操作单元格里的三个 id：`courseId` / `classId` / `examId`。
-  ///
-  /// 照脚本 :861-878 的三段退路：`onclick="go('…')"` 里那串地址 → 它的 `refer`
-  /// 参数（再解一次百分号）→ 退路直接在 onclick/地址上正则 `moocId=` /
-  /// `clazzid=` / `examId=`。**额外加一条退路**：有些行是普通 `<a href="…">`
-  /// 而不是 go()（脚本没这形态，会连 courseId 都拿不到），这里把 href 也当
-  /// 那串地址用。三个都拿不到就返回空——详情 URL 拼不出来时如实返回 null
-  /// （见 `chaoxing_links.dart`），不编参数。
-  static Map<String, String> _idsOf(String cellHtml) {
-    final String anchor = _kAnchor.firstMatch(cellHtml)?.group(1) ?? '';
-    final String onclick = attrOf(anchor, 'onclick');
-    final String href = attrOf(anchor, 'href');
-    final String raw = _kGo.firstMatch(onclick)?.group(1) ?? href;
-    final Map<String, String> outer = queryOf(raw);
-    String refer = outer['refer'] ?? '';
-    // refer 可能被整体二次转义（脚本 :867 又 decode 了一次）：解完还剩 %3D/%26
-    // 就再解一次。解不动保持原样，后面还有正则退路。
-    if (refer.contains('%3D') || refer.contains('%26')) {
-      try {
-        refer = Uri.decodeFull(refer);
-      } catch (_) {}
-    }
-    final Map<String, String> inner = queryOf(refer);
-    final String blob = '$onclick$raw$href';
-    return <String, String>{
-      'courseId': _pair(inner['courseId'], outer['moocId'], blob, 'moocId'),
-      'classId': _pair(inner['classId'], outer['clazzid'], blob, 'clazzid'),
-      'examId': _pair(inner['examId'], '', blob, 'examId'),
-    };
-  }
-
-  /// 取值优先序：refer 里的 > 外层地址里的 > 在整串 onclick 上正则到的
-  /// （脚本 :869-871 与 :873-878 正是这个次序）。
-  static String _pair(String? a, String? b, String blob, String name) {
-    if ((a ?? '').isNotEmpty) return a!;
-    if ((b ?? '').isNotEmpty) return b!;
-    return RegExp('$name=(\\d+)').firstMatch(blob)?.group(1) ?? '';
-  }
 }

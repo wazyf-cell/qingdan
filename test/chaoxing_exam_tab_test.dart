@@ -82,6 +82,9 @@ void main() {
       expect(h.cardOf(endedExam()), findsOneWidget);
       expect(h.cardOf(mixed()[0]), findsNothing, reason: '$label：作业不该混进考试栏');
       expect(h.cardOf(mixed()[1]), findsNothing, reason: '$label：活动同理');
+      // 2026-10-26：考试卡片要有开始 / 截止两行。
+      expect(find.text('开始 10-18 11:00'), findsOneWidget);
+      expect(find.textContaining('截止 10-18 18:00'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -93,9 +96,11 @@ void main() {
       await h.tapIo(tester, h.key(ChaoxingKeys.tabExam));
 
       expect(h.cardOf(endedExam()), findsOneWidget);
-      expect(find.text('已过期'), findsOneWidget,
+      expect(find.textContaining('已过期'), findsOneWidget,
           reason: '$label：卡片必须说实话（扩展 :5674 的已过期档），不再编倒计时');
-      expect(find.textContaining('截止（剩'), findsOneWidget,
+      expect(find.text('开始 10-11 08:00'), findsOneWidget);
+      expect(find.textContaining('截止 10-11 22:00'), findsOneWidget);
+      expect(find.textContaining('截止 10-18 18:00（剩'), findsOneWidget,
           reason: '$label：同一栏里还没考完的那条正常显示倒计时');
 
       await h.tapIo(tester, h.key(ChaoxingKeys.filter));

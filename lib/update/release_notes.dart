@@ -11,6 +11,13 @@ library;
 
 /// 键是去掉 `v` 前缀与 `+build` 的版本号，与 `kAppVersion` 同一形状。
 const Map<String, String> kReleaseNotes = <String, String>{
+  '1.0.16': '更新内容\n'
+      '· 学习通「全部考试」卡片补上开始时间，和截止时间一起显示；'
+      '缺时间的写「未知」\n'
+      '· 考试详情补扫整行 / 整卡与标题链接里的 courseId、clazzId、examId；'
+      '仍缺时给「打开网页版课程 / 考试列表」入口，在应用内继续打开\n'
+      '\n下载\n'
+      '· 设置 → 通用 → 检测更新 → 下载并安装，或到 GitHub Releases 选对应 ABI 的 APK',
   '1.0.15': '更新内容\n'
       '· 学习通「全部考试」「课堂活动」补上和「全部作业」一致的红/黄/绿标识：'
       '按截止时间着色\n'

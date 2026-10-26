@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qingdan/features/chaoxing/chaoxing_detail_page.dart';
+import 'package:qingdan/import/chaoxing/chaoxing_links.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 import 'package:qingdan/theme/app_theme.dart';
 
@@ -40,6 +41,30 @@ void main() {
   String textAt(WidgetTester tester, String k) =>
       tester.widget<Text>(key(k)).data ?? '';
 
+  /// 点了「网页版」后，注入的 WebView 收到的地址。
+  Future<String?> openFallback(WidgetTester tester, ChaoxingTask task) async {
+    String? opened;
+    tester.view.physicalSize = const Size(411, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: ChaoxingDetailPage(
+        task: task,
+        webView: (BuildContext _, String url, ValueChanged<Uri?> _) {
+          opened = url;
+          return const SizedBox.shrink();
+        },
+      ),
+    ));
+    await tester.pump();
+    expect(key('detail-open-web-fallback'), findsOneWidget);
+    await tester.tap(key('detail-open-web-fallback'));
+    await tester.pump();
+    expect(key('detail-fallback-note'), findsOneWidget);
+    return opened;
+  }
+
   for (final (String label, double width) in
       <(String, double)>[('手机 411dp', 411), ('桌面 1280dp', 1280)]) {
     testWidgets('$label：真作业缺 clazzId → 说清「它有题目页，是我们参数没抓到」',
@@ -70,4 +95,25 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('考试缺全部 id → 给网页版考试列表兜底', (WidgetTester tester) async {
+    final ChaoxingTask t =
+        cxExam('x', courseId: '', clazzId: null, examId: null);
+    final String? url = await openFallback(tester, t);
+    expect(url, kChaoxingExamListUrl);
+    expect(find.textContaining('网页版 · 在页面里找到'), findsOneWidget);
+    expect(find.text('学习通网页版'), findsOneWidget);
+  });
+
+  testWidgets('考试有课程/班级但缺 examId → 打开网页版课程',
+      (WidgetTester tester) async {
+    final ChaoxingTask t = cxExam('y',
+        courseId: '240000001', clazzId: '160000002', examId: null);
+    final String? url = await openFallback(tester, t);
+    expect(url, isNotNull);
+    expect(url, contains('visit/stucoursemiddle'));
+    expect(url, contains('courseid=240000001'));
+    expect(url, contains('clazzid=160000002'));
+    expect(find.textContaining('网页版 · 在页面里找到'), findsOneWidget);
+  });
 }

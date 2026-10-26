@@ -97,6 +97,33 @@ const String kExamTable = '''
 </tbody></table>
 ''';
 
+/// 表格行：操作列只有一个 `#`，三个 id 全在标题链接里。
+/// 真页面上见过这种形态；脚本只读操作列，会把它判成「缺参数」。
+const String kExamTableIdsInTitle = '''
+<table class="dataTable"><tbody>
+<tr class="dataTr">
+  <td>1</td>
+  <td><a href="/exam-ans/exam/test/examcode/examnotes?courseId=240000001&amp;classId=160000002&amp;examId=996">标题链接测验</a></td>
+  <td>2026-11-01 09:00 至 2026-11-01 10:00</td>
+  <td>60分钟</td><td>未开始</td><td>未提交</td><td></td><td>自主考试</td>
+  <td><a href="#">详情</a></td>
+</tr>
+</tbody></table>
+''';
+
+/// 卡片：`li[data]` 只有 courseId/classId，examId 在标题 `<a>` 里。
+const String kExamCardsIdsInTitle = '''
+<div id="chaoxing-assignment-wrapper">
+<ul class="ks_list">
+  <li data="https://x/examnotes?courseId=240000001&amp;classId=160000002">
+    <div class="ks_pic"><img src="https://x/ks_01.png"></div>
+    <dl><dt><a href="https://x/examnotes?taskrefId=88006&amp;courseId=240000001&amp;classId=160000002">标题链接测验</a></dt><dd>剩余1天</dd></dl>
+    <span class="ks_state">未提交</span>
+  </li>
+</ul>
+</div>
+''';
+
 List<ChaoxingTask> examCards([Map<String, String> names = kExamCourses]) =>
     ChaoxingExam.parseCards(kExamCards, courseNames: names, now: kExamNow);
 

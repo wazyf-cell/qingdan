@@ -56,6 +56,32 @@ String formatDeadlineLine(DateTime due, DateTime now) {
       : '$stamp 截止（剩${formatRemaining(d)}）';
 }
 
+/// 考试卡片的两行时间：开始 / 截止。考试比作业多一个开始时刻，列表里
+/// 只给截止会让「什么时候开考」看不出来（用户 2026-10-26 要求）。
+///
+/// 缺开始 / 缺截止都如实写「未知」，不猜；已过截止写「已过期」，
+/// 与卡片原来的状态文案一致。
+({String start, String end}) formatExamWindow(
+    ChaoxingTask t, DateTime now) {
+  final String start = t.startAt == null
+      ? '开始时间未知'
+      : '开始 ${_monthDayTime(t.startAt!)}';
+  final DateTime? due = t.dueAt;
+  final String end;
+  if (due == null) {
+    end = '截止时间未知';
+  } else if (!t.ongoing || due.isBefore(now)) {
+    end = '截止 ${_monthDayTime(due)}（已过期）';
+  } else {
+    end = '截止 ${_monthDayTime(due)}（剩${formatRemaining(due.difference(now))}）';
+  }
+  return (start: start, end: end);
+}
+
+String _monthDayTime(DateTime d) =>
+    '${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} '
+    '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
 ChaoxingUrgency urgencyOf(DateTime? due, DateTime now) {
   if (due == null) return ChaoxingUrgency.none;
   final Duration d = due.difference(now);

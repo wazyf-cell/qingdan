@@ -10,6 +10,28 @@ import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 import 'chaoxing_exam_fixtures.dart';
 
 void main() {
+  group('ID 不在脚本读的位置时的回退', () {
+    test('表格：操作列只有 #，标题链接里的三个 id 也能补全', () {
+      final List<ChaoxingTask> l = ChaoxingExam.parseTable(
+          kExamTableIdsInTitle, courseNames: kExamCourses, now: kExamNow);
+      final ChaoxingTask t = l.single;
+      expect(t.courseId, '240000001');
+      expect(t.clazzId, '160000002');
+      expect(t.examId, '996');
+      expect(detailUrlOf(t), contains('examId=996'));
+    });
+
+    test('卡片：data 缺 taskrefId，标题锚点里的 examId 也能补全', () {
+      final List<ChaoxingTask> l = ChaoxingExam.parseCards(
+          kExamCardsIdsInTitle, courseNames: kExamCourses, now: kExamNow);
+      final ChaoxingTask t = l.single;
+      expect(t.courseId, '240000001');
+      expect(t.clazzId, '160000002');
+      expect(t.examId, '88006');
+      expect(detailUrlOf(t), contains('examId=88006'));
+    });
+  });
+
   group('卡片形态 ul.ks_list（脚本 extractExams :793-832）', () {
     test('四条都解析到，标题/类型/来源/状态/课程名各归其位', () {
       final List<ChaoxingTask> l = examCards();

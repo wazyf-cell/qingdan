@@ -83,6 +83,36 @@ void main() {
           '10-17 09:55 截止（已逾期 2小时5分）');
     });
 
+    test('考试窗口两行：开始/截止都显示，缺的写未知', () {
+      ChaoxingTask exam(DateTime? start, DateTime? due,
+              {bool ongoing = true}) =>
+          ChaoxingTask(
+              id: 'e',
+              courseId: 'c',
+              courseName: '课程',
+              title: '考试',
+              kind: '考试',
+              ongoing: ongoing,
+              startAt: start,
+              dueAt: due,
+              source: ChaoxingSource.exam,
+              serverStatus: '未提交');
+      final ({String start, String end}) a = formatExamWindow(
+          exam(DateTime(2026, 10, 25, 14), DateTime(2026, 10, 25, 16)), kNow);
+      expect(a.start, '开始 10-25 14:00');
+      expect(a.end, '截止 10-25 16:00（剩8天4小时）');
+
+      final ({String start, String end}) b =
+          formatExamWindow(exam(null, null), kNow);
+      expect(b.start, '开始时间未知');
+      expect(b.end, '截止时间未知');
+
+      final ({String start, String end}) c = formatExamWindow(
+          exam(DateTime(2026, 10, 11, 8), DateTime(2026, 10, 11, 22)), kNow);
+      expect(c.start, '开始 10-11 08:00');
+      expect(c.end, '截止 10-11 22:00（已过期）');
+    });
+
     test('紧急度分档：24 小时内急、72 小时内近', () {
       expect(urgencyOf(null, kNow), ChaoxingUrgency.none);
       expect(urgencyOf(kNow.add(const Duration(hours: 3)), kNow),
