@@ -10,10 +10,12 @@
 //     打开「仅看未完成」后**整条从列表消失**——这就是「结束时间已过 → 不进列表」；
 //  4. 未登录空态那句「…列出还没交的作业和考试」不再是半真半假：同一个面板上
 //     就摆着「全部考试」这一栏。
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qingdan/features/chaoxing/chaoxing_grouping.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_keys.dart';
+import 'package:qingdan/theme/app_colors.dart';
 // 扩展方法（setTab 等）不会随 harness 的传递导入进作用域，必须直接 import 模型库。
 import 'package:qingdan/features/chaoxing/chaoxing_model.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
@@ -39,6 +41,14 @@ ChaoxingTask openExam() => cxExam('992',
     startAt: kNow.subtract(const Duration(hours: 1)),
     dueAt: kNow.add(const Duration(hours: 6)),
     status: '未提交');
+
+/// 卡片最终画出来的底色（外层 Container 的 BoxDecoration）。
+Color? cardTint(WidgetTester tester, Finder card) {
+  final Container box = tester.widget<Container>(find
+      .descendant(of: card, matching: find.byType(Container))
+      .first);
+  return (box.decoration! as BoxDecoration).color;
+}
 
 List<ChaoxingTask> mixed() => <ChaoxingTask>[
       cxHomework('h1', dueAt: kNow.add(const Duration(hours: 3))),
@@ -101,6 +111,39 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('未开始的考试/活动在各自页签也带三色底（2026-10-26 用户报）',
+      (WidgetTester tester) async {
+    final ChaoxingTask upcomingExam = cxExam('994',
+        courseId: '240000004',
+        examId: '994',
+        title: '下周测验',
+        startAt: kNow.add(const Duration(hours: 1)),
+        dueAt: kNow.add(const Duration(hours: 48)),
+        status: '未提交');
+    final ChaoxingTask upcomingActivity = ChaoxingTask(
+        id: 'a9',
+        courseId: '240000005',
+        courseName: '课程丙',
+        title: '活动9',
+        kind: '签到',
+        ongoing: true,
+        startAt: kNow.add(const Duration(hours: 1)),
+        dueAt: kNow.add(const Duration(days: 5)),
+        clazzId: 'z9');
+    final ChaoxingHarness h = ChaoxingHarness();
+    await h.start(tasks: <ChaoxingTask>[upcomingExam, upcomingActivity]);
+    await h.pump(tester, width: 411);
+
+    await h.tapIo(tester, h.key(ChaoxingKeys.tabExam));
+    expect(cardTint(tester, h.cardOf(upcomingExam)),
+        AppColors.light().dueNearBg);
+
+    await h.tapIo(tester, h.key(ChaoxingKeys.tabActivity));
+    expect(cardTint(tester, h.cardOf(upcomingActivity)),
+        AppColors.light().dueSafeBg);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('未登录空态那句「作业和考试」有对应界面（不许留假承诺）',
       (WidgetTester tester) async {

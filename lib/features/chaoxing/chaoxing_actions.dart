@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:qingdan/features/common/app_toast.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_time.dart';
 import 'package:qingdan/notify/reminder_coordinator.dart';
@@ -106,7 +107,7 @@ Future<void> openChaoxingHiddenList(BuildContext context) =>
 void openChaoxingDetail(BuildContext context, ChaoxingTask task) =>
     chaoxingDetailLauncher(context, task);
 
-/// 隐藏一条待办。**仍在生效期（卡片带红/黄/绿底）的先弹一次确认**；
+/// 隐藏一条待办。**还在等待处理（卡片带红/黄/绿底）的先弹一次确认**；
 /// 已过期 / 已完成 / 无截止时间 → 直接隐藏不问（用户裁决：每次都问，
 /// 不做「本次会话不再问」，自用工具误隐藏的代价比多问一句高）。
 Future<void> hideChaoxingTask(
@@ -136,16 +137,11 @@ Future<void> hideChaoxingTask(
   }
   await model.hide(task);
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: const Text('已隐藏 · 可在 ⋮ → 隐藏列表 里恢复',
-        style: AppTypography.meta),
-    // `persist` 的缺省值是 `action != null`（Flutter 3.47.5 snack_bar.dart:303），
-    // 于是**带 action 的 SnackBar 会无视 duration 常驻**：ScaffoldMessenger 照样
-    // 挂 4 秒定时器，到点却只执行 `if (snackBar.persist) return;`
-    // （scaffold.dart:619-626）——真机上这条就是这么赖着不走的。恢复入口在
-    // ⋮ → 隐藏列表 里也有一份，不必把提示钉在屏上，故显式要求自动收起。
-    duration: const Duration(seconds: 4),
-    persist: false,
-    action: SnackBarAction(label: '全部恢复', onPressed: model.unhideAll),
-  ));
+  // 只撤销这一条；要一次恢复全部，仍走 ⋮ → 隐藏列表。
+  AppToast.show(
+    context,
+    message: '已隐藏',
+    actionLabel: '撤销',
+    onAction: () => model.unhide(task.key),
+  );
 }

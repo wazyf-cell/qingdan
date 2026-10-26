@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:qingdan/domain/task.dart';
 import 'package:qingdan/domain/task_priority.dart';
+import 'package:qingdan/features/common/app_toast.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 import 'package:qingdan/features/tasks/list_shortcuts.dart';
 import 'package:qingdan/features/tasks/quick_add_field.dart';
@@ -126,18 +127,11 @@ class TaskListPane extends StatelessWidget {
       BuildContext context, TaskPaneModel model, Task task) {
     model.deleteTask(task).then((String title) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已删除「$title」'),
-          // `persist: false` 的理由见 `list_shortcuts.dart` 里那份同名方法
-          // （带 action 的 SnackBar 缺省常驻，会无视 duration）。
-          duration: const Duration(seconds: 5),
-          persist: false,
-          action: SnackBarAction(
-            label: '撤销',
-            onPressed: () => model.undoDelete(task.id),
-          ),
-        ),
+      AppToast.show(
+        context,
+        message: '已删除「$title」',
+        actionLabel: '撤销',
+        onAction: () => model.undoDelete(task.id),
       );
     });
   }
@@ -148,9 +142,7 @@ class TaskListPane extends StatelessWidget {
       buf.write('\n${task.note}');
     }
     Clipboard.setData(ClipboardData(text: buf.toString()));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已复制为文本'), duration: Duration(seconds: 2)),
-    );
+    AppToast.show(context, message: '已复制');
   }
 }
 

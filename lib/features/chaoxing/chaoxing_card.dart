@@ -27,8 +27,9 @@ class ChaoxingCard extends StatelessWidget {
     final AppColors colors = AppColors.of(context);
     final ChaoxingTask t = row.task;
     final ChaoxingUrgency u = urgencyOf(t.dueAt, now);
-    // 只有「期限内且有截止」的待办上底色：1 天内淡红、3 天内淡黄、更晚淡绿
-    // （用户 2026-10-17 指定）。已完成/已结束/未开始、以及没有截止的条目不上色。
+    // 有截止且还没结束/没完成的条目上底色：1 天内淡红、3 天内淡黄、更晚淡绿
+    // （用户 2026-10-17 指定）。考试与课堂活动在开始前（未开始）也上色，作业
+    // 未开始则保持不上色（用户 2026-10-26 要求同步这两类的三色标识）。
     // 判定抽到 `showsUrgencyTint`：隐藏确认框用同一个函数，两处不会漂（M6B §B5）。
     final bool live = showsUrgencyTint(t, now);
     final Color? tint = !live

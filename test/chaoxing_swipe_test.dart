@@ -58,7 +58,7 @@ void main() {
 
     expect(h.cardOf(tasks[0]), findsNothing);
     expect(h.model.settings.hidden, contains(tasks[0].key));
-    expect(find.text('已隐藏 · 可在 ⋮ → 隐藏列表 里恢复'), findsOneWidget);
+    expect(find.text('已隐藏'), findsOneWidget);
   });
 
   testWidgets('纵向拖卡片 → 列表滚动，不揭示按钮', (WidgetTester tester) async {

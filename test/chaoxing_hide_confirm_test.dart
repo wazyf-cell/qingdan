@@ -6,7 +6,7 @@ import 'package:qingdan/import/chaoxing/chaoxing_time.dart';
 
 import 'chaoxing_harness.dart';
 
-/// M6B §B5：只有「仍在生效期且未完成」（卡片带红/黄/绿底）的项在隐藏时问一次；
+/// M6B §B5：只有「还在等待处理且未完成」（卡片带红/黄/绿底）的项在隐藏时问一次；
 /// 已过期 / 已完成 / 无截止 → 直接隐藏。判定与卡片着色共用 `showsUrgencyTint`。
 void main() {
   /// 起面板并把这张卡片滑开（返回 harness，调用方自己握着那条 task）。
@@ -49,7 +49,8 @@ void main() {
     await h.tapIo(tester, h.hideOf(t));
     await h.tapIo(tester, find.widgetWithText(FilledButton, '仍然隐藏'));
     expect(h.cardOf(t), findsNothing);
-    expect(find.text('已隐藏 · 可在 ⋮ → 隐藏列表 里恢复'), findsOneWidget);
+    expect(find.text('已隐藏'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
   });
 
   testWidgets('已过期 → 不问，直接隐藏', (WidgetTester tester) async {
@@ -86,9 +87,12 @@ void main() {
     expect(h.cardOf(t), findsNothing);
   });
 
-  group('showsUrgencyTint 真值表（四档 urgency × 是否待办）', () {
+  group('showsUrgencyTint 真值表（四档 urgency × 状态/来源）', () {
     bool tint(DateTime? due,
-            {bool ongoing = true, bool done = false, DateTime? startAt}) =>
+            {bool ongoing = true,
+            bool done = false,
+            DateTime? startAt,
+            ChaoxingSource source = ChaoxingSource.activity}) =>
         showsUrgencyTint(
             ChaoxingTask(
                 id: 'x',
@@ -99,7 +103,8 @@ void main() {
                 ongoing: ongoing,
                 startAt: startAt,
                 dueAt: due,
-                serverDone: done),
+                serverDone: done,
+                source: source),
             kCxNow);
 
     test('urgent（<24h）/ soon（<72h）/ calm（≥72h）三档都算生效期', () {
@@ -118,15 +123,29 @@ void main() {
 
     test('none 档（无截止）不算', () => expect(tint(null), isFalse));
 
-    test('已完成 / 已结束 / 未开始都不算', () {
+    test('已完成 / 已结束不算；未开始只有作业不算', () {
       final DateTime due = kCxNow.add(const Duration(hours: 3));
+      final DateTime start = kCxNow.add(const Duration(hours: 1));
       expect(tint(due, done: true), isFalse);
       expect(tint(due, ongoing: false), isFalse);
-      expect(tint(due, startAt: kCxNow.add(const Duration(hours: 1))), isFalse);
+      expect(tint(due, startAt: start, source: ChaoxingSource.homework),
+          isFalse);
+      // 2026-10-26：考试与课堂活动在开始前也要有和作业一样的红/黄/绿底色。
+      expect(tint(due, startAt: start, source: ChaoxingSource.exam), isTrue);
+      expect(tint(due, startAt: start, source: ChaoxingSource.activity), isTrue);
+    });
+
+    test('未开始但已取消（ongoing=false）的考试/活动不上色', () {
+      expect(
+          tint(kCxNow.add(const Duration(hours: 3)),
+              startAt: kCxNow.add(const Duration(hours: 1)),
+              ongoing: false,
+              source: ChaoxingSource.exam),
+          isFalse);
     });
   });
 
-  test('判定只看「仍是待办 + 有截止」，与 urgencyOf 的档位互不重复实现', () {
+  test('判定只看状态/来源 + 有截止，与 urgencyOf 的档位互不重复实现', () {
     // 钉住「卡片着色与隐藏确认共用一个函数」这条约定：任何一处再写一套阈值
     // 就会在这里对不上（卡片用的是同一个 showsUrgencyTint）。
     final ChaoxingTask urgent = cxHomework('9', dueAt: kCxNow);

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:qingdan/domain/task.dart';
+import 'package:qingdan/features/common/app_toast.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 import 'package:qingdan/features/tasks/task_pane_model.dart';
 
@@ -105,18 +106,11 @@ class ListShortcuts extends StatelessWidget {
       BuildContext context, TaskPaneModel model, Task task) {
     model.deleteTask(task).then((String title) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已删除「$title」'),
-          // 带 action 的 SnackBar 缺省 `persist: true`（Flutter 3.47.5
-          // snack_bar.dart:303），会无视 duration 常驻；撤销入口在回收站里也有一份。
-          duration: const Duration(seconds: 5),
-          persist: false,
-          action: SnackBarAction(
-            label: '撤销',
-            onPressed: () => model.undoDelete(task.id),
-          ),
-        ),
+      AppToast.show(
+        context,
+        message: '已删除「$title」',
+        actionLabel: '撤销',
+        onAction: () => model.undoDelete(task.id),
       );
     });
   }
