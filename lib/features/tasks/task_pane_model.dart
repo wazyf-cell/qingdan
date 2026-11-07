@@ -24,9 +24,13 @@ export 'task_pane_queries.dart' show TaskSortMode;
 /// 视图 id 跟随 [SidebarModel.selectedId]（侧栏点击切列表）。
 /// [useCase] 为空时（widget 冒烟测试）load 直接返回空态。
 class TaskPaneModel extends ChangeNotifier {
-  TaskPaneModel({TaskUseCase? useCase, required SidebarModel sidebar})
-      : _useCase = useCase,
-        _sidebar = sidebar {
+  TaskPaneModel({
+    TaskUseCase? useCase,
+    required SidebarModel sidebar,
+    DateTime Function()? clock,
+  })  : _useCase = useCase,
+        _sidebar = sidebar,
+        _clock = clock ?? DateTime.now {
     _lastViewId = sidebar.selectedId;
     _sidebar.addListener(_onViewChanged);
   }
@@ -37,6 +41,9 @@ class TaskPaneModel extends ChangeNotifier {
 
   final TaskUseCase? _useCase;
   final SidebarModel _sidebar;
+  final DateTime Function() _clock;
+
+  DateTime get now => _clock();
 
   /// 详情面板编辑用（UI 只经用例层，不碰 DAO）。
   TaskUseCase? get useCase => _useCase;
@@ -152,13 +159,16 @@ class TaskPaneModel extends ChangeNotifier {
       final List<Task> all = viewId == kSmartCompleted
           ? await useCase.findCompleted()
           : await useCase.findAllActive();
-      tasks = sortTasks(
-        filterForView(viewId, all),
-        sortMode,
-        smart: viewId == kSmartToday ||
-            viewId == kSmartNext7 ||
-            viewId == kSmartAll,
-      );
+      final DateTime at = now;
+      final List<Task> filtered = filterForView(viewId, all, now: at);
+      tasks = switch (viewId) {
+        kSmartCompleted => sortCompletedTasks(filtered),
+        kSmartToday || kSmartNext7 =>
+          sortSmartTasks(filtered, grouped: true, now: at),
+        kSmartAll =>
+          sortSmartTasks(filtered, grouped: false, now: at),
+        _ => sortTasks(filtered, sortMode, smart: false),
+      };
       final PaneAnnotations marks = await loadAnnotations(useCase, tasks);
       subtaskProgress = marks.subtaskProgress;
       tagCounts = marks.tagCounts;
@@ -171,7 +181,13 @@ class TaskPaneModel extends ChangeNotifier {
 
   void setSortMode(TaskSortMode mode) {
     sortMode = mode;
-    tasks = sortTasks(tasks, mode, smart: !isUserList || viewId == kSmartCompleted);
+    tasks = switch (viewId) {
+      kSmartCompleted => sortCompletedTasks(tasks),
+      kSmartToday || kSmartNext7 =>
+        sortSmartTasks(tasks, grouped: true, now: now),
+      kSmartAll => sortSmartTasks(tasks, grouped: false, now: now),
+      _ => sortTasks(tasks, mode, smart: false),
+    };
     notifyListeners();
   }
 

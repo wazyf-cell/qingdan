@@ -1,6 +1,7 @@
 import 'package:qingdan/application/app_services.dart';
 import 'package:qingdan/domain/task.dart';
 import 'package:qingdan/domain/task_list.dart';
+import 'package:qingdan/domain/task_schedule.dart';
 
 /// 清单用例（F6）+ 侧栏聚合数据装载（自 `sidebar_model.dart` 上移，M1 定案）。
 ///
@@ -33,16 +34,12 @@ class TaskListUseCase {
 
   /// 侧栏聚合读模型（原 `sidebar_model.load` 的直读 DAO 逻辑上移至此）：
   /// 清单 + 智能清单计数一次取回。
-  Future<SidebarSnapshot> loadSidebar() async {
+  Future<SidebarSnapshot> loadSidebar({DateTime? now}) async {
     final List<TaskList> lists = await _services.taskListDao.findAll();
     final List<Task> active = await _services.taskDao.findAllActive();
     final List<Task> completed = await _services.taskDao.findCompleted();
 
-    final DateTime now = DateTime.now();
-    final DateTime todayStart = DateTime(now.year, now.month, now.day);
-    final DateTime todayEnd = todayStart.add(const Duration(days: 1));
-    final DateTime next7End = todayEnd.add(const Duration(days: 6));
-
+    final DateTime at = now ?? DateTime.now();
     int today = 0;
     int next7 = 0;
     final Map<String, int> listCounts = <String, int>{};
@@ -55,16 +52,9 @@ class TaskListUseCase {
       if (t.completed) continue;
       final String key = t.listId ?? inboxId ?? 'inbox';
       listCounts[key] = (listCounts[key] ?? 0) + 1;
-      final DateTime? due = t.dueDate?.toLocal();
-      if (due == null) continue;
-      // 计入口径（M1 简化）：今天 = 到期早于今日 24 点（含往日逾期）；
-      // 最近 7 天 = 到期早于今天 +7 天。
-      if (due.isBefore(todayEnd)) {
-        today++;
-        next7++;
-      } else if (due.isBefore(next7End)) {
-        next7++;
-      }
+      // 与列表同一口径：开始或截止任一命中；逾期/进行中含在内。
+      if (inToday(t, at)) today++;
+      if (inNext7(t, at)) next7++;
     }
 
     return SidebarSnapshot(

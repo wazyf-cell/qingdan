@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:qingdan/domain/task.dart';
 import 'package:qingdan/domain/task_priority.dart';
+import 'package:qingdan/domain/task_schedule.dart';
 import 'package:qingdan/features/common/app_toast.dart';
 import 'package:qingdan/features/shell/sidebar/sidebar_model.dart';
 import 'package:qingdan/features/tasks/list_shortcuts.dart';
@@ -95,28 +96,16 @@ class TaskListPane extends StatelessWidget {
     );
   }
 
-  /// 智能清单（今天/最近7天）按日期分组：已过期/今天/明天/以后。
+  /// 智能清单（今天/最近7天）按关注时间分组：
+  /// 已过期 → 已开始 → 今天 → 明天 → 以后。
   static List<String?> _groupHeaders(TaskPaneModel model) {
     final bool smart =
         model.viewId == kSmartToday || model.viewId == kSmartNext7;
     if (!smart) return List<String?>.filled(model.tasks.length, null);
-    final DateTime now = DateTime.now();
-    final DateTime today =
-        DateTime(now.year, now.month, now.day);
-    String? headerFor(Task t) {
-      final DateTime? due = t.dueDate?.toLocal();
-      if (due == null) return null;
-      final DateTime day = DateTime(due.year, due.month, due.day);
-      if (day.isBefore(today)) return '已过期';
-      if (day == today) return '今天';
-      if (day == today.add(const Duration(days: 1))) return '明天';
-      return '以后';
-    }
-
     final List<String?> headers = <String?>[];
     String? last;
     for (final Task t in model.tasks) {
-      final String? h = headerFor(t);
+      final String h = groupLabel(groupOf(t, model.now));
       headers.add(h == last ? null : h);
       last = h;
     }

@@ -15,6 +15,7 @@ import 'package:qingdan/domain/course.dart';
 import 'package:qingdan/domain/course_uid.dart';
 import 'package:qingdan/domain/semester.dart';
 import 'package:qingdan/domain/task.dart';
+import 'package:qingdan/domain/task_schedule.dart';
 import 'package:qingdan/domain/time_table.dart';
 import 'package:qingdan/features/chaoxing/chaoxing_counts.dart';
 import 'package:qingdan/import/chaoxing/chaoxing_models.dart';
@@ -40,20 +41,34 @@ String _two(int v) => v.toString().padLeft(2, '0');
 String _hhmm(int minutes) =>
     '${_two(minutes ~/ 60)}:${_two(minutes % 60)}';
 
-/// 清单 · 今天：与「今天」视图同一口径（未完成、有到期时间、到期早于明天 0 点）。
+/// 清单 · 今天：与「今天」视图同一口径（开始或截止任一命中）。
+///
+/// 行尾时间：有截止时刻显示截止，否则显示开始时刻；日期型（00:00）不显示
+/// 时刻。快照字段名仍是 `due`，原生小组件不需要改。
 Map<String, Object?> buildTodaySnapshot({
   required List<Task> allActive,
   required DateTime now,
 }) {
-  final DateTime todayEnd =
-      DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
   final List<Task> today = allActive
-      .where((Task t) =>
-          !t.completed &&
-          t.dueDate != null &&
-          t.dueDate!.toLocal().isBefore(todayEnd))
+      .where((Task t) => inToday(t, now))
       .toList()
-    ..sort((Task a, Task b) => a.dueDate!.compareTo(b.dueDate!));
+    ..sort((Task a, Task b) {
+      final DateTime? af = focusOf(a);
+      final DateTime? bf = focusOf(b);
+      if (af == null && bf == null) return a.title.compareTo(b.title);
+      if (af == null) return 1;
+      if (bf == null) return -1;
+      final int c = af.compareTo(bf);
+      return c != 0 ? c : a.title.compareTo(b.title);
+    });
+
+  DateTime? displayTime(Task t) {
+    final DateTime? due = t.dueDate?.toLocal();
+    if (due != null && hasTimeOfDay(due)) return due;
+    final DateTime? start = t.startDate?.toLocal();
+    if (start != null && hasTimeOfDay(start)) return start;
+    return null;
+  }
 
   return <String, Object?>{
     'v': 1,
@@ -65,8 +80,10 @@ Map<String, Object?> buildTodaySnapshot({
         <String, Object?>{
           'id': t.id,
           'title': t.title,
-          'due': _hhmm(t.dueDate!.toLocal().hour * 60 +
-              t.dueDate!.toLocal().minute),
+          'due': switch (displayTime(t)) {
+            final DateTime d => _hhmm(d.hour * 60 + d.minute),
+            null => '',
+          },
         },
     ],
   };

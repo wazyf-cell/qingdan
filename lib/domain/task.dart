@@ -37,11 +37,12 @@ class Task {
 
   final TaskPriority priority;
 
-  /// 开始 / 结束时间（时间段任务，F26）。
+  /// 开始 / 结束时间（时间段任务，F26）。开始时间也参与「今天 / 最近 7 天」
+  /// 的成员判定；结束时间只用于显示。
   final DateTime? startDate;
   final DateTime? endDate;
 
-  /// 到期时间（智能清单「今天 / 最近 7 天」的判定依据，F8）。
+  /// 到期时间（F8）。与开始时间任一命中即进入「今天 / 最近 7 天」。
   final DateTime? dueDate;
 
   /// 所属清单 id；null = 收集箱（任务随清单删除时移入，见迁移 v2 外键语义）。

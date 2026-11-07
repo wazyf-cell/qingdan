@@ -40,6 +40,9 @@ abstract final class AppDimens {
   /// 任务行高（UI-2 使用）。
   static const double taskRowHeight = 40;
 
+  /// 带时间段的行走两行（标题 + 开始/结束/截止），不把日期挤进右侧。
+  static const double taskRowHeightTall = 56;
+
   /// 分组头高。
   static const double groupHeaderHeight = 32;
 

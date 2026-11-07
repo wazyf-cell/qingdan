@@ -10,10 +10,14 @@ import 'package:qingdan/features/shell/shell_tab.dart';
 ///
 /// 另承载「当前选中项」状态：任务列表与侧栏共用（点击清单切列表）。
 class SidebarModel extends ChangeNotifier {
-  SidebarModel({required TaskListUseCase listUseCase})
-      : _listUseCase = listUseCase;
+  SidebarModel({
+    required TaskListUseCase listUseCase,
+    DateTime Function()? clock,
+  })  : _listUseCase = listUseCase,
+        _clock = clock ?? DateTime.now;
 
   final TaskListUseCase _listUseCase;
+  final DateTime Function() _clock;
 
   bool loaded = false;
   String? error;
@@ -93,7 +97,7 @@ class SidebarModel extends ChangeNotifier {
   /// 加载清单与计数。失败时记录 [error] 并原样抛出，由入口呈现，不静默吞掉。
   Future<void> load() async {
     try {
-      final SidebarSnapshot snap = await _listUseCase.loadSidebar();
+      final SidebarSnapshot snap = await _listUseCase.loadSidebar(now: _clock());
       lists = snap.lists;
       todayCount = snap.todayCount;
       next7Count = snap.next7Count;

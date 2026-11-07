@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:qingdan/domain/task.dart';
 import 'package:qingdan/domain/task_list.dart';
 import 'package:qingdan/domain/task_priority.dart';
+import 'package:qingdan/domain/task_schedule.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
@@ -37,6 +38,7 @@ class TaskRow extends StatelessWidget {
     this.onReorder,
     this.index = 0,
     this.lists = const <TaskList>[],
+    this.now,
   });
 
   final Task task;
@@ -60,17 +62,48 @@ class TaskRow extends StatelessWidget {
   final bool showDragHandle;
   final VoidCallback? onReorder;
 
+  /// 测试注入固定时钟；生产不传 = 当前时间。
+  final DateTime? now;
+
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
-    final (String? dueText, bool overdue) =
-        formatDueText(task.dueDate, completed: task.completed);
+    final ({String? text, bool overdue}) date =
+        taskDateLine(task, now ?? DateTime.now());
+    final bool hasTimeline = task.startDate != null || task.endDate != null;
+    final bool showSubtitle = hasTimeline && date.text != null;
+    final bool showInlineDue = !hasTimeline && date.text != null;
     final Color titleColor = restoreMode || task.completed
         ? colors.textSecondary
         : colors.textPrimary;
 
+    final Widget title = _AnimatedTitle(
+      text: task.title,
+      color: titleColor,
+      strike: task.completed && !restoreMode,
+    );
+    final Widget main = showSubtitle
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              title,
+              const SizedBox(height: 2),
+              Text(date.text!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.meta.copyWith(
+                      color: date.overdue
+                          ? colors.overdue
+                          : colors.textSecondary)),
+            ],
+          )
+        : title;
+
     final Widget row = SizedBox(
-      height: AppDimens.taskRowHeight,
+      height: showSubtitle
+          ? AppDimens.taskRowHeightTall
+          : AppDimens.taskRowHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppDimens.listPanePaddingH),
         child: Row(
@@ -121,17 +154,11 @@ class TaskRow extends StatelessWidget {
             ),
             // 来源圆点预留位（§2.1：标题前 6dp；M1 无事件/课表数据，恒空）。
             const SizedBox(width: 6),
-            Expanded(
-              child: _AnimatedTitle(
-                text: task.title,
-                color: titleColor,
-                strike: task.completed && !restoreMode,
-              ),
-            ),
+            Expanded(child: main),
             _MetaInfo(
               task: task,
-              dueText: dueText,
-              overdue: overdue,
+              dueText: showInlineDue ? date.text : null,
+              overdue: showInlineDue && date.overdue,
               subtaskProgress: subtaskProgress,
               tagCount: tagCount,
               colors: colors,

@@ -34,17 +34,17 @@ class ParsedDue {
   final String label;
 }
 
-final RegExp _datePattern = RegExp(
-  r'大后天|后天|明天|今天|今晚|明晚|明早|'
-  r'下下周[一二三四五六日天]|下周[一二三四五六日天]|'
-  r'(?:礼拜|周)[一二三四五六日天]|'
-  r'\d{1,2}月\d{1,2}日|\d{1,2}/\d{1,2}',
-);
+/// 日期/时刻短语的源码；`quick_add_parser.dart` 的标记语法复用同一份。
+const String kDatePhraseSource = r'大后天|后天|明天|今天|今晚|明晚|明早|'
+    r'下下周[一二三四五六日天]|下周[一二三四五六日天]|'
+    r'(?:礼拜|周)[一二三四五六日天]|'
+    r'\d{1,2}月\d{1,2}日|\d{1,2}/\d{1,2}';
 
-final RegExp _timePattern = RegExp(
-  r'(上午|早上|凌晨|中午|下午|晚上|傍晚)?\s*(\d{1,2})点(半)?'
-  r'|\s*(\d{1,2})[:：](\d{2})',
-);
+const String kTimePhraseSource = r'(上午|早上|凌晨|中午|下午|晚上|傍晚)?\s*'
+    r'(\d{1,2})点(半)?|\s*(\d{1,2})[:：](\d{2})';
+
+final RegExp _datePattern = RegExp(kDatePhraseSource);
+final RegExp _timePattern = RegExp(kTimePhraseSource);
 
 int _weekdayOf(String ch) => switch (ch) {
       '一' => DateTime.monday,
@@ -72,14 +72,15 @@ ParsedDue? parseDuePhrase(String input, DateTime now) {
   int defaultHour = 9;
   bool dateOnly = false;
   String label = '';
+  String dateToken = '';
 
   if (dateMatch == null) {
     baseDay = DateTime(now.year, now.month, now.day);
     dateOnly = true;
   } else {
-    final String token = dateMatch.group(0)!;
+    dateToken = dateMatch.group(0)!;
     (baseDay, defaultHour, label, dateOnly) =
-        _resolveDate(token, now, dateMatch.start);
+        _resolveDate(dateToken, now, dateMatch.start);
   }
 
   int hour = defaultHour;
@@ -92,6 +93,11 @@ ParsedDue? parseDuePhrase(String input, DateTime now) {
       hour = h;
       minute = m;
       hasExplicitTime = true;
+      // 「今晚8点」的日期词已经说明是晚上，裸 8 点应补成 20 点
+      // （`今晚`/`明晚` 单独出现时 defaultHour 已是 20，不会走到这里）。
+      if ((dateToken == '今晚' || dateToken == '明晚') && hour < 12) {
+        hour += 12;
+      }
     }
   }
 

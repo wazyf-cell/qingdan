@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:qingdan/domain/due_date_parser.dart';
+import 'package:qingdan/domain/quick_add_parser.dart';
+import 'package:qingdan/domain/task_schedule.dart';
 import 'package:qingdan/theme/app_colors.dart';
 import 'package:qingdan/theme/app_dimens.dart';
 import 'package:qingdan/theme/app_typography.dart';
@@ -26,7 +27,7 @@ class QuickAddField extends StatefulWidget {
 
 class _QuickAddFieldState extends State<QuickAddField> {
   final TextEditingController _controller = TextEditingController();
-  ParsedDue? _parsed;
+  ParsedQuickAdd? _parsed;
 
   @override
   void initState() {
@@ -43,18 +44,13 @@ class _QuickAddFieldState extends State<QuickAddField> {
 
   void _onChanged() {
     setState(() {
-      _parsed = parseDuePhrase(_controller.text, DateTime.now());
+      _parsed = parseQuickAdd(_controller.text, DateTime.now());
     });
   }
 
   /// 点 ✕：把日期短语从输入框剔除（剩余文本保留），任务落收集箱（§2.2）。
   void _clearDate() {
-    final ParsedDue p = _parsed!;
-    final String text = _controller.text;
-    final String rest =
-        (text.substring(0, p.start).trimRight() +
-                (p.end < text.length ? ' ${text.substring(p.end).trim()}' : ''))
-            .trim();
+    final String rest = _parsed!.title;
     _controller.value = TextEditingValue(
       text: rest,
       selection: TextSelection.collapsed(offset: rest.length),
@@ -65,28 +61,20 @@ class _QuickAddFieldState extends State<QuickAddField> {
   Future<void> _save() async {
     final String raw = _controller.text.trim();
     if (raw.isEmpty) return;
-    final ParsedDue? parsed = _parsed;
+    final ParsedQuickAdd? parsed = _parsed;
     _controller.clear();
 
     // 落点清单：M1 不解析 #清单，用当前视图（智能清单/收集箱落 null）。
     String? listId = widget.model.viewId;
     if (widget.model.isSmartView) listId = null;
 
-    // 标题 = 剔除日期短语后的剩余文本。
-    String title = raw;
-    if (parsed != null && parsed.end > parsed.start) {
-      final String stripped =
-          (raw.substring(0, parsed.start).trimRight() +
-                  (parsed.end < raw.length
-                      ? ' ${raw.substring(parsed.end).trim()}'
-                      : ''))
-              .trim();
-      if (stripped.isNotEmpty) title = stripped;
-    }
+    // 标题 = 剔除日期短语后的剩余文本；只剩日期时退回原文本（不建空标题）。
+    final String stripped = parsed?.title ?? raw;
     await widget.model.createQuickAdd(
-      title: title,
+      title: stripped.isEmpty ? raw : stripped,
       listId: listId,
-      dueDate: parsed?.due.toUtc(),
+      startDate: parsed?.start?.toUtc(),
+      dueDate: parsed?.due?.toUtc(),
     );
   }
 
@@ -143,14 +131,26 @@ class _QuickAddFieldState extends State<QuickAddField> {
 class _FeedbackRow extends StatelessWidget {
   const _FeedbackRow({required this.parsed, required this.onClearDate});
 
-  final ParsedDue? parsed;
+  final ParsedQuickAdd? parsed;
   final VoidCallback onClearDate;
+
+  String? _preview(ParsedQuickAdd p) {
+    final DateTime now = DateTime.now();
+    final DateTime? start = p.start;
+    final DateTime? due = p.due;
+    if (start != null && due != null) {
+      return '${dateText(start, now)} 开始 · 截止 ${dateText(due, now)}';
+    }
+    if (start != null) return '${dateText(start, now)} 开始';
+    return due == null ? null : dateText(due, now);
+  }
 
   @override
   Widget build(BuildContext context) {
     final AppColors colors = AppColors.of(context);
     final TaskPaneModel model = context.watch<TaskPaneModel>();
     final String target = model.currentViewName;
+    final String? preview = parsed == null ? null : _preview(parsed!);
     return Container(
       margin: const EdgeInsets.only(top: AppDimens.s4),
       height: AppDimens.syncSlotHeight,
@@ -165,16 +165,15 @@ class _FeedbackRow extends StatelessWidget {
         children: <Widget>[
           Icon(Icons.schedule,
               size: 14,
-              color: parsed != null ? colors.accent : colors.textFaint),
+              color: preview != null ? colors.accent : colors.textFaint),
           const SizedBox(width: AppDimens.s4),
           Expanded(
-            child: parsed != null
+            child: preview != null
                 ? Text.rich(
                     TextSpan(
                       children: <InlineSpan>[
                         TextSpan(
-                          text:
-                              '${parsed!.label} ${parsed!.due.hour.toString().padLeft(2, '0')}:${parsed!.due.minute.toString().padLeft(2, '0')}',
+                          text: preview,
                           style: AppTypography.meta
                               .copyWith(color: colors.accent),
                         ),
@@ -196,7 +195,7 @@ class _FeedbackRow extends StatelessWidget {
                     maxLines: 1,
                   ),
           ),
-          if (parsed != null)
+          if (preview != null)
             GestureDetector(
               onTap: onClearDate,
               child: Icon(Icons.close, size: 14, color: colors.textSecondary),
